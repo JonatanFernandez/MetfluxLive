@@ -1,0 +1,14 @@
+[
+ {
+  "slug": "human-gem",
+  "name": "Human-GEM",
+  "version": "2.1.1",
+  "description": "Generic genome-scale metabolic model of Homo sapiens"
+ },
+ {
+  "slug": "mouse-gem",
+  "name": "Mouse-GEM",
+  "version": "1.8.0",
+  "description": ""
+ }
+]

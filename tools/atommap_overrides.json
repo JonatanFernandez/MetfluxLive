@@ -1,0 +1,487 @@
+{
+ "_comment": "Hand-curated carbon transitions that override the automatic mapper. Atom indices follow the canonical SMILES in 'smiles'; a rule is skipped (with a warning) if the model's structure differs. Rules match any reaction containing the listed substrates and products, in any compartment and either direction.",
+ "rules": [
+  {
+   "name": "Transketolase (Xu5P + R5P -> GAP + S7P): C1-C2 ketol unit of Xu5P is transferred onto R5P",
+   "sub": [
+    "D-xylulose-5-phosphate",
+    "ribose-5-phosphate"
+   ],
+   "prod": [
+    "D-glyceraldehyde 3-phosphate",
+    "sedoheptulose-7-phosphate"
+   ],
+   "pairs": [
+    [
+     "D-xylulose-5-phosphate",
+     2,
+     "sedoheptulose-7-phosphate",
+     2
+    ],
+    [
+     "D-xylulose-5-phosphate",
+     1,
+     "sedoheptulose-7-phosphate",
+     1
+    ],
+    [
+     "D-xylulose-5-phosphate",
+     4,
+     "D-glyceraldehyde 3-phosphate",
+     1
+    ],
+    [
+     "D-xylulose-5-phosphate",
+     6,
+     "D-glyceraldehyde 3-phosphate",
+     2
+    ],
+    [
+     "D-xylulose-5-phosphate",
+     8,
+     "D-glyceraldehyde 3-phosphate",
+     4
+    ],
+    [
+     "ribose-5-phosphate",
+     1,
+     "sedoheptulose-7-phosphate",
+     4
+    ],
+    [
+     "ribose-5-phosphate",
+     2,
+     "sedoheptulose-7-phosphate",
+     6
+    ],
+    [
+     "ribose-5-phosphate",
+     4,
+     "sedoheptulose-7-phosphate",
+     8
+    ],
+    [
+     "ribose-5-phosphate",
+     6,
+     "sedoheptulose-7-phosphate",
+     10
+    ],
+    [
+     "ribose-5-phosphate",
+     8,
+     "sedoheptulose-7-phosphate",
+     12
+    ]
+   ],
+   "smiles": {
+    "D-glyceraldehyde 3-phosphate": "O=C[C@H](O)COP(=O)([O-])[O-]",
+    "D-xylulose-5-phosphate": "O=C(CO)[C@@H](O)[C@H](O)COP(=O)([O-])[O-]",
+    "sedoheptulose-7-phosphate": "O=C(CO)[C@@H](O)[C@H](O)[C@H](O)[C@H](O)COP(=O)([O-])[O-]",
+    "ribose-5-phosphate": "O=C[C@H](O)[C@H](O)[C@H](O)COP(=O)([O-])[O-]"
+   }
+  },
+  {
+   "name": "Transketolase (Xu5P + E4P -> F6P + GAP)",
+   "sub": [
+    "D-xylulose-5-phosphate",
+    "erythrose-4-phosphate"
+   ],
+   "prod": [
+    "fructose-6-phosphate",
+    "D-glyceraldehyde 3-phosphate"
+   ],
+   "pairs": [
+    [
+     "D-xylulose-5-phosphate",
+     2,
+     "fructose-6-phosphate",
+     2
+    ],
+    [
+     "D-xylulose-5-phosphate",
+     1,
+     "fructose-6-phosphate",
+     1
+    ],
+    [
+     "D-xylulose-5-phosphate",
+     4,
+     "D-glyceraldehyde 3-phosphate",
+     1
+    ],
+    [
+     "D-xylulose-5-phosphate",
+     6,
+     "D-glyceraldehyde 3-phosphate",
+     2
+    ],
+    [
+     "D-xylulose-5-phosphate",
+     8,
+     "D-glyceraldehyde 3-phosphate",
+     4
+    ],
+    [
+     "erythrose-4-phosphate",
+     1,
+     "fructose-6-phosphate",
+     4
+    ],
+    [
+     "erythrose-4-phosphate",
+     2,
+     "fructose-6-phosphate",
+     6
+    ],
+    [
+     "erythrose-4-phosphate",
+     4,
+     "fructose-6-phosphate",
+     8
+    ],
+    [
+     "erythrose-4-phosphate",
+     6,
+     "fructose-6-phosphate",
+     10
+    ]
+   ],
+   "smiles": {
+    "fructose-6-phosphate": "O=C(CO)[C@@H](O)[C@H](O)[C@H](O)COP(=O)([O-])[O-]",
+    "D-glyceraldehyde 3-phosphate": "O=C[C@H](O)COP(=O)([O-])[O-]",
+    "D-xylulose-5-phosphate": "O=C(CO)[C@@H](O)[C@H](O)COP(=O)([O-])[O-]",
+    "erythrose-4-phosphate": "O=C[C@H](O)[C@H](O)COP(=O)([O-])[O-]"
+   }
+  },
+  {
+   "name": "Transaldolase (S7P + GAP -> E4P + F6P): C1-C3 dihydroxyacetone unit of S7P is transferred onto GAP",
+   "sub": [
+    "D-glyceraldehyde 3-phosphate",
+    "sedoheptulose-7-phosphate"
+   ],
+   "prod": [
+    "erythrose-4-phosphate",
+    "fructose-6-phosphate"
+   ],
+   "pairs": [
+    [
+     "sedoheptulose-7-phosphate",
+     2,
+     "fructose-6-phosphate",
+     2
+    ],
+    [
+     "sedoheptulose-7-phosphate",
+     1,
+     "fructose-6-phosphate",
+     1
+    ],
+    [
+     "sedoheptulose-7-phosphate",
+     4,
+     "fructose-6-phosphate",
+     4
+    ],
+    [
+     "sedoheptulose-7-phosphate",
+     6,
+     "erythrose-4-phosphate",
+     1
+    ],
+    [
+     "sedoheptulose-7-phosphate",
+     8,
+     "erythrose-4-phosphate",
+     2
+    ],
+    [
+     "sedoheptulose-7-phosphate",
+     10,
+     "erythrose-4-phosphate",
+     4
+    ],
+    [
+     "sedoheptulose-7-phosphate",
+     12,
+     "erythrose-4-phosphate",
+     6
+    ],
+    [
+     "D-glyceraldehyde 3-phosphate",
+     1,
+     "fructose-6-phosphate",
+     6
+    ],
+    [
+     "D-glyceraldehyde 3-phosphate",
+     2,
+     "fructose-6-phosphate",
+     8
+    ],
+    [
+     "D-glyceraldehyde 3-phosphate",
+     4,
+     "fructose-6-phosphate",
+     10
+    ]
+   ],
+   "smiles": {
+    "fructose-6-phosphate": "O=C(CO)[C@@H](O)[C@H](O)[C@H](O)COP(=O)([O-])[O-]",
+    "D-glyceraldehyde 3-phosphate": "O=C[C@H](O)COP(=O)([O-])[O-]",
+    "erythrose-4-phosphate": "O=C[C@H](O)[C@H](O)COP(=O)([O-])[O-]",
+    "sedoheptulose-7-phosphate": "O=C(CO)[C@@H](O)[C@H](O)[C@H](O)[C@H](O)COP(=O)([O-])[O-]"
+   }
+  },
+  {
+   "name": "6-phosphogluconate dehydrogenase: C1 carboxyl leaves as CO2",
+   "sub": [
+    "6-phospho-D-gluconate"
+   ],
+   "prod": [
+    "ribulose-5-phosphate",
+    "CO2"
+   ],
+   "pairs": [
+    [
+     "6-phospho-D-gluconate",
+     1,
+     "CO2",
+     1
+    ],
+    [
+     "6-phospho-D-gluconate",
+     3,
+     "ribulose-5-phosphate",
+     2
+    ],
+    [
+     "6-phospho-D-gluconate",
+     5,
+     "ribulose-5-phosphate",
+     1
+    ],
+    [
+     "6-phospho-D-gluconate",
+     7,
+     "ribulose-5-phosphate",
+     4
+    ],
+    [
+     "6-phospho-D-gluconate",
+     9,
+     "ribulose-5-phosphate",
+     6
+    ],
+    [
+     "6-phospho-D-gluconate",
+     11,
+     "ribulose-5-phosphate",
+     8
+    ]
+   ],
+   "smiles": {
+    "ribulose-5-phosphate": "O=C(CO)[C@H](O)[C@H](O)COP(=O)([O-])[O-]",
+    "6-phospho-D-gluconate": "O=C([O-])[C@H](O)[C@@H](O)[C@H](O)[C@H](O)COP(=O)([O-])[O-]",
+    "CO2": "O=C=O"
+   }
+  },
+  {
+   "name": "Aconitase, hydration step: the alkene CH (oxaloacetate-derived arm) becomes the CH-OH of isocitrate",
+   "sub": [
+    "cis-aconitate"
+   ],
+   "prod": [
+    "isocitrate"
+   ],
+   "pairs": [
+    [
+     "cis-aconitate",
+     1,
+     "isocitrate",
+     10
+    ],
+    [
+     "cis-aconitate",
+     3,
+     "isocitrate",
+     8
+    ],
+    [
+     "cis-aconitate",
+     4,
+     "isocitrate",
+     4
+    ],
+    [
+     "cis-aconitate",
+     9,
+     "isocitrate",
+     5
+    ],
+    [
+     "cis-aconitate",
+     5,
+     "isocitrate",
+     3
+    ],
+    [
+     "cis-aconitate",
+     6,
+     "isocitrate",
+     1
+    ]
+   ],
+   "smiles": {
+    "isocitrate": "O=C([O-])CC(C(=O)[O-])C(O)C(=O)[O-]",
+    "cis-aconitate": "O=C([O-])/C=C(/CC(=O)[O-])C(=O)[O-]"
+   }
+  },
+  {
+   "name": "Aconitase, overall: the pro-R (oxaloacetate-derived) arm of citrate is hydroxylated; the acetyl-derived arm stays CH2-COOH",
+   "sub": [
+    "citrate"
+   ],
+   "prod": [
+    "isocitrate"
+   ],
+   "pairs": [
+    [
+     "citrate",
+     4,
+     "isocitrate",
+     4
+    ],
+    [
+     "citrate",
+     10,
+     "isocitrate",
+     5
+    ],
+    [
+     "citrate",
+     3,
+     "isocitrate",
+     8
+    ],
+    [
+     "citrate",
+     1,
+     "isocitrate",
+     10
+    ],
+    [
+     "citrate",
+     6,
+     "isocitrate",
+     3
+    ],
+    [
+     "citrate",
+     7,
+     "isocitrate",
+     1
+    ]
+   ],
+   "smiles": {
+    "citrate": "O=C([O-])CC(O)(CC(=O)[O-])C(=O)[O-]",
+    "isocitrate": "O=C([O-])CC(C(=O)[O-])C(O)C(=O)[O-]"
+   }
+  }
+ ],
+ "pairs": [
+  {
+   "name": "2-oxoglutarate <-> glutamate keep their carbon skeleton (transaminases, glutamate dehydrogenase); automatic mappers tend to pair the two amino acids instead",
+   "a": "AKG",
+   "b": "glutamate",
+   "atoms": [
+    [
+     5,
+     1
+    ],
+    [
+     7,
+     7
+    ],
+    [
+     4,
+     2
+    ],
+    [
+     3,
+     3
+    ],
+    [
+     1,
+     4
+    ],
+    [
+     8,
+     8
+    ],
+    [
+     9,
+     9
+    ],
+    [
+     0,
+     5
+    ],
+    [
+     2,
+     6
+    ]
+   ],
+   "smiles": {
+    "AKG": "O=C([O-])CCC(=O)C(=O)[O-]",
+    "glutamate": "[NH3+][C@@H](CCC(=O)[O-])C(=O)[O-]"
+   }
+  },
+  {
+   "name": "glutamine <-> glutamate keep their carbon skeleton (amidotransferases, glutaminase, glutamine synthetase); the amide N is left to the acceptor",
+   "a": "glutamine",
+   "b": "glutamate",
+   "atoms": [
+    [
+     1,
+     4
+    ],
+    [
+     2,
+     5
+    ],
+    [
+     3,
+     3
+    ],
+    [
+     4,
+     2
+    ],
+    [
+     5,
+     1
+    ],
+    [
+     6,
+     0
+    ],
+    [
+     7,
+     7
+    ],
+    [
+     8,
+     8
+    ],
+    [
+     9,
+     9
+    ]
+   ],
+   "smiles": {
+    "glutamine": "NC(=O)CC[C@H](N)C(=O)O",
+    "glutamate": "[NH3+][C@@H](CCC(=O)[O-])C(=O)[O-]"
+   }
+  }
+ ]
+}
