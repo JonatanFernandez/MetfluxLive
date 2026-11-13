@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MetfluxLive</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand"><span class="logo"></span>Metflux<b>Live</b></div>
+    <select id="modelSelect" data-i18n-title="h.model"></select>
+    <div class="search">
+      <input id="search" type="search" data-i18n-ph="h.search" autocomplete="off" spellcheck="false">
+      <div id="searchResults" class="dropdown" hidden></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="segmented" id="modeToggle" role="tablist" data-i18n-aria="h.modeAria">
+      <button data-mode="steady" class="on" data-i18n="h.steady"></button>
+      <button data-mode="dynamic" data-i18n="h.dynamic"></button>
+    </div>
+    <button id="methodsBtn" class="icon" data-i18n-title="h.methodsTitle">?</button>
+    <button id="runBtn" class="primary" data-i18n="h.run"></button>
+    <select id="langSel" data-i18n-title="h.lang"></select>
+  </header>
+
+  <main>
+    <aside id="left">
+      <section>
+        <h2><span data-i18n="h.medium"></span> <button id="resetMedium" class="link" data-i18n="h.reset" data-i18n-title="h.resetTitle"></button></h2>
+        <p class="hint" data-i18n-html="h.mediumHint"></p>
+        <div class="add">
+          <input id="addSupply" type="search" data-i18n-ph="h.addSupply" autocomplete="off" spellcheck="false">
+          <div id="addResults" class="dropdown" hidden></div>
+        </div>
+        <div id="tracerList"></div>
+        <div id="supplyList"></div>
+      </section>
+      <section>
+        <h2><span data-i18n="h.perturb"></span> <button id="clearPerturb" class="link" data-i18n="h.clearPerturb" hidden></button></h2>
+        <p class="hint" data-i18n="h.perturbHint"></p>
+        <div class="add">
+          <input id="addPerturb" type="search" data-i18n-ph="h.addPerturb" autocomplete="off" spellcheck="false">
+          <div id="perturbResults" class="dropdown" hidden></div>
+        </div>
+        <div id="perturbList"></div>
+      </section>
+      <section>
+        <h2 data-i18n="h.objective"></h2>
+        <div class="row">
+          <select id="objSense"><option value="max" data-i18n="h.max"></option><option value="min" data-i18n="h.min"></option></select>
+          <div class="add grow">
+            <input id="objInput" type="search" data-i18n-ph="h.objInput" autocomplete="off" spellcheck="false">
+            <div id="objResults" class="dropdown" hidden></div>
+          </div>
+        </div>
+        <div id="objCurrent" class="chip"></div>
+        <label class="check"><input id="pfba" type="checkbox" checked> <span data-i18n="h.pfba"></span></label>
+      </section>
+      <section id="dynSection" hidden>
+        <h2 data-i18n="h.dynParams"></h2>
+        <label class="field"><span class="t" data-i18n="h.dynHours"></span> <span><input id="dynHours" type="number" min="0.1" step="1" value="24"> h</span></label>
+        <label class="field"><span class="t" data-i18n="h.dynBiomass"></span> <span><input id="dynBiomass" type="number" min="0.001" step="0.1" value="0.5"> gDW/L</span></label>
+        <label class="field"><span class="t" data-i18n="h.dynPool"></span> <span><input id="dynPool" type="number" min="0.01" step="0.1" value="0.5"> µmol/gDW</span></label>
+        <p class="hint" data-i18n="h.dynHint"></p>
+      </section>
+    </aside>
+
+    <section id="stage">
+      <canvas id="map"></canvas>
+      <nav id="crumbs"></nav>
+      <div id="viewOpts">
+        <select id="groupSel" data-i18n-title="h.groupTitle">
+          <option value="pathway" data-i18n="group.pathway"></option>
+          <option value="cell" data-i18n="group.cell"></option>
+        </select>
+        <select id="filterSel" data-i18n-title="h.filterTitle">
+          <option value="all" data-i18n="filter.all"></option>
+          <option value="label" data-i18n="filter.label"></option>
+          <option value="delta" data-i18n="filter.delta"></option>
+        </select>
+        <label class="check" data-i18n-title="h.inactiveTitle"><input id="optInactive" type="checkbox" checked> <span data-i18n="h.inactive"></span></label>
+        <label class="check"><input id="optParticles" type="checkbox" checked> <span data-i18n="h.particles"></span></label>
+        <button id="fitBtn" class="icon" data-i18n-title="h.fit">⤢</button>
+      </div>
+      <div id="legend"></div>
+      <div id="timeline" hidden>
+        <button id="playBtn" class="icon">▶</button>
+        <input id="timeSlider" type="range" min="0" max="0" value="0">
+        <span id="timeLabel"></span>
+      </div>
+      <div id="listView" hidden></div>
+      <div id="emptyNote" data-i18n="empty.filter" hidden></div>
+      <div id="tooltip" hidden></div>
+      <div id="status"></div>
+    </section>
+
+    <aside id="right"><div id="details"></div></aside>
+  </main>
+
+  <dialog id="molDialog">
+    <form method="dialog">
+      <header><h3 id="molTitle"></h3><button class="icon" value="cancel" data-i18n-aria="h.close">✕</button></header>
+      <p class="hint" id="molHint"></p>
+      <div class="mol-tools">
+        <button type="button" data-act="allC" data-i18n="h.molAllC"></button>
+        <button type="button" data-act="allN" data-i18n="h.molAllN"></button>
+        <button type="button" data-act="clear" data-i18n="h.molClear"></button>
+        <span class="spacer"></span>
+        <label><span data-i18n="h.molFraction"></span> <input id="molFraction" type="range" min="1" max="100" value="100"> <output id="molFractionOut">100 %</output></label>
+      </div>
+      <div id="molCanvas"></div>
+      <footer><span id="molName"></span><span class="spacer"></span><button value="cancel" data-i18n="h.cancel"></button><button id="molApply" value="ok" class="primary" data-i18n="h.molApply"></button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="methodsDialog">
+    <form method="dialog">
+      <header><h3 data-i18n="h.methods"></h3><button class="icon" value="cancel" data-i18n-aria="h.close">✕</button></header>
+      <div class="methods">
+        <article data-i18n-html="methods.steady"></article>
+        <article data-i18n-html="methods.dynamic"></article>
+      </div>
+      <h4 data-i18n="methods.tracerH"></h4>
+      <p data-i18n="methods.tracer"></p>
+      <h4 data-i18n="methods.perturbH"></h4>
+      <p data-i18n-html="methods.perturb"></p>
+      <footer><span class="spacer"></span><button value="ok" class="primary" data-i18n="h.ok"></button></footer>
+    </form>
+  </dialog>
+
+  <div id="loading"><div class="box"><div class="spinner"></div><div id="loadingText">Cargando modelo…</div></div></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
