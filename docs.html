@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MetfluxLive · Docs</title>
+  <style>
+    :root { --bg: #0b1020; --panel: #111830; --panel2: #162040; --line: #243055; --text: #e8eefc; --muted: #93a2c6; --accent: #4cc9f0; --hot: #ffbe3c; color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 70px; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.65 Inter, "Segoe UI", system-ui, -apple-system, sans-serif; }
+    header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+    .brand { font-size: 17px; display: flex; align-items: center; gap: 8px; white-space: nowrap; } .brand b { color: var(--accent); }
+    .logo { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff, var(--accent) 45%, #5b7cfa 100%); }
+    .spacer { flex: 1; }
+    a { color: var(--accent); }
+    .btn, header button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; color: var(--text); text-decoration: none; font: inherit; font-size: 14px; cursor: pointer; }
+    header button.on { border-color: var(--accent); color: var(--accent); }
+    .wrap { display: grid; grid-template-columns: 250px minmax(0, 1fr); max-width: 1180px; margin: 0 auto; }
+    nav { position: sticky; top: 52px; align-self: start; max-height: calc(100vh - 52px); overflow: auto; padding: 22px 12px 22px 20px; font-size: 13.5px; }
+    nav a { display: block; padding: 4px 8px; border-radius: 6px; color: var(--muted); text-decoration: none; }
+    nav a:hover { color: var(--text); background: var(--panel); }
+    article { padding: 10px 28px 80px; min-width: 0; }
+    article[hidden] { display: none; }
+    h1 { font-size: 28px; margin: 26px 0 6px; }
+    h2 { font-size: 21px; margin: 46px 0 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+    h3 { font-size: 16px; margin: 26px 0 6px; }
+    p, li { max-width: 78ch; }
+    .lead { color: var(--muted); font-size: 16px; }
+    code { background: #0d142a; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+    .note { background: var(--panel); border-left: 3px solid var(--hot); border-radius: 6px; padding: 10px 14px; margin: 14px 0; max-width: 78ch; }
+    .note.tip { border-left-color: var(--accent); }
+    .tablebox { overflow-x: auto; margin: 12px 0; }
+    table { border-collapse: collapse; font-size: 14px; min-width: 520px; }
+    th, td { text-align: left; vertical-align: top; padding: 7px 12px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .5px; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .exp { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px 18px 12px; margin: 18px 0; }
+    .exp h3 { margin-top: 14px; } .exp ol { padding-left: 20px; } .exp .res { color: var(--muted); }
+    .formula { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #0d142a; border-radius: 8px; padding: 10px 14px; overflow-x: auto; font-size: 13.5px; }
+    kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; font-size: 12.5px; background: var(--panel2); }
+    @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } nav { display: none; } article { padding: 6px 16px 60px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="logo"></span>Metflux<b>Live</b> · Docs</div>
+    <div class="spacer"></div>
+    <button data-set="en">EN</button><button data-set="es">ES</button>
+    <a class="btn" href="index.html" id="back">← App</a>
+  </header>
+  <div class="wrap">
+    <nav id="toc"></nav>
+    <div>
+
+<!-- ============================================================ ENGLISH -->
+<article data-lang="en">
+<h1>MetfluxLive documentation</h1>
+<p class="lead">What the app computes, where its data come from, how to read the results, and a set of in-silico experiments to try.</p>
+
+<h2 id="en-what">1. What MetfluxLive is</h2>
+<p>MetfluxLive is a browser tool for exploring a whole-cell metabolic model. You choose a culture medium, the app predicts how fast every reaction of the cell runs (the <em>fluxes</em>), and draws them as an animated map. On top of that you can label atoms of a nutrient and watch where they end up, switch enzymes off, and follow the medium as it is consumed over time.</p>
+<p>Everything runs inside the browser: there is no server doing calculations and nothing you enter leaves your computer. Saved media and preferences are kept in the browser's local storage.</p>
+<div class="note">The numbers are <b>model predictions</b>, not measurements. They show what the network <em>can</em> do under the assumptions explained below. Use them to form hypotheses and design experiments, not as a substitute for them.</div>
+
+<h2 id="en-start">2. Quick start</h2>
+<ol>
+  <li>Open the app. It loads Human-GEM, the standard medium, and runs a first simulation.</li>
+  <li>The centre shows the cell: each bubble is a pathway inside a compartment; the bright moving lines are carbon flowing between them. Double-click a bubble to open its pathway map.</li>
+  <li>The left panel is the experiment: medium, knockouts and the objective. Change a concentration and the fluxes are recomputed.</li>
+  <li>The right panel explains whatever is selected: the summary, a metabolite, a reaction, a pathway or a gene.</li>
+  <li>Use the search box (<kbd>Ctrl</kbd>+<kbd>K</kbd>) to jump to any metabolite, reaction, enzyme or pathway.</li>
+</ol>
+
+<h2 id="en-ui">3. The interface</h2>
+<h3>Three ways to arrange the map</h3>
+<div class="tablebox"><table>
+  <tr><th>Group</th><th>What you see</th><th>Good for</th></tr>
+  <tr><td><b>Cell</b> (default)</td><td>Reactions grouped by compartment and pathway, laid out as a cell: cytosol, mitochondrion, ER, Golgi, lysosome, peroxisome, nucleus and the medium outside. Reactions that cross a membrane sit on it.</td><td>Seeing where things happen and what is transported.</td></tr>
+  <tr><td><b>Pathways</b></td><td>One bubble per pathway, placed so that pathways sharing metabolites are close.</td><td>An overview of which pathways are active.</td></tr>
+  <tr><td><b>Cascade</b></td><td>Pathways in rows, ordered by how many reaction steps separate them from the medium: nutrients at the top, distant products at the bottom. Inside a pathway the same idea gives a textbook-like top-to-bottom chain.</td><td>Reading metabolism as a flow from nutrients to products.</td></tr>
+</table></div>
+<h3>Reading the map</h3>
+<ul>
+  <li><b>Line width and particle speed</b> show flux on a logarithmic scale, so small fluxes stay visible.</li>
+  <li><b>In a pathway map</b>, circles are metabolites and diamonds are reactions. The ring colour of a metabolite is its compartment. Cofactors such as ATP or water are hidden to keep the map readable.</li>
+  <li><b>With a tracer</b>, colour changes from grey (unlabelled) through amber to magenta (fully labelled).</li>
+  <li><b>With a knockout</b>, choosing "Changed flux only" colours by increase (orange) or decrease (blue) against the unperturbed cell; a red ring marks the perturbed reactions.</li>
+</ul>
+<h3>Other controls</h3>
+<ul>
+  <li><b>Show</b>: everything, only what carries label, or only what changed after a knockout.</li>
+  <li><b>Panels</b>: drag the border between a side panel and the map to resize it; double-click the border to restore it. The sections of the left panel fold when you click their title.</li>
+  <li><b>Language</b>: English or Spanish (top right). Names of metabolites, reactions and pathways come from the model and stay in English.</li>
+  <li><b>Download</b>: exports tables, charts and the map (see <a href="#en-download">section 11</a>).</li>
+</ul>
+
+<h2 id="en-data">4. Data sources</h2>
+<div class="tablebox"><table>
+  <tr><th>What</th><th>Source</th><th>Used for</th></tr>
+  <tr><td>Human-GEM 2.1.1</td><td><a href="https://github.com/SysBioChalmers/Human-GEM" target="_blank" rel="noopener">SysBioChalmers/Human-GEM</a>; Robinson et al., <i>Sci. Signal.</i> 2020</td><td>The human network: 12,748 reactions, 8,374 metabolites (one per compartment), 2,870 genes, 146 pathways, plus gene–reaction rules and metabolite structures.</td></tr>
+  <tr><td>Mouse-GEM 1.8.0</td><td><a href="https://github.com/SysBioChalmers/Mouse-GEM" target="_blank" rel="noopener">SysBioChalmers/Mouse-GEM</a>; Wang et al., <i>PNAS</i> 2021</td><td>The mouse network. It shares identifiers with Human-GEM, so structures are reused.</td></tr>
+  <tr><td>Atom-to-atom maps</td><td>Computed for this app with <a href="https://github.com/rxn4chemistry/rxnmapper" target="_blank" rel="noopener">RXNMapper</a> (Schwaller et al., <i>Sci. Adv.</i> 2021) and RDKit, plus hand-curated corrections for central metabolism</td><td>Following individual atoms through each reaction.</td></tr>
+  <tr><td>Plasmax and HPLM</td><td>Table S1 of <a href="https://pubmed.ncbi.nlm.nih.gov/30613774/" target="_blank" rel="noopener">Vande Voorde et al., <i>Sci. Adv.</i> 2019</a>; HPLM originally from Cantor et al., <i>Cell</i> 2017</td><td>Physiological media.</td></tr>
+  <tr><td>Standard medium</td><td>Loosely follows DMEM / Ham's F-12</td><td>Default medium.</td></tr>
+  <tr><td>Uptake kinetics (V<sub>max</sub>, K<sub>m</sub>)</td><td>Order-of-magnitude values for cultured mammalian cells, set by hand</td><td>Turning concentrations into maximum uptake rates. <b>Not measured values.</b></td></tr>
+  <tr><td>Linear solver</td><td><a href="https://highs.dev" target="_blank" rel="noopener">HiGHS</a>, compiled to WebAssembly</td><td>Solving the flux balance problem.</td></tr>
+</table></div>
+<p>The models are converted once, offline, into the JSON files in <code>data/</code>; the app itself needs only those files.</p>
+<h3>How good are the atom maps?</h3>
+<p>Of the 11,094 reactions of Human-GEM that are not simple exchanges, 10,551 have an atom map:</p>
+<div class="tablebox"><table>
+  <tr><th>Method</th><th>Reactions</th><th>Reliability</th></tr>
+  <tr><td>Identity (the same molecule on both sides: transport)</td><td class="num">4,144</td><td>Exact.</td></tr>
+  <tr><td>RXNMapper</td><td class="num">5,224</td><td>Usually right; a confidence score is shown in the reaction panel.</td></tr>
+  <tr><td>Largest common substructure</td><td class="num">1,138</td><td>Lower: used for generic "R-group" reactions and very large molecules.</td></tr>
+  <tr><td>Partial</td><td class="num">45</td><td>Only some atoms are mapped.</td></tr>
+</table></div>
+<p>Transketolase, transaldolase, 6-phosphogluconate dehydrogenase, aconitase and the transaminases were checked and corrected by hand. Where no map exists, label is spread evenly over the products and the metabolite is drawn with a dashed outline.</p>
+
+<h2 id="en-fba">5. Flux balance analysis, in plain words</h2>
+<p>A cell runs thousands of reactions at once. We rarely know the speed of each one, but we do know two solid things: the <b>recipe</b> of every reaction (what it consumes and what it makes), and the fact that a cell cannot create or destroy matter.</p>
+<p>Flux balance analysis (FBA) builds on that. Think of the cell as a city's water network:</p>
+<ul>
+  <li><b>Pipes are reactions</b>; the flow through a pipe is the flux, in millimoles per gram of dry cell weight per hour (mmol/gDW/h).</li>
+  <li><b>Junctions are metabolites.</b> At every junction, what flows in must equal what flows out: nothing piles up and nothing appears from nowhere. This is the <em>steady-state</em> assumption.</li>
+  <li><b>Some pipes are one-way</b>, and each has a maximum capacity. The pipes that bring nutrients in from the medium are limited by what the medium offers.</li>
+</ul>
+<p>Those rules leave many possible flow patterns. To choose one, FBA assumes the cell is <em>trying to achieve something</em> — by default, to grow as fast as possible — and finds the pattern that does it best. "Growing" is itself a reaction, the <b>biomass reaction</b>, which consumes amino acids, nucleotides, lipids and energy in the proportions a new cell needs.</p>
+<div class="formula">maximise  v<sub>biomass</sub><br>subject to  S · v = 0   (every metabolite is balanced)<br>           lower<sub>j</sub> ≤ v<sub>j</sub> ≤ upper<sub>j</sub>   (direction and capacity of every reaction)</div>
+<p>This is a linear programme, which a computer solves exactly in a few seconds even for 12,748 reactions.</p>
+<h3>What FBA can and cannot tell you</h3>
+<ul>
+  <li>It needs <b>no enzyme kinetics</b>, which is why it works for a whole cell. For the same reason it knows nothing about enzyme amounts, regulation or metabolite concentrations inside the cell.</li>
+  <li>The best growth rate is unique, but <b>the fluxes that achieve it often are not</b>: there may be several equally good routes. The app therefore applies <b>parsimonious FBA</b> (pFBA) by default: among all the best solutions it takes the one with the smallest total flux, on the idea that cells avoid making enzyme they do not need. This also removes pointless internal loops.</li>
+  <li>The objective is a hypothesis. Growth is reasonable for proliferating cells in culture; it is a poor description of a resting neuron or hepatocyte. You can pick any reaction as the objective (see the experiments).</li>
+</ul>
+
+<h2 id="en-modes">6. Steady state versus Dynamic</h2>
+<div class="tablebox"><table>
+  <tr><th></th><th>Steady state</th><th>Dynamic</th></tr>
+  <tr><td>Question</td><td>"With this medium, what does the cell do?"</td><td>"What happens over the next hours as the medium is used up?"</td></tr>
+  <tr><td>Medium</td><td>Constant: concentrations do not change.</td><td>Finite: every uptake lowers the concentration, every secretion raises it.</td></tr>
+  <tr><td>Fluxes</td><td>One FBA solution.</td><td>FBA is solved again each time a nutrient runs low enough to change what the cell can take up.</td></tr>
+  <tr><td>Biomass</td><td>Not tracked.</td><td>Grows exponentially at the current growth rate.</td></tr>
+  <tr><td>Label</td><td>Final (isotopic steady state): every pool has reached its ultimate enrichment.</td><td>Fills the intracellular pools gradually, so you see label arrive first in glycolysis and later in distant products.</td></tr>
+  <tr><td>Time needed</td><td>A few seconds.</td><td>Around half a minute; twice that with a knockout, because the unperturbed cell is simulated too.</td></tr>
+</table></div>
+<h3>How the dynamic mode works</h3>
+<ol>
+  <li>Time runs from 10 seconds to the chosen duration in 30 steps, spaced logarithmically (short steps first, when label changes fastest).</li>
+  <li>At each step the maximum uptake of every nutrient is recomputed from its current concentration, and can never exceed what is physically left in the medium.</li>
+  <li>If a limit that was actually constraining the cell has moved by more than about 8 %, FBA is solved again; otherwise the previous fluxes are kept.</li>
+  <li>Concentrations are updated: <code>ΔC = −uptake × biomass × Δt</code>. Oxygen is held constant, as gas exchange replenishes it.</li>
+  <li>Biomass grows: <code>X ← X · exp(growth rate × Δt)</code>.</li>
+  <li>Label is advanced by one implicit step in every metabolite pool.</li>
+</ol>
+<p>Three numbers control it: the duration, the initial biomass (gDW per litre of medium: more cells deplete the medium sooner) and the intracellular pool size (how much of each metabolite the cell holds, which sets how fast label fills it).</p>
+<div class="note">The dynamic mode is an approximation ("dynamic FBA"). All intracellular pools are given the same size, which is not true in real cells: read labelling <em>times</em> as indicative, and the <em>order</em> in which things get labelled as the informative part.</div>
+
+<h2 id="en-medium">7. The medium</h2>
+<p>A stoichiometric model has no concentrations, only limits on uptake. The app converts each concentration into a maximum uptake rate with a saturating rule:</p>
+<div class="formula">maximum uptake = V<sub>max</sub> · C / (K<sub>m</sub> + C)</div>
+<p>So doubling a low concentration roughly doubles what the cell may take, while doubling an already saturating one changes little. Hover a concentration box to see the resulting limit. The cell does not have to use the whole allowance: FBA takes what serves the objective.</p>
+<ul>
+  <li><b>Built-in media</b>: Standard (rich, DMEM/F-12-like), Plasmax and HPLM (physiological concentrations).</li>
+  <li><b>Your own</b>: edit, add or remove components, then "save…" to keep the medium under a name in this browser.</li>
+  <li><b>Unlimited components</b>: water, protons, phosphate and the bulk salts are never limiting.</li>
+  <li><b>Injections</b>: you can add a metabolite that is not extracellular (for example cytosolic citrate). It is then supplied directly inside that compartment — an experiment that only a model allows.</li>
+</ul>
+<p>For Plasmax and HPLM, components that the models do not contain (selenite, manganese, vanadate, nitrate, p-aminobenzoate, methyl acetoacetate, phenol red) are left out. Essential fatty acids and fat-soluble vitamins, which in the real media come from serum, are added at the standard medium's values.</p>
+
+<h2 id="en-tracing">8. Isotope tracing</h2>
+<p>Press <b>⚛</b> next to a medium component to open the molecule editor, click the atoms to label (<sup>13</sup>C, <sup>15</sup>N, <sup>18</sup>O or <sup>34</sup>S) and choose which fraction of the molecules carries the label.</p>
+<h3>Positional enrichment</h3>
+<p>For each atom of each metabolite the app computes its <b>enrichment</b>: the fraction of molecules in which that atom is the heavy isotope. An atom inherits its enrichment from the atoms it was made from, weighted by flux:</p>
+<div class="formula">enrichment of an atom = Σ (flux of each producing reaction × enrichment of the source atom) / Σ flux</div>
+<p>This is solved exactly for the whole network, cycles included (the TCA cycle feeds label back into itself). Select a metabolite to see its structure coloured atom by atom.</p>
+<h3>Isotopologues (M+0, M+1, M+2 …)</h3>
+<p>A mass spectrometer does not see positions: it counts how many heavy atoms each molecule carries. M+0 is the unlabelled molecule, M+3 a molecule with three heavy atoms. This distribution cannot be deduced from positional enrichment alone. Fully labelled glucose gives pyruvate that is either M+3 or M+0, never a random mix of labelled positions.</p>
+<p>The app therefore traces <b>whole molecules backwards</b>. To build one molecule of the selected metabolite it picks one of the reactions that make it (in proportion to flux), finds which substrate molecule each atom came from, and repeats for those substrates until it reaches the medium, where the label is known. Atoms that came from the same substrate molecule stay together, which is what keeps the pattern right. Doing this for 2,000 molecules gives the distribution shown in the metabolite panel.</p>
+<ul>
+  <li>Available in steady-state mode with a tracer.</li>
+  <li><b>Without a tracer</b> the panel shows the distribution expected from natural isotope abundance (<sup>13</sup>C 1.07 %, <sup>15</sup>N 0.36 %, <sup>18</sup>O 0.2 %, <sup>34</sup>S 4.25 %, <sup>2</sup>H 0.01 % …), computed exactly from the formula. This is the background any measurement starts from.</li>
+  <li>With a tracer, natural isotope abundance is <b>not</b> added on top: compare with measurements that have been corrected for it.</li>
+  <li>Being a random sample of 2,000 molecules, each bar has an uncertainty of roughly ±1 percentage point.</li>
+  <li>If part of the atoms went through reactions without an atom map, the panel says so and the distribution is approximate.</li>
+  <li><sup>18</sup>O and <sup>34</sup>S add two mass units per atom, <sup>13</sup>C and <sup>15</sup>N one.</li>
+</ul>
+<h3>Where the label ends up</h3>
+<p>With a tracer, the summary shows what share of the labelled atoms leaves the cell in each product (CO<sub>2</sub>, lactate, biomass …).</p>
+
+<h2 id="en-ko">9. Knockout and knockdown</h2>
+<p>Add a gene or a reaction in the "Knockout / knockdown" section and set its residual activity: 0 % is a knockout, anything in between a knockdown.</p>
+<ul>
+  <li><b>Genes act through gene–protein–reaction rules.</b> If a reaction needs <code>A and B</code> (a complex), losing either stops it. If it needs <code>A or B</code> (isoenzymes), losing one changes nothing. The list shows, for example, "2/7": two of the seven reactions that mention the gene actually depend on it. A struck-through gene has no effect at all.</li>
+  <li><b>The reference.</b> Every perturbed simulation is compared with the same simulation without the perturbation, computed automatically.</li>
+  <li><b>A knockdown</b> limits the reaction to that fraction of its reference flux. A reaction that carried no flux in the reference is not constrained by a partial knockdown.</li>
+  <li><b>"Changed" means</b> a flux that differs from the reference by more than 2 %.</li>
+</ul>
+<div class="note">FBA assumes the cell reroutes perfectly and instantly. A knockout that is harmless in the model means "an alternative route exists in the network", not "the cell will not notice". Conversely, a knockout that stops growth in the model points to a reaction with no bypass.</div>
+
+<h2 id="en-cascade">10. The cascade order</h2>
+<p>Each metabolite gets a <b>depth</b>: the smallest number of reaction steps needed to reach it from the metabolites of the current medium. Medium components are at 0; glucose inside the cell is at 1; glucose 6-phosphate at 2; and so on. Reaction directions follow the model, not the simulated fluxes, so the order does not jump when you change a concentration — only when you add or remove a medium component.</p>
+<ul>
+  <li>Cofactors (ATP, NAD, water, CoA …) are ignored, otherwise everything would be one step from everything.</li>
+  <li>The metabolite panel shows the depth and its position on a 0–100 scale.</li>
+  <li>With a rich medium most of central metabolism is only two to four steps away, because amino acids enter it directly. Remove components to stretch the cascade.</li>
+  <li>Inside a pathway map the rows count steps <em>within that pathway</em>, starting from its metabolites closest to the medium. That is what gives glycolysis its familiar glucose-to-pyruvate ladder.</li>
+  <li>Cycles cannot be drawn without some arrows pointing up; that is expected.</li>
+</ul>
+
+<h2 id="en-experiments">11. In-silico experiments</h2>
+<p>Each example gives the steps and what we obtained with Human-GEM, the standard medium and pFBA on. Your numbers should match closely.</p>
+
+<div class="exp">
+<h3>A. Knock out an enzyme</h3>
+<ol>
+  <li>In "Knockout / knockdown", type <code>ASNS</code> (asparagine synthetase) and pick the gene.</li>
+  <li>Set "Show" to "Changed flux only".</li>
+</ol>
+<p class="res"><b>Result.</b> Growth falls from 0.0370 to 0.0249 h⁻¹ (−33 %): the cell can no longer make asparagine and depends on the limited uptake from the medium. Raise asparagine in the medium and growth recovers.</p>
+<p class="res"><b>Compare with:</b> <code>PDHB</code> (pyruvate dehydrogenase): growth unchanged, but about 160 reactions are rerouted. <code>FASN</code>, <code>HMGCR</code> or <code>CAD</code>: growth stops, there is no bypass. <code>GAPDH</code>: no effect, because the model has an isoenzyme (GAPDHS).</p>
+</div>
+
+<div class="exp">
+<h3>B. Knock out a transporter</h3>
+<ol>
+  <li>Knock out the gene <code>SLC2A1</code> (GLUT1). The list shows 2/7: only two of its seven reactions depend on it alone.</li>
+  <li>Now remove it and knock out the reaction <code>MAR05029</code> (facilitated glucose transport, catalysed by all GLUT isoforms).</li>
+</ol>
+<p class="res"><b>Result.</b> In both cases growth is unchanged and glucose uptake continues (0.046 mmol/gDW/h): the model still has other glucose transport reactions, such as the sodium-coupled symporters. To really starve the cell of glucose, set its concentration to 0.</p>
+<p class="res"><b>Lesson.</b> A generic model contains every transporter of the organism. A real cell line expresses only a few.</p>
+</div>
+
+<div class="exp">
+<h3>C. Trace <sup>13</sup>C from glucose and read the isotopologues</h3>
+<ol>
+  <li>Press ⚛ next to glucose, click "All C", apply.</li>
+  <li>Search for <code>pyruvate</code>, then <code>citrate</code>, and look at "Isotopologues" in the right panel. Use the compartment tabs to compare cytosol and mitochondrion.</li>
+</ol>
+<p class="res"><b>Result.</b> Mitochondrial pyruvate: about 70 % M+0 and 24 % M+3 — whole labelled three-carbon units from glucose, diluted by unlabelled pyruvate made from amino acids. Citrate: about 73 % M+0, 20 % M+2 and 6 % M+1. M+2 is the signature of labelled acetyl-CoA entering the TCA cycle.</p>
+<p class="res"><b>Variation.</b> Label glutamine instead ("All C"): glutamate is mostly M+5 (about 76 %), and citrate shows M+4 (about 36 %, oxidative TCA cycle) next to a smaller M+5 (about 6 %, reductive carboxylation).</p>
+</div>
+
+<div class="exp">
+<h3>D. Trace nitrogen</h3>
+<ol>
+  <li>Press ⚛ next to glutamine, click "All N", apply.</li>
+  <li>Set "Show" to "Labelled only" and switch to the cell view.</li>
+</ol>
+<p class="res"><b>Result.</b> Label appears in glutamate, aspartate, alanine and the nucleotides, showing which pathways take their nitrogen from glutamine. Transaminases are less well atom-mapped than carbon chemistry, so check the "approximate" notice in the isotopologue panel.</p>
+</div>
+
+<div class="exp">
+<h3>E. Watch the medium run out</h3>
+<ol>
+  <li>Switch to "Dynamic". Keep 24 h and 0.5 gDW/L.</li>
+  <li>When it finishes, drag the time slider and look at "Medium over time" in the summary.</li>
+</ol>
+<p class="res"><b>Result.</b> Biomass doubles (0.50 → 1.07 gDW/L). Choline is exhausted after about 13 h, serine and alanine by 24 h. Growth slows from 0.0370 to 0.0260 h⁻¹ as they run low. Glucose barely moves (5.5 → 4.8 mM) and glutamine falls from 2 to 0.65 mM. FBA was solved 8 times.</p>
+<p class="res"><b>Variation.</b> Raise the initial biomass to 2 gDW/L to see depletion within a few hours, or switch to Plasmax, where physiological concentrations run out much sooner.</p>
+</div>
+
+<div class="exp">
+<h3>F. Maximise an antioxidant: glutathione</h3>
+<ol>
+  <li>In "Cellular objective", search <code>MAR09351</code> ("Exchange of GSH") and keep "Maximise".</li>
+  <li>Read the objective value and the uptake list.</li>
+  <li>Raise cystine, then cysteine, to 1 mM.</li>
+</ol>
+<p class="res"><b>Result.</b> The cell can export at most 0.0200 mmol/gDW/h of glutathione. The uptake list shows why: sulfur is limiting (cysteine, methionine and cystine are all taken up at their maximum). With 1 mM cystine the maximum rises to 0.0224, and with 1 mM cysteine as well to 0.0248.</p>
+<p class="res"><b>Pitfall.</b> If you maximise the <em>synthesis</em> reaction instead (<code>MAR04326</code>), you get 6.6 mmol/gDW/h: the model makes and degrades glutathione in a loop, burning ATP. To ask "how much can the cell produce", maximise the export of the product, not an internal reaction.</p>
+<p class="res"><b>Note.</b> Growth is no longer the objective, so the cell does not grow in this simulation. The same approach works for other products, for example urate or taurine: search for "Exchange of …".</p>
+</div>
+
+<div class="exp">
+<h3>G. Low oxygen</h3>
+<ol>
+  <li>Set O<sub>2</sub> from 0.2 to 0.0003 mM.</li>
+</ol>
+<p class="res"><b>Result.</b> Growth falls from 0.0370 to 0.0309 h⁻¹ and glucose uptake rises tenfold, to its ceiling (0.046 → 0.47 mmol/gDW/h): the cell turns to fermentation. The model excretes <b>succinate</b> rather than lactate. Both dispose of excess reducing power, and FBA has no reason to prefer the one real cells use. With no oxygen at all the model cannot grow, because some biomass components need O<sub>2</sub> to be made.</p>
+</div>
+
+<div class="exp">
+<h3>H. Compare media</h3>
+<ol>
+  <li>Switch the medium selector between Standard, Plasmax and HPLM.</li>
+</ol>
+<p class="res"><b>Result.</b> Growth: 0.0370, 0.0238 and 0.0152 h⁻¹. The differences come from the lower, physiological amino acid levels — and depend on the assumed uptake kinetics, so read them as a ranking rather than as absolute values.</p>
+</div>
+
+<div class="exp">
+<h3>I. Remove glutamine</h3>
+<ol>
+  <li>Set glutamine to 0.</li>
+</ol>
+<p class="res"><b>Result.</b> Growth stays at 0.0370 h⁻¹; glucose uptake more than doubles (0.046 → 0.108). The network can make everything it needs without glutamine. Many cultured cells cannot — a reminder that FBA shows capability, not regulation.</p>
+</div>
+
+<h3>More ideas</h3>
+<ul>
+  <li><b>Titrate a knockdown</b>: add <code>ATP5F1A</code> (ATP synthase; the knockout costs 11 % of growth) and move the slider from 100 % to 0 %.</li>
+  <li><b>Find essential nutrients</b>: remove medium components one at a time and see which ones stop growth.</li>
+  <li><b>Positional tracers</b>: label only carbon 1 of glucose and see how much of it is lost as CO<sub>2</sub> in the pentose phosphate pathway.</li>
+  <li><b>Feed an intermediate</b>: inject cytosolic citrate or mitochondrial succinate and see what the cell does with it.</li>
+  <li><b>Combine</b>: a tracer plus a knockout shows how label is rerouted.</li>
+</ul>
+
+<h2 id="en-download">12. Downloading results</h2>
+<p>"Download" opens a list of everything the current result can provide. Tick what you want; you get one <code>.zip</code> with a <code>README.txt</code> describing each file. Tables are CSV (open them in any spreadsheet), charts are SVG (vector, editable), and the map is a PNG of what is on screen.</p>
+<div class="tablebox"><table>
+  <tr><th>File</th><th>Content</th><th>Available</th></tr>
+  <tr><td><code>fluxes.csv</code></td><td>Every reaction: flux, bounds, pathway, equation, genes, EC numbers; reference flux and change when there is a perturbation.</td><td>Always</td></tr>
+  <tr><td><code>exchange_fluxes.csv</code></td><td>Uptake and secretion of every exchanged metabolite, with its concentration and kinetic parameters.</td><td>Always</td></tr>
+  <tr><td><code>pathways.csv</code></td><td>Per pathway: reactions, active reactions, total flux, enrichment.</td><td>Always</td></tr>
+  <tr><td><code>metabolites.csv</code></td><td>Per metabolite: turnover, cascade depth, mean enrichment.</td><td>Always</td></tr>
+  <tr><td><code>flux_changes_vs_reference.csv</code></td><td>Reactions that changed by more than 2 %.</td><td>Knockout / knockdown</td></tr>
+  <tr><td><code>atom_enrichment.csv</code></td><td>Enrichment of every labelled atom.</td><td>Tracer</td></tr>
+  <tr><td><code>isotopologues.csv</code></td><td>M+0, M+1 … of the 150 busiest labelled metabolites.</td><td>Tracer, steady state</td></tr>
+  <tr><td><code>timecourse.csv</code>, <code>timecourse_enrichment.csv</code></td><td>Biomass, growth, medium concentrations, exchange fluxes and enrichment at every time point.</td><td>Dynamic</td></tr>
+  <tr><td><code>chart_*.svg</code></td><td>Uptake, secretion, pathway activity, most changed reactions, label fate, isotopologues, medium depletion, biomass.</td><td>As above</td></tr>
+  <tr><td><code>map.png</code></td><td>The map as shown.</td><td>Map views</td></tr>
+  <tr><td><code>settings.json</code></td><td>Model, medium, objective, tracers and perturbations: what you need to repeat the run.</td><td>Always</td></tr>
+</table></div>
+<p>In dynamic mode the per-reaction tables refer to the time point selected on the slider.</p>
+
+<h2 id="en-limits">13. Limitations</h2>
+<ul>
+  <li><b>No kinetics or regulation.</b> Concentrations only set uptake limits. Enzyme levels, allostery and signalling are absent.</li>
+  <li><b>A generic cell.</b> Human-GEM contains every reaction known in any human tissue. A specific cell type expresses a subset; the app does not yet build tissue-specific models.</li>
+  <li><b>Alternative optima.</b> Several flux patterns can give the same growth. pFBA picks one; small "changes" after a knockout can be an equally good alternative rather than a real effect.</li>
+  <li><b>Uptake kinetics are rough estimates.</b> Absolute growth rates and differences between media depend on them.</li>
+  <li><b>Net fluxes only.</b> Reversible reactions exchange label in both directions in reality; the model sees only the net flow, which can underestimate label scrambling.</li>
+  <li><b>Atom maps are computed</b>, not all curated. Uncertain positions are flagged.</li>
+  <li><b>No hydrogen tracing</b> (<sup>2</sup>H) and no natural-abundance correction.</li>
+  <li><b>Dynamic mode</b> assumes one pool size for all intracellular metabolites.</li>
+  <li><b>Mouse-GEM 1.8.0</b> ships with an objective (<code>MAR00021</code>) on a different scale from the human biomass reaction, so its absolute growth is very low with the default medium. You can choose another objective.</li>
+</ul>
+
+<h2 id="en-glossary">14. Glossary</h2>
+<div class="tablebox"><table>
+  <tr><td><b>Flux</b></td><td>Rate of a reaction, in mmol per gram dry weight per hour.</td></tr>
+  <tr><td><b>GEM</b></td><td>Genome-scale metabolic model: all known metabolic reactions of an organism, linked to its genes.</td></tr>
+  <tr><td><b>FBA / pFBA</b></td><td>Flux balance analysis / its parsimonious variant (least total flux).</td></tr>
+  <tr><td><b>Objective</b></td><td>The reaction whose flux is maximised or minimised.</td></tr>
+  <tr><td><b>Biomass reaction</b></td><td>A pseudo-reaction that consumes cell components in the proportions needed to make new cell mass.</td></tr>
+  <tr><td><b>Exchange reaction</b></td><td>The entry or exit of a metabolite between the medium and the outside of the model.</td></tr>
+  <tr><td><b>GPR rule</b></td><td>Gene–protein–reaction rule: which genes a reaction needs.</td></tr>
+  <tr><td><b>Enrichment</b></td><td>Fraction of an atom position occupied by the heavy isotope.</td></tr>
+  <tr><td><b>Isotopologue</b></td><td>Molecules differing only in their number of heavy atoms (M+0, M+1 …).</td></tr>
+  <tr><td><b>Turnover</b></td><td>Total rate at which a metabolite is produced.</td></tr>
+  <tr><td><b>gDW</b></td><td>Gram of dry cell weight.</td></tr>
+</table></div>
+
+<h2 id="en-refs">15. References</h2>
+<ul>
+  <li>Orth JD, Thiele I, Palsson BØ. What is flux balance analysis? <i>Nat. Biotechnol.</i> 2010; 28:245–248. <a href="https://doi.org/10.1038/nbt.1614" target="_blank" rel="noopener">doi:10.1038/nbt.1614</a></li>
+  <li>Lewis NE et al. Omic data from evolved <i>E. coli</i> are consistent with computed optimal growth from genome-scale models. <i>Mol. Syst. Biol.</i> 2010; 6:390 (parsimonious FBA). <a href="https://doi.org/10.1038/msb.2010.47" target="_blank" rel="noopener">doi:10.1038/msb.2010.47</a></li>
+  <li>Mahadevan R, Edwards JS, Doyle FJ. Dynamic flux balance analysis of diauxic growth in <i>Escherichia coli</i>. <i>Biophys. J.</i> 2002; 83:1331–1340. <a href="https://doi.org/10.1016/S0006-3495(02)73903-9" target="_blank" rel="noopener">doi:10.1016/S0006-3495(02)73903-9</a></li>
+  <li>Robinson JL et al. An atlas of human metabolism. <i>Sci. Signal.</i> 2020; 13:eaaz1482 (Human-GEM). <a href="https://doi.org/10.1126/scisignal.aaz1482" target="_blank" rel="noopener">doi:10.1126/scisignal.aaz1482</a></li>
+  <li>Wang H et al. Genome-scale metabolic network reconstruction of model animals as a platform for translational research. <i>PNAS</i> 2021; 118:e2102344118 (Mouse-GEM). <a href="https://doi.org/10.1073/pnas.2102344118" target="_blank" rel="noopener">doi:10.1073/pnas.2102344118</a></li>
+  <li>Schwaller P et al. Extraction of organic chemistry grammar from unsupervised learning of chemical reactions. <i>Sci. Adv.</i> 2021; 7:eabe4166 (RXNMapper). <a href="https://doi.org/10.1126/sciadv.abe4166" target="_blank" rel="noopener">doi:10.1126/sciadv.abe4166</a></li>
+  <li>Vande Voorde J et al. Improving the metabolic fidelity of cancer models with a physiological cell culture medium. <i>Sci. Adv.</i> 2019; 5:eaau7314 (Plasmax). <a href="https://doi.org/10.1126/sciadv.aau7314" target="_blank" rel="noopener">doi:10.1126/sciadv.aau7314</a></li>
+  <li>Cantor JR et al. Physiologic medium rewires cellular metabolism and reveals uric acid as an endogenous inhibitor of UMP synthase. <i>Cell</i> 2017; 169:258–272 (HPLM). <a href="https://doi.org/10.1016/j.cell.2017.03.023" target="_blank" rel="noopener">doi:10.1016/j.cell.2017.03.023</a></li>
+  <li>Huangfu Q, Hall JAJ. Parallelizing the dual revised simplex method. <i>Math. Program. Comput.</i> 2018; 10:119–142 (HiGHS). <a href="https://doi.org/10.1007/s12532-017-0130-5" target="_blank" rel="noopener">doi:10.1007/s12532-017-0130-5</a></li>
+</ul>
+</article>
+
+<!-- ============================================================ ESPAÑOL -->
+<article data-lang="es" hidden>
+<h1>Documentación de MetfluxLive</h1>
+<p class="lead">Qué calcula la aplicación, de dónde salen sus datos, cómo leer los resultados y una serie de experimentos in silico para probar.</p>
+
+<h2 id="es-what">1. Qué es MetfluxLive</h2>
+<p>MetfluxLive es una herramienta de navegador para explorar un modelo metabólico de la célula completa. Eliges un medio de cultivo, la aplicación predice a qué velocidad funciona cada reacción de la célula (los <em>flujos</em>) y los dibuja en un mapa animado. Además puedes marcar átomos de un nutriente y ver dónde acaban, apagar enzimas y seguir el medio mientras se consume.</p>
+<p>Todo se ejecuta dentro del navegador: no hay un servidor que calcule y nada de lo que introduces sale de tu ordenador. Los medios guardados y las preferencias se conservan en el almacenamiento local del navegador.</p>
+<div class="note">Los números son <b>predicciones de un modelo</b>, no medidas. Muestran lo que la red <em>puede</em> hacer bajo los supuestos que se explican abajo. Úsalos para formular hipótesis y diseñar experimentos, no para sustituirlos.</div>
+
+<h2 id="es-start">2. Primeros pasos</h2>
+<ol>
+  <li>Abre la aplicación. Carga Human-GEM, el medio estándar y ejecuta una primera simulación.</li>
+  <li>En el centro se ve la célula: cada burbuja es una ruta dentro de un compartimento; las líneas brillantes en movimiento son carbono que fluye entre ellas. Doble clic en una burbuja abre el mapa de su ruta.</li>
+  <li>El panel izquierdo es el experimento: medio, knockouts y objetivo. Cambia una concentración y los flujos se recalculan.</li>
+  <li>El panel derecho explica lo que esté seleccionado: el resumen, un metabolito, una reacción, una ruta o un gen.</li>
+  <li>Usa el buscador (<kbd>Ctrl</kbd>+<kbd>K</kbd>) para saltar a cualquier metabolito, reacción, enzima o ruta.</li>
+</ol>
+
+<h2 id="es-ui">3. La interfaz</h2>
+<h3>Tres formas de ordenar el mapa</h3>
+<div class="tablebox"><table>
+  <tr><th>Agrupar</th><th>Qué se ve</th><th>Útil para</th></tr>
+  <tr><td><b>Célula</b> (por defecto)</td><td>Reacciones agrupadas por compartimento y ruta, dispuestas como una célula: citosol, mitocondria, retículo, Golgi, lisosoma, peroxisoma, núcleo y el medio exterior. Las reacciones que cruzan una membrana se sitúan sobre ella.</td><td>Ver dónde ocurre cada cosa y qué se transporta.</td></tr>
+  <tr><td><b>Rutas</b></td><td>Una burbuja por ruta, colocadas de modo que las rutas que comparten metabolitos queden cerca.</td><td>Una visión general de qué rutas están activas.</td></tr>
+  <tr><td><b>Cascada</b></td><td>Rutas en filas, ordenadas por el número de pasos de reacción que las separan del medio: nutrientes arriba, productos lejanos abajo. Dentro de una ruta, la misma idea da una cadena de arriba abajo como en los libros de texto.</td><td>Leer el metabolismo como un flujo de nutrientes a productos.</td></tr>
+</table></div>
+<h3>Cómo leer el mapa</h3>
+<ul>
+  <li><b>El grosor de la línea y la velocidad de las partículas</b> indican el flujo en escala logarítmica, para que los flujos pequeños sigan viéndose.</li>
+  <li><b>En el mapa de una ruta</b>, los círculos son metabolitos y los rombos reacciones. El color del anillo de un metabolito es su compartimento. Los cofactores como ATP o agua se ocultan para que el mapa sea legible.</li>
+  <li><b>Con un trazador</b>, el color pasa de gris (sin marca) por ámbar a magenta (totalmente marcado).</li>
+  <li><b>Con un knockout</b>, al elegir «Solo flujo alterado» el color indica aumento (naranja) o disminución (azul) frente a la célula sin perturbar; un anillo rojo señala las reacciones perturbadas.</li>
+</ul>
+<h3>Otros controles</h3>
+<ul>
+  <li><b>Mostrar</b>: todo, solo lo que lleva marca, o solo lo que cambió tras un knockout.</li>
+  <li><b>Paneles</b>: arrastra el borde entre un panel lateral y el mapa para cambiar su ancho; doble clic en el borde lo restaura. Las secciones del panel izquierdo se pliegan al hacer clic en su título.</li>
+  <li><b>Idioma</b>: inglés o español (arriba a la derecha). Los nombres de metabolitos, reacciones y rutas vienen del modelo y siguen en inglés.</li>
+  <li><b>Descargar</b>: exporta tablas, gráficas y el mapa (véase la <a href="#es-download">sección 12</a>).</li>
+</ul>
+
+<h2 id="es-data">4. Fuentes de datos</h2>
+<div class="tablebox"><table>
+  <tr><th>Qué</th><th>Fuente</th><th>Para qué se usa</th></tr>
+  <tr><td>Human-GEM 2.1.1</td><td><a href="https://github.com/SysBioChalmers/Human-GEM" target="_blank" rel="noopener">SysBioChalmers/Human-GEM</a>; Robinson et al., <i>Sci. Signal.</i> 2020</td><td>La red humana: 12 748 reacciones, 8374 metabolitos (uno por compartimento), 2870 genes, 146 rutas, además de las reglas gen–reacción y las estructuras de los metabolitos.</td></tr>
+  <tr><td>Mouse-GEM 1.8.0</td><td><a href="https://github.com/SysBioChalmers/Mouse-GEM" target="_blank" rel="noopener">SysBioChalmers/Mouse-GEM</a>; Wang et al., <i>PNAS</i> 2021</td><td>La red de ratón. Comparte identificadores con Human-GEM, así que se reutilizan las estructuras.</td></tr>
+  <tr><td>Mapas átomo a átomo</td><td>Calculados para esta aplicación con <a href="https://github.com/rxn4chemistry/rxnmapper" target="_blank" rel="noopener">RXNMapper</a> (Schwaller et al., <i>Sci. Adv.</i> 2021) y RDKit, más correcciones manuales en el metabolismo central</td><td>Seguir cada átomo a través de cada reacción.</td></tr>
+  <tr><td>Plasmax y HPLM</td><td>Tabla S1 de <a href="https://pubmed.ncbi.nlm.nih.gov/30613774/" target="_blank" rel="noopener">Vande Voorde et al., <i>Sci. Adv.</i> 2019</a>; HPLM procede de Cantor et al., <i>Cell</i> 2017</td><td>Medios fisiológicos.</td></tr>
+  <tr><td>Medio estándar</td><td>Sigue de forma aproximada DMEM / Ham's F-12</td><td>Medio por defecto.</td></tr>
+  <tr><td>Cinética de captación (V<sub>max</sub>, K<sub>m</sub>)</td><td>Órdenes de magnitud para células de mamífero en cultivo, fijados a mano</td><td>Convertir concentraciones en captación máxima. <b>No son valores medidos.</b></td></tr>
+  <tr><td>Solver lineal</td><td><a href="https://highs.dev" target="_blank" rel="noopener">HiGHS</a>, compilado a WebAssembly</td><td>Resolver el problema de balance de flujos.</td></tr>
+</table></div>
+<p>Los modelos se convierten una sola vez, fuera de la aplicación, en los ficheros JSON de <code>data/</code>; la aplicación solo necesita esos ficheros.</p>
+<h3>¿Cómo de fiables son los mapas atómicos?</h3>
+<p>De las 11 094 reacciones de Human-GEM que no son simples intercambios, 10 551 tienen mapa atómico:</p>
+<div class="tablebox"><table>
+  <tr><th>Método</th><th>Reacciones</th><th>Fiabilidad</th></tr>
+  <tr><td>Identidad (la misma molécula a ambos lados: transporte)</td><td class="num">4144</td><td>Exacto.</td></tr>
+  <tr><td>RXNMapper</td><td class="num">5224</td><td>Normalmente correcto; la ficha de la reacción muestra su confianza.</td></tr>
+  <tr><td>Subestructura común máxima</td><td class="num">1138</td><td>Menor: se usa en reacciones genéricas con «grupos R» y moléculas muy grandes.</td></tr>
+  <tr><td>Parcial</td><td class="num">45</td><td>Solo se mapean algunos átomos.</td></tr>
+</table></div>
+<p>La transcetolasa, la transaldolasa, la 6-fosfogluconato deshidrogenasa, la aconitasa y las transaminasas se comprobaron y corrigieron a mano. Donde no hay mapa, la marca se reparte por igual entre los productos y el metabolito se dibuja con contorno discontinuo.</p>
+
+<h2 id="es-fba">5. El análisis de balance de flujos, explicado sin fórmulas</h2>
+<p>Una célula ejecuta miles de reacciones a la vez. Rara vez conocemos la velocidad de cada una, pero sí sabemos dos cosas firmes: la <b>receta</b> de cada reacción (qué consume y qué produce) y que una célula no puede crear ni destruir materia.</p>
+<p>El análisis de balance de flujos (FBA) se apoya en eso. Imagina la célula como la red de agua de una ciudad:</p>
+<ul>
+  <li><b>Las tuberías son reacciones</b>; el caudal de una tubería es el flujo, en milimoles por gramo de peso seco celular y hora (mmol/gDW/h).</li>
+  <li><b>Los empalmes son metabolitos.</b> En cada empalme, lo que entra debe ser igual a lo que sale: nada se acumula y nada aparece de la nada. Es el supuesto de <em>estado estacionario</em>.</li>
+  <li><b>Algunas tuberías son de un solo sentido</b> y cada una tiene una capacidad máxima. Las que traen nutrientes del medio están limitadas por lo que el medio ofrece.</li>
+</ul>
+<p>Esas reglas dejan muchos patrones de flujo posibles. Para elegir uno, el FBA supone que la célula <em>intenta conseguir algo</em> —por defecto, crecer lo más rápido posible— y busca el patrón que mejor lo logra. «Crecer» es a su vez una reacción, la <b>reacción de biomasa</b>, que consume aminoácidos, nucleótidos, lípidos y energía en las proporciones que necesita una célula nueva.</p>
+<div class="formula">maximizar  v<sub>biomasa</sub><br>sujeto a   S · v = 0   (cada metabolito está equilibrado)<br>           inferior<sub>j</sub> ≤ v<sub>j</sub> ≤ superior<sub>j</sub>   (sentido y capacidad de cada reacción)</div>
+<p>Es un programa lineal, que un ordenador resuelve de forma exacta en pocos segundos incluso con 12 748 reacciones.</p>
+<h3>Qué puede y qué no puede decirte el FBA</h3>
+<ul>
+  <li><b>No necesita cinética enzimática</b>, y por eso funciona para una célula entera. Por la misma razón no sabe nada de cantidades de enzima, regulación ni concentraciones dentro de la célula.</li>
+  <li>La mejor tasa de crecimiento es única, pero <b>los flujos que la consiguen a menudo no lo son</b>: puede haber varias rutas igual de buenas. Por eso la aplicación usa por defecto el <b>FBA parsimonioso</b> (pFBA): entre todas las soluciones óptimas toma la de menor flujo total, con la idea de que la célula evita fabricar enzima que no necesita. Esto también elimina bucles internos sin sentido.</li>
+  <li>El objetivo es una hipótesis. El crecimiento es razonable para células que proliferan en cultivo; describe mal a una neurona o un hepatocito en reposo. Puedes elegir cualquier reacción como objetivo (véanse los experimentos).</li>
+</ul>
+
+<h2 id="es-modes">6. Estacionario frente a Dinámico</h2>
+<div class="tablebox"><table>
+  <tr><th></th><th>Estacionario</th><th>Dinámico</th></tr>
+  <tr><td>Pregunta</td><td>«Con este medio, ¿qué hace la célula?»</td><td>«¿Qué ocurre en las próximas horas mientras el medio se agota?»</td></tr>
+  <tr><td>Medio</td><td>Constante: las concentraciones no cambian.</td><td>Finito: cada captación baja la concentración y cada excreción la sube.</td></tr>
+  <tr><td>Flujos</td><td>Una única solución de FBA.</td><td>El FBA se resuelve de nuevo cada vez que un nutriente baja lo suficiente como para cambiar lo que la célula puede captar.</td></tr>
+  <tr><td>Biomasa</td><td>No se sigue.</td><td>Crece exponencialmente a la tasa de crecimiento del momento.</td></tr>
+  <tr><td>Marca</td><td>Final (estado estacionario isotópico): cada pool ha alcanzado su enriquecimiento definitivo.</td><td>Llena los pools intracelulares poco a poco: la marca llega primero a la glucólisis y más tarde a los productos lejanos.</td></tr>
+  <tr><td>Tiempo de cálculo</td><td>Unos segundos.</td><td>Alrededor de medio minuto; el doble con un knockout, porque también se simula la célula sin perturbar.</td></tr>
+</table></div>
+<h3>Cómo funciona el modo dinámico</h3>
+<ol>
+  <li>El tiempo va de 10 segundos a la duración elegida en 30 pasos, espaciados logarítmicamente (pasos cortos al principio, cuando la marca cambia más deprisa).</li>
+  <li>En cada paso se recalcula la captación máxima de cada nutriente a partir de su concentración actual, y nunca puede superar lo que queda físicamente en el medio.</li>
+  <li>Si un límite que realmente restringía a la célula se ha movido más de un 8 % aproximadamente, se resuelve el FBA de nuevo; si no, se mantienen los flujos anteriores.</li>
+  <li>Se actualizan las concentraciones: <code>ΔC = −captación × biomasa × Δt</code>. El oxígeno se mantiene constante, porque el intercambio gaseoso lo repone.</li>
+  <li>La biomasa crece: <code>X ← X · exp(tasa de crecimiento × Δt)</code>.</li>
+  <li>La marca avanza un paso implícito en cada pool de metabolito.</li>
+</ol>
+<p>Lo controlan tres números: la duración, la biomasa inicial (gDW por litro de medio: más células agotan antes el medio) y el tamaño del pool intracelular (cuánto de cada metabolito contiene la célula, que fija lo rápido que se llena de marca).</p>
+<div class="note">El modo dinámico es una aproximación («FBA dinámico»). Se da el mismo tamaño a todos los pools intracelulares, lo que no es cierto en células reales: toma los <em>tiempos</em> de marcaje como orientativos y el <em>orden</em> en que se marcan las cosas como la parte informativa.</div>
+
+<h2 id="es-medium">7. El medio</h2>
+<p>Un modelo estequiométrico no tiene concentraciones, solo límites de captación. La aplicación convierte cada concentración en una captación máxima con una regla saturable:</p>
+<div class="formula">captación máxima = V<sub>max</sub> · C / (K<sub>m</sub> + C)</div>
+<p>Así, duplicar una concentración baja duplica más o menos lo que la célula puede tomar, mientras que duplicar una ya saturante cambia poco. Pasa el cursor por una casilla de concentración para ver el límite resultante. La célula no tiene por qué usar todo lo permitido: el FBA toma lo que sirve al objetivo.</p>
+<ul>
+  <li><b>Medios predefinidos</b>: Estándar (rico, tipo DMEM/F-12), Plasmax y HPLM (concentraciones fisiológicas).</li>
+  <li><b>Los tuyos</b>: edita, añade o quita componentes y pulsa «guardar…» para conservar el medio con un nombre en este navegador.</li>
+  <li><b>Componentes sin límite</b>: el agua, los protones, el fosfato y las sales mayoritarias nunca son limitantes.</li>
+  <li><b>Inyecciones</b>: puedes añadir un metabolito que no sea extracelular (por ejemplo, citrato citosólico). Se suministra entonces directamente dentro de ese compartimento, un experimento que solo permite un modelo.</li>
+</ul>
+<p>En Plasmax y HPLM se omiten los componentes que los modelos no contienen (selenito, manganeso, vanadato, nitrato, p-aminobenzoato, metilacetoacetato, rojo fenol). Los ácidos grasos esenciales y las vitaminas liposolubles, que en los medios reales aporta el suero, se añaden con los valores del medio estándar.</p>
+
+<h2 id="es-tracing">8. Trazado isotópico</h2>
+<p>Pulsa <b>⚛</b> junto a un componente del medio para abrir el editor de moléculas, haz clic en los átomos que quieras marcar (<sup>13</sup>C, <sup>15</sup>N, <sup>18</sup>O o <sup>34</sup>S) y elige qué fracción de las moléculas lleva la marca.</p>
+<h3>Enriquecimiento posicional</h3>
+<p>Para cada átomo de cada metabolito la aplicación calcula su <b>enriquecimiento</b>: la fracción de moléculas en las que ese átomo es el isótopo pesado. Un átomo hereda el enriquecimiento de los átomos de los que procede, ponderado por el flujo:</p>
+<div class="formula">enriquecimiento de un átomo = Σ (flujo de cada reacción productora × enriquecimiento del átomo de origen) / Σ flujo</div>
+<p>Esto se resuelve de forma exacta para toda la red, ciclos incluidos (el ciclo de Krebs devuelve marca a sí mismo). Selecciona un metabolito para ver su estructura coloreada átomo a átomo.</p>
+<h3>Isotopólogos (M+0, M+1, M+2…)</h3>
+<p>Un espectrómetro de masas no ve posiciones: cuenta cuántos átomos pesados lleva cada molécula. M+0 es la molécula sin marca; M+3, una molécula con tres átomos pesados. Esta distribución no se puede deducir solo del enriquecimiento posicional. La glucosa totalmente marcada da piruvato que es M+3 o M+0, nunca una mezcla aleatoria de posiciones marcadas.</p>
+<p>Por eso la aplicación rastrea <b>moléculas enteras hacia atrás</b>. Para construir una molécula del metabolito seleccionado elige una de las reacciones que lo producen (en proporción a su flujo), averigua de qué molécula de sustrato vino cada átomo y repite con esos sustratos hasta llegar al medio, donde la marca es conocida. Los átomos que vinieron de la misma molécula de sustrato permanecen juntos, y eso es lo que mantiene el patrón correcto. Hacerlo con 2000 moléculas da la distribución que se muestra en la ficha del metabolito.</p>
+<ul>
+  <li>Disponible en modo estacionario con un trazador.</li>
+  <li><b>Sin trazador</b>, la ficha muestra la distribución esperada por la abundancia natural de isótopos (<sup>13</sup>C 1,07 %, <sup>15</sup>N 0,36 %, <sup>18</sup>O 0,2 %, <sup>34</sup>S 4,25 %, <sup>2</sup>H 0,01 %…), calculada de forma exacta a partir de la fórmula. Es el fondo del que parte cualquier medida.</li>
+  <li>Con un trazador, la abundancia natural <b>no</b> se suma encima: compáralo con medidas ya corregidas.</li>
+  <li>Al ser una muestra aleatoria de 2000 moléculas, cada barra tiene una incertidumbre de aproximadamente ±1 punto porcentual.</li>
+  <li>Si parte de los átomos pasó por reacciones sin mapa atómico, la ficha lo indica y la distribución es aproximada.</li>
+  <li><sup>18</sup>O y <sup>34</sup>S suman dos unidades de masa por átomo; <sup>13</sup>C y <sup>15</sup>N, una.</li>
+</ul>
+<h3>Dónde acaba la marca</h3>
+<p>Con un trazador, el resumen muestra qué parte de los átomos marcados sale de la célula en cada producto (CO<sub>2</sub>, lactato, biomasa…).</p>
+
+<h2 id="es-ko">9. Knockout y knockdown</h2>
+<p>Añade un gen o una reacción en la sección «Knockout / knockdown» y fija su actividad residual: 0 % es un knockout; cualquier valor intermedio, un knockdown.</p>
+<ul>
+  <li><b>Los genes actúan a través de reglas gen–proteína–reacción.</b> Si una reacción necesita <code>A and B</code> (un complejo), perder cualquiera la detiene. Si necesita <code>A or B</code> (isoenzimas), perder una no cambia nada. La lista muestra, por ejemplo, «2/7»: dos de las siete reacciones que mencionan el gen dependen realmente de él. Un gen tachado no tiene ningún efecto.</li>
+  <li><b>La referencia.</b> Cada simulación perturbada se compara con la misma simulación sin la perturbación, que se calcula automáticamente.</li>
+  <li><b>Un knockdown</b> limita la reacción a esa fracción de su flujo de referencia. Una reacción sin flujo en la referencia no queda restringida por un knockdown parcial.</li>
+  <li><b>«Alterado» significa</b> un flujo que difiere de la referencia en más de un 2 %.</li>
+</ul>
+<div class="note">El FBA supone que la célula redirige sus flujos de forma perfecta e instantánea. Un knockout inocuo en el modelo significa «existe una ruta alternativa en la red», no «la célula no lo notará». A la inversa, un knockout que detiene el crecimiento en el modelo señala una reacción sin alternativa.</div>
+
+<h2 id="es-cascade">10. El orden en cascada</h2>
+<p>Cada metabolito recibe una <b>profundidad</b>: el menor número de pasos de reacción necesarios para alcanzarlo desde los metabolitos del medio actual. Los componentes del medio están en 0; la glucosa dentro de la célula, en 1; la glucosa 6-fosfato, en 2; y así sucesivamente. Los sentidos de las reacciones son los del modelo, no los de los flujos simulados, de modo que el orden no salta al cambiar una concentración, solo al añadir o quitar un componente del medio.</p>
+<ul>
+  <li>Los cofactores (ATP, NAD, agua, CoA…) se ignoran; de lo contrario todo estaría a un paso de todo.</li>
+  <li>La ficha del metabolito muestra la profundidad y su posición en una escala de 0 a 100.</li>
+  <li>Con un medio rico, casi todo el metabolismo central queda a solo dos o cuatro pasos, porque los aminoácidos entran en él directamente. Quita componentes para estirar la cascada.</li>
+  <li>Dentro del mapa de una ruta, las filas cuentan pasos <em>dentro de esa ruta</em>, empezando por sus metabolitos más cercanos al medio. Eso es lo que da a la glucólisis su conocida escalera de glucosa a piruvato.</li>
+  <li>Los ciclos no se pueden dibujar sin algunas flechas hacia arriba; es lo esperado.</li>
+</ul>
+
+<h2 id="es-experiments">11. Experimentos in silico</h2>
+<p>Cada ejemplo da los pasos y lo que obtuvimos con Human-GEM, el medio estándar y pFBA activado. Tus números deberían coincidir de cerca. Los nombres de los botones corresponden a la interfaz en español.</p>
+
+<div class="exp">
+<h3>A. Knockout de una enzima</h3>
+<ol>
+  <li>En «Knockout / knockdown», escribe <code>ASNS</code> (asparagina sintetasa) y elige el gen.</li>
+  <li>Pon «Mostrar» en «Solo flujo alterado».</li>
+</ol>
+<p class="res"><b>Resultado.</b> El crecimiento baja de 0,0370 a 0,0249 h⁻¹ (−33 %): la célula ya no puede fabricar asparagina y depende de la captación limitada desde el medio. Sube la asparagina del medio y el crecimiento se recupera.</p>
+<p class="res"><b>Compáralo con:</b> <code>PDHB</code> (piruvato deshidrogenasa): el crecimiento no cambia, pero unas 160 reacciones se redirigen. <code>FASN</code>, <code>HMGCR</code> o <code>CAD</code>: el crecimiento se detiene, no hay alternativa. <code>GAPDH</code>: sin efecto, porque el modelo tiene una isoenzima (GAPDHS).</p>
+</div>
+
+<div class="exp">
+<h3>B. Knockout de un transportador</h3>
+<ol>
+  <li>Anula el gen <code>SLC2A1</code> (GLUT1). La lista muestra 2/7: solo dos de sus siete reacciones dependen únicamente de él.</li>
+  <li>Quítalo y anula ahora la reacción <code>MAR05029</code> (transporte facilitado de glucosa, catalizado por todas las isoformas GLUT).</li>
+</ol>
+<p class="res"><b>Resultado.</b> En ambos casos el crecimiento no cambia y la captación de glucosa continúa (0,046 mmol/gDW/h): el modelo conserva otras reacciones de transporte de glucosa, como los simportadores acoplados a sodio. Para dejar de verdad a la célula sin glucosa, pon su concentración a 0.</p>
+<p class="res"><b>Lección.</b> Un modelo genérico contiene todos los transportadores del organismo. Una línea celular real expresa solo unos pocos.</p>
+</div>
+
+<div class="exp">
+<h3>C. Trazar <sup>13</sup>C desde la glucosa y leer los isotopólogos</h3>
+<ol>
+  <li>Pulsa ⚛ junto a la glucosa, haz clic en «Todos los C» y aplica.</li>
+  <li>Busca <code>pyruvate</code> y luego <code>citrate</code>, y mira «Isotopólogos» en el panel derecho. Usa las pestañas de compartimento para comparar citosol y mitocondria.</li>
+</ol>
+<p class="res"><b>Resultado.</b> Piruvato mitocondrial: cerca del 70 % M+0 y el 24 % M+3, es decir, unidades enteras de tres carbonos procedentes de la glucosa, diluidas por piruvato sin marca formado a partir de aminoácidos. Citrato: cerca del 73 % M+0, el 20 % M+2 y el 6 % M+1. M+2 es la firma del acetil-CoA marcado que entra en el ciclo de Krebs.</p>
+<p class="res"><b>Variación.</b> Marca la glutamina («Todos los C»): el glutamato es sobre todo M+5 (cerca del 76 %), y el citrato muestra M+4 (cerca del 36 %, ciclo de Krebs oxidativo) junto a un M+5 menor (cerca del 6 %, carboxilación reductora).</p>
+</div>
+
+<div class="exp">
+<h3>D. Trazar nitrógeno</h3>
+<ol>
+  <li>Pulsa ⚛ junto a la glutamina, haz clic en «Todos los N» y aplica.</li>
+  <li>Pon «Mostrar» en «Solo con marca» y cambia a la vista de célula.</li>
+</ol>
+<p class="res"><b>Resultado.</b> La marca aparece en glutamato, aspartato, alanina y los nucleótidos, y muestra qué rutas toman su nitrógeno de la glutamina. Las transaminasas tienen peores mapas atómicos que la química del carbono, así que fíjate en el aviso de «aproximada» de la ficha de isotopólogos.</p>
+</div>
+
+<div class="exp">
+<h3>E. Ver cómo se agota el medio</h3>
+<ol>
+  <li>Cambia a «Dinámico». Deja 24 h y 0,5 gDW/L.</li>
+  <li>Cuando termine, arrastra el control de tiempo y mira «Medio a lo largo del tiempo» en el resumen.</li>
+</ol>
+<p class="res"><b>Resultado.</b> La biomasa se duplica (0,50 → 1,07 gDW/L). La colina se agota a las 13 h aproximadamente; la serina y la alanina, a las 24 h. El crecimiento se frena de 0,0370 a 0,0260 h⁻¹ a medida que escasean. La glucosa apenas se mueve (5,5 → 4,8 mM) y la glutamina cae de 2 a 0,65 mM. El FBA se resolvió 8 veces.</p>
+<p class="res"><b>Variación.</b> Sube la biomasa inicial a 2 gDW/L para ver el agotamiento en pocas horas, o cambia a Plasmax, donde las concentraciones fisiológicas se acaban mucho antes.</p>
+</div>
+
+<div class="exp">
+<h3>F. Maximizar un antioxidante: el glutatión</h3>
+<ol>
+  <li>En «Objetivo celular», busca <code>MAR09351</code> («Exchange of GSH») y deja «Maximizar».</li>
+  <li>Lee el valor del objetivo y la lista de captación.</li>
+  <li>Sube la cistina, y después la cisteína, a 1 mM.</li>
+</ol>
+<p class="res"><b>Resultado.</b> La célula puede exportar como máximo 0,0200 mmol/gDW/h de glutatión. La lista de captación muestra por qué: el azufre es limitante (cisteína, metionina y cistina se captan al máximo). Con 1 mM de cistina el máximo sube a 0,0224, y con 1 mM de cisteína además, a 0,0248.</p>
+<p class="res"><b>Trampa.</b> Si maximizas la reacción de <em>síntesis</em> (<code>MAR04326</code>) obtienes 6,6 mmol/gDW/h: el modelo fabrica y degrada glutatión en bucle, gastando ATP. Para preguntar «cuánto puede producir la célula», maximiza la exportación del producto, no una reacción interna.</p>
+<p class="res"><b>Nota.</b> El crecimiento deja de ser el objetivo, así que la célula no crece en esta simulación. El mismo método sirve para otros productos, por ejemplo urato o taurina: busca «Exchange of …».</p>
+</div>
+
+<div class="exp">
+<h3>G. Poco oxígeno</h3>
+<ol>
+  <li>Cambia el O<sub>2</sub> de 0,2 a 0,0003 mM.</li>
+</ol>
+<p class="res"><b>Resultado.</b> El crecimiento baja de 0,0370 a 0,0309 h⁻¹ y la captación de glucosa se multiplica por diez, hasta su techo (0,046 → 0,47 mmol/gDW/h): la célula pasa a fermentar. El modelo excreta <b>succinato</b> en lugar de lactato. Ambos eliminan el exceso de poder reductor, y el FBA no tiene motivo para preferir el que usan las células reales. Sin nada de oxígeno el modelo no puede crecer, porque algunos componentes de la biomasa necesitan O<sub>2</sub> para sintetizarse.</p>
+</div>
+
+<div class="exp">
+<h3>H. Comparar medios</h3>
+<ol>
+  <li>Cambia el selector de medio entre Estándar, Plasmax y HPLM.</li>
+</ol>
+<p class="res"><b>Resultado.</b> Crecimiento: 0,0370, 0,0238 y 0,0152 h⁻¹. Las diferencias se deben a los niveles de aminoácidos, más bajos y fisiológicos, y dependen de la cinética de captación supuesta: léelas como un orden, no como valores absolutos.</p>
+</div>
+
+<div class="exp">
+<h3>I. Quitar la glutamina</h3>
+<ol>
+  <li>Pon la glutamina a 0.</li>
+</ol>
+<p class="res"><b>Resultado.</b> El crecimiento se mantiene en 0,0370 h⁻¹; la captación de glucosa aumenta a más del doble (0,046 → 0,108). La red puede fabricar todo lo que necesita sin glutamina. Muchas células en cultivo no pueden: un recordatorio de que el FBA muestra capacidad, no regulación.</p>
+</div>
+
+<h3>Más ideas</h3>
+<ul>
+  <li><b>Titular un knockdown</b>: añade <code>ATP5F1A</code> (ATP sintasa; el knockout cuesta un 11 % del crecimiento) y mueve el deslizador de 100 % a 0 %.</li>
+  <li><b>Buscar nutrientes esenciales</b>: quita componentes del medio de uno en uno y mira cuáles detienen el crecimiento.</li>
+  <li><b>Trazadores posicionales</b>: marca solo el carbono 1 de la glucosa y mira cuánto se pierde como CO<sub>2</sub> en la ruta de las pentosas fosfato.</li>
+  <li><b>Alimentar con un intermediario</b>: inyecta citrato citosólico o succinato mitocondrial y mira qué hace la célula con él.</li>
+  <li><b>Combinar</b>: un trazador más un knockout muestra cómo se redirige la marca.</li>
+</ul>
+
+<h2 id="es-download">12. Descargar resultados</h2>
+<p>«Descargar» abre una lista con todo lo que puede ofrecer el resultado actual. Marca lo que quieras; obtienes un único <code>.zip</code> con un <code>README.txt</code> que describe cada fichero. Las tablas son CSV (se abren en cualquier hoja de cálculo), las gráficas son SVG (vectoriales, editables) y el mapa es un PNG de lo que hay en pantalla. El contenido de los ficheros está en inglés.</p>
+<div class="tablebox"><table>
+  <tr><th>Fichero</th><th>Contenido</th><th>Disponible</th></tr>
+  <tr><td><code>fluxes.csv</code></td><td>Todas las reacciones: flujo, límites, ruta, ecuación, genes, números EC; flujo de referencia y cambio cuando hay una perturbación.</td><td>Siempre</td></tr>
+  <tr><td><code>exchange_fluxes.csv</code></td><td>Captación y excreción de cada metabolito intercambiado, con su concentración y parámetros cinéticos.</td><td>Siempre</td></tr>
+  <tr><td><code>pathways.csv</code></td><td>Por ruta: reacciones, reacciones activas, flujo total, enriquecimiento.</td><td>Siempre</td></tr>
+  <tr><td><code>metabolites.csv</code></td><td>Por metabolito: recambio, profundidad en la cascada, enriquecimiento medio.</td><td>Siempre</td></tr>
+  <tr><td><code>flux_changes_vs_reference.csv</code></td><td>Reacciones que cambiaron más de un 2 %.</td><td>Knockout / knockdown</td></tr>
+  <tr><td><code>atom_enrichment.csv</code></td><td>Enriquecimiento de cada átomo marcado.</td><td>Trazador</td></tr>
+  <tr><td><code>isotopologues.csv</code></td><td>M+0, M+1… de los 150 metabolitos marcados con más recambio.</td><td>Trazador, estacionario</td></tr>
+  <tr><td><code>timecourse.csv</code>, <code>timecourse_enrichment.csv</code></td><td>Biomasa, crecimiento, concentraciones del medio, flujos de intercambio y enriquecimiento en cada instante.</td><td>Dinámico</td></tr>
+  <tr><td><code>chart_*.svg</code></td><td>Captación, excreción, actividad por ruta, reacciones más alteradas, destino de la marca, isotopólogos, depleción del medio, biomasa.</td><td>Según lo anterior</td></tr>
+  <tr><td><code>map.png</code></td><td>El mapa tal como se ve.</td><td>Vistas de mapa</td></tr>
+  <tr><td><code>settings.json</code></td><td>Modelo, medio, objetivo, trazadores y perturbaciones: lo necesario para repetir la simulación.</td><td>Siempre</td></tr>
+</table></div>
+<p>En modo dinámico, las tablas por reacción corresponden al instante seleccionado en el control de tiempo.</p>
+
+<h2 id="es-limits">13. Limitaciones</h2>
+<ul>
+  <li><b>Sin cinética ni regulación.</b> Las concentraciones solo fijan límites de captación. No hay niveles de enzima, alosterismo ni señalización.</li>
+  <li><b>Una célula genérica.</b> Human-GEM contiene todas las reacciones conocidas en cualquier tejido humano. Un tipo celular concreto expresa un subconjunto; la aplicación todavía no construye modelos específicos de tejido.</li>
+  <li><b>Óptimos alternativos.</b> Varios patrones de flujo pueden dar el mismo crecimiento. El pFBA elige uno; pequeños «cambios» tras un knockout pueden ser una alternativa igual de buena y no un efecto real.</li>
+  <li><b>La cinética de captación es una estimación gruesa.</b> Las tasas absolutas de crecimiento y las diferencias entre medios dependen de ella.</li>
+  <li><b>Solo flujos netos.</b> En la realidad las reacciones reversibles intercambian marca en ambos sentidos; el modelo solo ve el flujo neto, lo que puede subestimar la mezcla de marca.</li>
+  <li><b>Los mapas atómicos son calculados</b>, no todos revisados. Las posiciones inciertas se señalan.</li>
+  <li><b>No se traza hidrógeno</b> (<sup>2</sup>H) ni se corrige la abundancia natural.</li>
+  <li><b>El modo dinámico</b> supone un único tamaño de pool para todos los metabolitos intracelulares.</li>
+  <li><b>Mouse-GEM 1.8.0</b> trae un objetivo (<code>MAR00021</code>) con una escala distinta a la de la biomasa humana, así que su crecimiento absoluto sale muy bajo con el medio por defecto. Puedes elegir otro objetivo.</li>
+</ul>
+
+<h2 id="es-glossary">14. Glosario</h2>
+<div class="tablebox"><table>
+  <tr><td><b>Flujo</b></td><td>Velocidad de una reacción, en mmol por gramo de peso seco y hora.</td></tr>
+  <tr><td><b>GEM</b></td><td>Modelo metabólico a escala genómica: todas las reacciones metabólicas conocidas de un organismo, ligadas a sus genes.</td></tr>
+  <tr><td><b>FBA / pFBA</b></td><td>Análisis de balance de flujos / su variante parsimoniosa (mínimo flujo total).</td></tr>
+  <tr><td><b>Objetivo</b></td><td>La reacción cuyo flujo se maximiza o minimiza.</td></tr>
+  <tr><td><b>Reacción de biomasa</b></td><td>Pseudorreacción que consume componentes celulares en las proporciones necesarias para formar masa celular nueva.</td></tr>
+  <tr><td><b>Reacción de intercambio</b></td><td>La entrada o salida de un metabolito entre el medio y el exterior del modelo.</td></tr>
+  <tr><td><b>Regla GPR</b></td><td>Regla gen–proteína–reacción: qué genes necesita una reacción.</td></tr>
+  <tr><td><b>Enriquecimiento</b></td><td>Fracción de una posición atómica ocupada por el isótopo pesado.</td></tr>
+  <tr><td><b>Isotopólogo</b></td><td>Moléculas que solo difieren en su número de átomos pesados (M+0, M+1…).</td></tr>
+  <tr><td><b>Recambio</b></td><td>Velocidad total a la que se produce un metabolito.</td></tr>
+  <tr><td><b>gDW</b></td><td>Gramo de peso seco celular.</td></tr>
+</table></div>
+
+<h2 id="es-refs">15. Referencias</h2>
+<ul>
+  <li>Orth JD, Thiele I, Palsson BØ. What is flux balance analysis? <i>Nat. Biotechnol.</i> 2010; 28:245–248. <a href="https://doi.org/10.1038/nbt.1614" target="_blank" rel="noopener">doi:10.1038/nbt.1614</a></li>
+  <li>Lewis NE et al. Omic data from evolved <i>E. coli</i> are consistent with computed optimal growth from genome-scale models. <i>Mol. Syst. Biol.</i> 2010; 6:390 (FBA parsimonioso). <a href="https://doi.org/10.1038/msb.2010.47" target="_blank" rel="noopener">doi:10.1038/msb.2010.47</a></li>
+  <li>Mahadevan R, Edwards JS, Doyle FJ. Dynamic flux balance analysis of diauxic growth in <i>Escherichia coli</i>. <i>Biophys. J.</i> 2002; 83:1331–1340. <a href="https://doi.org/10.1016/S0006-3495(02)73903-9" target="_blank" rel="noopener">doi:10.1016/S0006-3495(02)73903-9</a></li>
+  <li>Robinson JL et al. An atlas of human metabolism. <i>Sci. Signal.</i> 2020; 13:eaaz1482 (Human-GEM). <a href="https://doi.org/10.1126/scisignal.aaz1482" target="_blank" rel="noopener">doi:10.1126/scisignal.aaz1482</a></li>
+  <li>Wang H et al. Genome-scale metabolic network reconstruction of model animals as a platform for translational research. <i>PNAS</i> 2021; 118:e2102344118 (Mouse-GEM). <a href="https://doi.org/10.1073/pnas.2102344118" target="_blank" rel="noopener">doi:10.1073/pnas.2102344118</a></li>
+  <li>Schwaller P et al. Extraction of organic chemistry grammar from unsupervised learning of chemical reactions. <i>Sci. Adv.</i> 2021; 7:eabe4166 (RXNMapper). <a href="https://doi.org/10.1126/sciadv.abe4166" target="_blank" rel="noopener">doi:10.1126/sciadv.abe4166</a></li>
+  <li>Vande Voorde J et al. Improving the metabolic fidelity of cancer models with a physiological cell culture medium. <i>Sci. Adv.</i> 2019; 5:eaau7314 (Plasmax). <a href="https://doi.org/10.1126/sciadv.aau7314" target="_blank" rel="noopener">doi:10.1126/sciadv.aau7314</a></li>
+  <li>Cantor JR et al. Physiologic medium rewires cellular metabolism and reveals uric acid as an endogenous inhibitor of UMP synthase. <i>Cell</i> 2017; 169:258–272 (HPLM). <a href="https://doi.org/10.1016/j.cell.2017.03.023" target="_blank" rel="noopener">doi:10.1016/j.cell.2017.03.023</a></li>
+  <li>Huangfu Q, Hall JAJ. Parallelizing the dual revised simplex method. <i>Math. Program. Comput.</i> 2018; 10:119–142 (HiGHS). <a href="https://doi.org/10.1007/s12532-017-0130-5" target="_blank" rel="noopener">doi:10.1007/s12532-017-0130-5</a></li>
+</ul>
+</article>
+
+    </div>
+  </div>
+  <script>
+    // Language: ?lang=…, else the app's stored choice, else English.
+    (function () {
+      var langs = ["en", "es"], lang = new URLSearchParams(location.search).get("lang");
+      if (langs.indexOf(lang) < 0) { try { lang = localStorage.getItem("metflux.lang"); } catch (e) { lang = null; } }
+      if (langs.indexOf(lang) < 0) lang = "en";
+      function show(l, keepHash) {
+        lang = l;
+        document.documentElement.lang = l;
+        document.title = "MetfluxLive · " + (l === "es" ? "Documentación" : "Docs");
+        var art = null;
+        document.querySelectorAll("article").forEach(function (a) { a.hidden = a.dataset.lang !== l; if (!a.hidden) art = a; });
+        document.querySelectorAll("header button").forEach(function (b) { b.classList.toggle("on", b.dataset.set === l); });
+        var toc = document.getElementById("toc");
+        toc.textContent = "";
+        art.querySelectorAll("h2").forEach(function (h) { var a = document.createElement("a"); a.href = "#" + h.id; a.textContent = h.textContent; toc.appendChild(a); });
+        document.getElementById("back").textContent = l === "es" ? "← Aplicación" : "← App";
+        // keep the reader in the same section when switching language
+        if (!keepHash && location.hash.length > 4) { var t = document.getElementById(l + location.hash.slice(3)); if (t) { history.replaceState(null, "", "#" + t.id); t.scrollIntoView(); } }
+      }
+      document.querySelectorAll("header button").forEach(function (b) { b.onclick = function () { show(b.dataset.set, false); }; });
+      show(lang, true);
+      if (location.hash) { var el = document.getElementById(location.hash.slice(1)); if (el && !el.closest("article").hidden) el.scrollIntoView(); }
+    })();
+  </script>
+</body>
+</html>

@@ -1,12 +1,16 @@
 // MetfluxLive — application shell: state, panels, navigation and simulation control.
 import { Simulator } from "./sim.js";
-import { defaultMedium, uptakeCapacity } from "./core/medium.js";
+import { MEDIA, presetMedium, exportMedium, importMedium, uptakeCapacity } from "./core/medium.js";
 import { gprActivity } from "./core/gpr.js";
 import { ModelIndex, fmtFlux, fmtTime, escapeHtml as esc } from "./modelindex.js";
 import { MapView, COMP_COLORS, enrichColor, deltaColor } from "./ui/mapview.js";
 import { SearchIndex, attachSearch } from "./ui/search.js";
 import { renderMolecule, tracerName } from "./ui/molecule.js";
 import { buildCellLayout } from "./celllayout.js";
+import { metDepths, cascadeGlobal, cascadeSub } from "./cascade.js";
+import { IsotopologueSampler, naturalMid } from "./core/isotopologues.js";
+import { DATASETS, buildResults } from "./export/results.js";
+import { makeZip } from "./export/zip.js";
 import { t, initLang, setLang, getLang, applyDom, LANGS } from "./i18n.js";
 
 const $ = (id) => document.getElementById(id);
@@ -14,7 +18,7 @@ const S = {
   slug: null, model: null, structures: null, layout: null, index: null, search: null, sim: null,
   supplies: [], perturb: [], cfg: { objective: 0, maximize: true, parsimonious: true },
   mode: "steady", result: null, frameIdx: 0, stale: false,
-  grouping: "pathway", filter: "all",
+  grouping: "cell", filter: "all",
   view: { kind: "global", ss: -1 }, sel: null, runSeq: 0, playing: null,
   scenes: {}, subScenes: new Map(), cell: undefined, statusFn: null,
 };
@@ -27,8 +31,10 @@ async function boot() {
   const ls = $("langSel");
   for (const [code] of LANGS) ls.add(new Option(code.toUpperCase(), code));
   ls.value = getLang();
+  bindFolds(); bindResizers();
   applyDom();
-  try { const g = localStorage.getItem("metflux.grouping"); if (g === "cell" || g === "pathway") S.grouping = g; } catch { /* storage unavailable */ }
+  $("docsBtn").href = "docs.html?lang=" + getLang();
+  try { const g = localStorage.getItem("metflux.grouping"); if (g === "cell" || g === "pathway" || g === "cascade") S.grouping = g; } catch { /* storage unavailable */ }
   map = new MapView($("map"), { onSelect: onMapSelect, onOpen: onMapOpen, onHover: onMapHover });
   bindUi();
   let models;
@@ -64,13 +70,14 @@ async function loadModel(slug) {
     $("loadingText").textContent = t("load.solver");
     S.sim = new Simulator(model, structures, atommaps);
     S.atommaps = atommaps;
-    S.supplies = defaultMedium(model).map((it) => ({ ...it, label: null, fraction: 1 }));
+    S.supplies = [];
+    loadMedium(storedMediumId(), false);
     S.perturb = [];
     S.cfg = { objective: Math.max(0, S.index.biomassRxn), maximize: true, parsimonious: true };
-    S.scenes = {}; S.subScenes = new Map(); S.cell = undefined;
+    S.scenes = {}; S.subScenes = new Map(); S.cell = undefined; S.depth = null;
     try { localStorage.setItem("metflux.model", slug); } catch { /* ignore */ }
     $("groupSel").querySelector('[value="cell"]').disabled = !cellLayout();
-    if (!cellLayout()) S.grouping = "pathway";
+    if (!cellLayout() && S.grouping === "cell") S.grouping = "pathway";
     $("groupSel").value = S.grouping;
     renderSupplies(); renderPerturb(); renderObjective(); openGlobal(); renderDetails();
     loading.classList.add("done");
@@ -111,9 +118,39 @@ function groups() {
 }
 const isCell = () => groups().key === "cell";
 
+// ---------------------------------------------------------------- cascade ----
+const isCascade = () => S.grouping === "cascade";
+const depthKey = () => S.supplies.filter((it) => it.unlimited || it.conc > 0).map((it) => it.met).sort((a, b) => a - b).join(",");
+
+/** Steps of every metabolite from the current medium; cascade layouts are rebuilt when the medium changes. */
+function depths() {
+  const key = depthKey();
+  if (!S.depth || S.depthKey !== key) {
+    S.depth = metDepths(S.model, S.index, key ? key.split(",").map(Number) : []);
+    S.depthKey = key;
+    delete S.scenes.cascade;
+    for (const k of [...S.subScenes.keys()]) if (String(k).startsWith("c")) S.subScenes.delete(k);
+  }
+  return S.depth;
+}
+
+function stepLabel(from, to) {
+  if (from > S.depth.max) return t("cascade.unreach");
+  if (to <= 0) return t("cascade.medium");
+  return from === to ? t("cascade.step", { a: from }) : t("cascade.steps", { a: from, b: Math.min(to, S.depth.max) });
+}
+
+/** After a medium change: redraw the cascade if its order moved. */
+function refreshCascade() {
+  if (!S.model || !isCascade() || !S.depth || depthKey() === S.depthKey) return;
+  if (S.view.kind === "global") { map.setScene(globalScene(), true); applyFrame(); }
+  else if (S.view.kind === "sub") { const sc = subScene(S.view.ss); if (sc) { map.setScene(sc, true); applyFrame(); } }
+}
+
 // ----------------------------------------------------------------- scenes ----
 function globalScene() {
-  const key = groups().key;
+  const key = isCascade() ? "cascade" : groups().key;
+  if (key === "cascade") depths();
   if (S.scenes[key]) return S.scenes[key];
   const listOnly = new Set(S.layout.listOnly);
   let sc;
@@ -124,19 +161,26 @@ function globalScene() {
     sc = { kind: "global", cell: true, nodes, edges: [], regions };
   } else {
     const g = S.layout.global;
-    const nodes = g.nodes.map((n) => ({ type: 2, ref: n.ss, ss: n.ss, x: n.x, y: n.y, size: n.n, r: n.r, label: S.model.subsystems[n.ss], listOnly: listOnly.has(n.ss) }));
+    const C = key === "cascade" ? cascadeGlobal(S.model, S.index, g.nodes, g.edges, depths()) : null;
+    const nodes = g.nodes.map((n) => ({ type: 2, ref: n.ss, ss: n.ss, x: C ? C.pos.get(n.ss)[0] : n.x, y: C ? C.pos.get(n.ss)[1] : n.y, size: n.n, r: n.r, label: S.model.subsystems[n.ss], listOnly: listOnly.has(n.ss) }));
     const at = new Map(nodes.map((n, i) => [n.ref, i]));
-    const edges = g.edges.filter((e) => at.has(e[0]) && at.has(e[1])).map((e) => ({ a: at.get(e[0]), b: at.get(e[1]) }));
+    // in the cascade the rows already carry the structure: only the flows are drawn
+    const edges = C ? [] : g.edges.filter((e) => at.has(e[0]) && at.has(e[1])).map((e) => ({ a: at.get(e[0]), b: at.get(e[1]) }));
     sc = { kind: "global", nodes, edges };
+    if (C) { sc.cascade = true; sc.guides = C.guides.map((gd) => ({ y: gd.y, label: stepLabel(gd.from, gd.to) })); }
   }
   return (S.scenes[key] = sc);
 }
 
 function subScene(ss) {
-  if (S.subScenes.has(ss)) return S.subScenes.get(ss);
-  const L = S.layout.subs[ss];
-  if (!L) return null;
+  const casc = isCascade(), key = casc ? "c" + ss : ss;
+  if (casc) depths();
+  if (S.subScenes.has(key)) return S.subScenes.get(key);
+  const L0 = S.layout.subs[ss];
+  if (!L0) return null;
   const { model } = S;
+  const C = casc ? cascadeSub(model, L0, depths()) : null;
+  const L = C ? { ...L0, mx: C.mx, my: C.my, rx: C.rx, ry: C.ry } : L0;
   const nodes = [], at = new Map();
   const seen = new Map();
   for (const m of L.m) seen.set(model.mets[m].b, (seen.get(model.mets[m].b) || 0) + 1);
@@ -153,7 +197,8 @@ function subScene(ss) {
     r.m.forEach((m, q) => { if (at.has(m)) edges.push({ r: ri, m: at.get(m), coef: r.c[q] }); });
   });
   const sc = { kind: "sub", ss, nodes, edges };
-  S.subScenes.set(ss, sc);
+  if (C) sc.guides = C.guides.map((gd) => ({ y: gd.y, label: gd.unreachable ? t("cascade.unreach") : gd.level === 0 ? t("cascade.entry") : t("cascade.local", { a: gd.level }) }));
+  S.subScenes.set(key, sc);
   return sc;
 }
 
@@ -182,7 +227,7 @@ function renderCrumbs() {
   const c = $("crumbs");
   c.textContent = "";
   const a = document.createElement("a");
-  a.textContent = t(isCell() ? "crumb.cell" : "crumb.global"); a.onclick = () => { S.sel = null; openGlobal(); renderDetails(); };
+  a.textContent = t(isCascade() ? "crumb.cascade" : isCell() ? "crumb.cell" : "crumb.global"); a.onclick = () => { S.sel = null; openGlobal(); renderDetails(); };
   c.appendChild(a);
   if (S.view.kind !== "global") {
     const sep = document.createElement("span"); sep.className = "sep"; sep.textContent = "›";
@@ -382,6 +427,7 @@ async function run() {
 let autoTimer = null;
 function changed() {
   S.stale = true;
+  refreshCascade();
   clearTimeout(autoTimer);
   if (S.mode === "steady") autoTimer = setTimeout(run, 700);
   else setStatus(() => t("status.changed"));
@@ -439,7 +485,96 @@ function renderLegend(mode) {
   if (sub && S.result?.pert?.size) h += `<div>${t("legend.pert")}</div>`;
   if (comps.length) h += `<div class="comps">${comps.map((c) => `<span><i style="border-color:${COMP_COLORS[c] || "#8fa3c8"}"></i>${esc(compName(c))}</span>`).join("")}</div>`;
   h += `<div style="margin-top:4px">${sub ? t("legend.subHint") : t("legend.globalHint") + (map.scene.cell ? "<br>" + t("legend.cellHint") : "")}</div>`;
+  if (map.scene.guides) h += `<div>${t(sub ? "legend.cascadeSub" : "legend.cascadeHint")}</div>`;
   $("legend").innerHTML = h;
+}
+
+// ------------------------------------------------------------------ media ----
+// Built-in media have plain ids ("plasmax"); media saved by the user are "user:<name>" and live in localStorage.
+const USER = "user:";
+function userMedia() {
+  try { const o = JSON.parse(localStorage.getItem("metflux.media") || "{}"); return o && typeof o === "object" && !Array.isArray(o) ? o : {}; } catch { return {}; }
+}
+const mediumExists = (id) => (id.startsWith(USER) ? Array.isArray(userMedia()[id.slice(USER.length)]) : MEDIA.some((m) => m.id === id));
+function storedMediumId() {
+  let id = null;
+  try { id = localStorage.getItem("metflux.medium"); } catch { /* storage unavailable */ }
+  return id && mediumExists(id) ? id : "default";
+}
+const mediumName = (id) => (id.startsWith(USER) ? id.slice(USER.length) : t("medium.name." + id));
+
+/** Replace the medium, keeping the isotope labels of metabolites present in both. */
+function loadMedium(id, rerun = true) {
+  if (!mediumExists(id)) id = "default";
+  const items = id.startsWith(USER) ? importMedium(S.model, userMedia()[id.slice(USER.length)]) : presetMedium(S.model, id);
+  const old = new Map(S.supplies.map((it) => [it.met, it]));
+  S.supplies = items.map((it) => { const o = old.get(it.met); return { ...it, label: o?.label ?? null, fraction: o?.fraction ?? 1 }; });
+  S.mediumId = id;
+  try { localStorage.setItem("metflux.medium", id); } catch { /* ignore */ }
+  renderMediumSel(); renderSupplies();
+  if (rerun) changed();
+}
+
+function renderMediumSel() {
+  const sel = $("mediumSel");
+  sel.textContent = "";
+  const group = (label, ids) => {
+    if (!ids.length) return;
+    const g = document.createElement("optgroup"); g.label = label;
+    for (const id of ids) g.appendChild(new Option(mediumName(id), id));
+    sel.appendChild(g);
+  };
+  group(t("medium.builtin"), MEDIA.map((m) => m.id));
+  group(t("medium.saved"), Object.keys(userMedia()).sort((a, b) => a.localeCompare(b)).map((n) => USER + n));
+  sel.value = S.mediumId;
+  const mine = S.mediumId.startsWith(USER);
+  $("deleteMedium").hidden = !mine;
+  $("mediumNote").innerHTML = t(mine ? "medium.note.user" : "medium.note." + S.mediumId);
+}
+
+function saveMedium() {
+  const mine = S.mediumId.startsWith(USER);
+  const asked = prompt(t("medium.savePrompt"), mine ? mediumName(S.mediumId) : t("medium.copyOf", { name: mediumName(S.mediumId) }));
+  const name = (asked || "").trim().slice(0, 60);
+  if (!name) return;
+  const all = userMedia();
+  if (name in all && USER + name !== S.mediumId && !confirm(t("medium.overwrite", { name }))) return;
+  all[name] = exportMedium(S.model, S.supplies);
+  try { localStorage.setItem("metflux.media", JSON.stringify(all)); } catch { alert(t("medium.storageError")); return; }
+  for (const it of S.supplies) it.conc0 = it.conc;
+  S.mediumId = USER + name;
+  try { localStorage.setItem("metflux.medium", S.mediumId); } catch { /* ignore */ }
+  renderMediumSel(); renderSupplies();
+}
+
+function deleteMedium() {
+  if (!S.mediumId.startsWith(USER)) return;
+  const name = S.mediumId.slice(USER.length);
+  if (!confirm(t("medium.deleteConfirm", { name }))) return;
+  const all = userMedia();
+  delete all[name];
+  try { localStorage.setItem("metflux.media", JSON.stringify(all)); } catch { /* ignore */ }
+  loadMedium("default");
+}
+
+// ------------------------------------------------------- collapsible panel ----
+function bindFolds() {
+  let folded = [];
+  try { folded = JSON.parse(localStorage.getItem("metflux.folded") || "[]"); } catch { /* storage unavailable */ }
+  if (!Array.isArray(folded)) folded = [];
+  document.querySelectorAll("section.fold").forEach((sec) => {
+    const h = sec.querySelector("h2");
+    const set = (on) => { sec.classList.toggle("folded", on); h.setAttribute("aria-expanded", String(!on)); };
+    const toggle = () => {
+      set(!sec.classList.contains("folded"));
+      const ids = [...document.querySelectorAll("section.fold.folded")].map((x) => x.id);
+      try { localStorage.setItem("metflux.folded", JSON.stringify(ids)); } catch { /* ignore */ }
+    };
+    h.tabIndex = 0; h.setAttribute("role", "button"); h.dataset.i18nTitle = "h.fold";
+    set(folded.includes(sec.id));
+    h.addEventListener("click", (ev) => { if (!ev.target.closest("button")) toggle(); });
+    h.addEventListener("keydown", (ev) => { if (ev.target === h && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); toggle(); } });
+  });
 }
 
 // --------------------------------------------------------------- supplies ----
@@ -741,6 +876,14 @@ function metHtml(m) {
   } else {
     h += `<div class="note">${t("met.noStruct")}${f?.metE ? t("met.noStructLabel", { x: (100 * f.metE[m]).toFixed(1) }) : ""}.</div>`;
   }
+  if (f?.e) h += `<h4>${t("mid.title")}${small(t("mid.unit"))}</h4><div id="detMid">${S.result.frames.length > 1 ? `<p class="meta">${t("mid.dynamic")}</p>` : ""}</div>`;
+  else {
+    // without a tracer: what a mass spectrometer would see anyway, from natural isotope abundance
+    const nat = naturalMid(base.f);
+    if (nat) h += `<h4>${t("mid.title")}${small(t("mid.natural"))}</h4>${midBars(nat.dist, 1)}<div class="meta" style="margin-top:6px">${t("mid.naturalCaption", { f: esc(base.f) })}${nat.ignored.length ? " " + t("mid.naturalIgnored", { els: esc(nat.ignored.join(", ")) }) : ""}</div>`;
+  }
+  const D = depths(), d = D.depth[m];
+  h += `<div class="meta">${index.currency[met.b] ? t("met.depthCur") : d < 0 ? t("met.depthNone") : d === 0 ? t("met.depth0") : t("met.depth", { d, p: Math.round((100 * d) / Math.max(1, D.max)) })}</div>`;
   h += `<div class="actions"><button data-act="supply">${t("met.addSupply")}</button><button data-act="label">${t("met.label")}</button></div>`;
   const prod = [], cons = [];
   for (let p = index.rxnStart[m]; p < index.rxnStart[m + 1]; p++) {
@@ -756,6 +899,27 @@ function metHtml(m) {
       Array.from(index.rxnList.subarray(index.rxnStart[m], Math.min(index.rxnStart[m + 1], index.rxnStart[m] + 12)), (j) => `<div class="bar-row" data-go="rxn:${j}"><span class="nm">${esc(model.rxns[j].n)}</span><span class="val">${model.rxns[j].id}</span></div>`).join("");
   }
   return h;
+}
+
+const sampler = (f) => f.sampler || (f.sampler = new IsotopologueSampler(S.sim.tracer, S.index, f.v, f.inputs, f.e, f.elements));
+
+/** Bar chart of a mass distribution; trailing isotopologues below 0.2 % are cut. */
+function midBars(full, dec) {
+  let last = full.length - 1;
+  while (last > 1 && full[last] < 0.002) last--;
+  const dist = full.slice(0, last + 1), every = dist.length > 14 ? Math.ceil(dist.length / 10) : 1;
+  return `<div class="mid">${dist.map((p, k) => `<div class="col" title="M+${k}: ${(100 * p).toFixed(dec + 1)} %">${p >= 0.03 && dist.length <= 14 ? `<span style="bottom:${(100 * p).toFixed(1)}%">${(100 * p).toFixed(p < 0.995 ? dec : 0)}</span>` : ""}<i style="height:${(100 * p).toFixed(1)}%"></i></div>`).join("")}</div>
+    <div class="mid-axis">${dist.map((_, k) => `<span>${k % every ? "" : dist.length > 9 ? k : "M+" + k}</span>`).join("")}</div>`;
+}
+
+/** Bars of the mass isotopologue distribution of a metabolite (steady state with a tracer). */
+function midHtml(f, m) {
+  const cache = f.mids || (f.mids = new Map());
+  let r = cache.get(m);
+  if (r === undefined) cache.set(m, (r = sampler(f).mid(m, 2000, 220)));
+  if (!r) return `<p class="meta">${t("mid.none")}</p>`;
+  return `${midBars(r.dist, 0)}
+    <div class="meta" style="margin-top:6px">${t("mid.caption", { n: r.n })}</div>${r.approx > 0.1 ? `<div class="note">${t("mid.approx", { p: Math.round(100 * r.approx) })}</div>` : ""}`;
 }
 
 function rxnHtml(j) {
@@ -839,6 +1003,9 @@ function renderDetails() {
     if (host && st) renderMolecule(host, st, { enrich: f?.e ? S.sim.tracer.atomsEnrichment({ e: f.e }, m) : null, height: 220 });
     on("supply", () => addSupply(m));
     on("label", () => addSupply(m, true));
+    const midBox = box.querySelector("#detMid");
+    // sampling takes up to a few hundred ms: let the panel paint first
+    if (midBox && f?.e && S.result.frames.length === 1) setTimeout(() => { if (midBox.isConnected) midBox.innerHTML = midHtml(f, m); }, f.mids?.has(m) ? 0 : 30);
   } else if (sel?.type === "rxn") {
     on("objective", () => { S.cfg.objective = sel.rxn; renderObjective(); changed(); });
     on("perturb", () => addPerturb("rxn", sel.rxn));
@@ -847,15 +1014,120 @@ function renderDetails() {
   else if (sel?.type === "grp") on("open", () => openGroup(sel.g));
 }
 
+// ----------------------------------------------------------------- export ----
+function exportContext() {
+  const f = frame(), steadyTracer = !!f.e && S.result.frames.length === 1;
+  const modelLabel = $("modelSelect").selectedOptions[0]?.text || S.slug;
+  return {
+    model: S.model, index: S.index, sim: S.sim, structures: S.structures, result: S.result, frame: f,
+    supplies: S.supplies, cfg: S.cfg, mode: S.result.frames.length > 1 ? "dynamic" : "steady",
+    dyn: { hours: +$("dynHours").value, biomass_gDW_L: +$("dynBiomass").value, pool_umol_gDW: +$("dynPool").value },
+    perturb: S.perturb.map((p) => ({ type: p.type, a: p.a, name: p.type === "gene" ? geneSymbol(p.ref) : S.model.rxns[p.ref].id })),
+    pert: S.result.pert || new Map(), mediumName: mediumName(S.mediumId), depth: depths(),
+    sampler: steadyTracer ? sampler(f) : null, fate: labelFate(f), canvas: S.view.kind === "list" ? null : $("map"),
+    selectedMet: S.sel?.type === "met" ? S.sel.met : null,
+    caption: `${modelLabel} · ${mediumName(S.mediumId)} · ${S.result.frames.length > 1 ? "dynamic, t = " + fmtTime(f.t) : "steady state"}`,
+  };
+}
+
+const EXP_NEEDS = { changes: "ref", chartChanges: "ref", enrichment: "tracer", chartFate: "tracer", isotopologues: "steady", chartMid: "steady", timecourse: "dynamic", timecourseLabel: "dynamic", chartTime: "dynamic" };
+
+function openExport() {
+  const list = $("expList"), go = $("expGo"), f = frame();
+  list.textContent = "";
+  const ok = !!f && f.status === "optimal";
+  go.disabled = !ok;
+  $("expStatus").textContent = ok ? "" : t("exp.noResult");
+  if (ok) {
+    const c = exportContext();
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem("metflux.export") || "null"); } catch { /* storage unavailable */ }
+    for (const kind of ["table", "chart", "other"]) {
+      const h = document.createElement("h4"); h.textContent = t("exp.g." + kind); list.appendChild(h);
+      for (const d of DATASETS.filter((x) => x.kind === kind)) {
+        const on = !d.when || d.when(c);
+        const lab = document.createElement("label"); lab.className = "check" + (on ? "" : " off");
+        const box = document.createElement("input"); box.type = "checkbox"; box.value = d.id; box.disabled = !on;
+        box.checked = on && (saved ? saved.includes(d.id) : true);
+        const txt = document.createElement("span"); txt.textContent = t("exp." + d.id);
+        if (!on) { const why = document.createElement("small"); why.textContent = t("exp.na." + (EXP_NEEDS[d.id] || "tracer")); txt.appendChild(why); }
+        lab.append(box, txt); list.appendChild(lab);
+      }
+    }
+  }
+  $("exportDialog").showModal();
+}
+
+async function downloadResults() {
+  const ids = [...$("expList").querySelectorAll("input:checked")].map((x) => x.value), st = $("expStatus"), go = $("expGo");
+  if (!ids.length) { st.textContent = t("exp.pick"); return; }
+  try { localStorage.setItem("metflux.export", JSON.stringify(ids)); } catch { /* ignore */ }
+  go.disabled = true;
+  try {
+    const files = await buildResults(exportContext(), ids, (p) => { st.textContent = t("exp.working", { p: Math.round(100 * p) }); });
+    const blob = makeZip(files);
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "-");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `metfluxlive_${S.slug}_${stamp}.zip`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+    st.textContent = t("exp.done", { n: files.length, kb: Math.round(blob.size / 1024) });
+    S.lastExport = { files: files.map((x) => x.name), size: blob.size };
+  } catch (err) {
+    console.error(err);
+    st.textContent = t("status.error", { msg: err.message });
+  } finally { go.disabled = false; }
+}
+
+// ---------------------------------------------------------- panel widths ----
+function bindResizers() {
+  const main = document.querySelector("main"), DEF = { left: 318, right: 348 };
+  let w = { ...DEF };
+  try { const o = JSON.parse(localStorage.getItem("metflux.panels") || "null"); if (o && o.left > 0 && o.right > 0) w = { left: o.left, right: o.right }; } catch { /* storage unavailable */ }
+  const apply = (save) => {
+    // the map always keeps at least 320 px
+    const room = Math.max(440, window.innerWidth - 320);
+    w.left = Math.round(Math.min(Math.max(w.left, 220), 640)); w.right = Math.round(Math.min(Math.max(w.right, 240), 720));
+    if (w.left + w.right > room) { const k = room / (w.left + w.right); w.left = Math.round(w.left * k); w.right = Math.round(w.right * k); }
+    main.style.setProperty("--left-w", w.left + "px"); main.style.setProperty("--right-w", w.right + "px");
+    if (save) try { localStorage.setItem("metflux.panels", JSON.stringify(w)); } catch { /* ignore */ }
+  };
+  apply(false);
+  window.addEventListener("resize", () => apply(false));
+  for (const [id, side, sign] of [["resLeft", "left", 1], ["resRight", "right", -1]]) {
+    const h = $(id);
+    h.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      h.setPointerCapture(ev.pointerId);
+      const x0 = ev.clientX, w0 = w[side];
+      h.classList.add("dragging"); document.body.classList.add("resizing");
+      const move = (e) => { w[side] = w0 + sign * (e.clientX - x0); apply(false); };
+      const up = () => { h.removeEventListener("pointermove", move); h.classList.remove("dragging"); document.body.classList.remove("resizing"); apply(true); };
+      h.addEventListener("pointermove", move);
+      h.addEventListener("pointerup", up, { once: true });
+      h.addEventListener("pointercancel", up, { once: true });
+    });
+    h.addEventListener("dblclick", () => { w[side] = DEF[side]; apply(true); });
+    h.addEventListener("keydown", (ev) => {
+      if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+      ev.preventDefault();
+      w[side] += sign * (ev.key === "ArrowRight" ? 16 : -16); apply(true);
+    });
+  }
+}
+
 // --------------------------------------------------------------------- ui ----
 function changeLanguage(lang) {
   setLang(lang);
   applyDom();
   if (!S.model) return;
   S.search = new SearchIndex(S.model, S.index);
-  S.scenes = {}; // region labels are translated
+  S.scenes = {}; // region and level labels are translated
+  for (const k of [...S.subScenes.keys()]) if (String(k).startsWith("c")) S.subScenes.delete(k);
+  $("docsBtn").href = "docs.html?lang=" + getLang();
   if (S.view.kind === "global") map.setScene(globalScene(), true);
-  renderSupplies(); renderPerturb(); renderObjective(); renderCrumbs(); applyFrame(); renderDetails();
+  else if (S.view.kind === "sub" && isCascade()) map.setScene(subScene(S.view.ss), true);
+  renderMediumSel(); renderSupplies(); renderPerturb(); renderObjective(); renderCrumbs(); applyFrame(); renderDetails();
   if (S.statusFn) setStatus(S.statusFn, S.statusErr);
 }
 
@@ -880,7 +1152,10 @@ function bindUi() {
       run();
     };
   });
-  $("resetMedium").onclick = () => { S.supplies = defaultMedium(S.model).map((it) => ({ ...it, label: null, fraction: 1 })); renderSupplies(); changed(); };
+  $("resetMedium").onclick = () => loadMedium(S.mediumId);
+  $("mediumSel").onchange = (ev) => loadMedium(ev.target.value);
+  $("saveMedium").onclick = saveMedium;
+  $("deleteMedium").onclick = deleteMedium;
   $("clearPerturb").onclick = () => { S.perturb = []; renderPerturb(); changed(); };
   $("objSense").onchange = (ev) => { S.cfg.maximize = ev.target.value === "max"; changed(); };
   $("pfba").onchange = (ev) => { S.cfg.parsimonious = ev.target.checked; changed(); };
@@ -888,8 +1163,12 @@ function bindUi() {
   $("groupSel").onchange = (ev) => {
     S.grouping = ev.target.value;
     try { localStorage.setItem("metflux.grouping", S.grouping); } catch { /* ignore */ }
-    S.sel = null; openGlobal(); renderDetails();
+    if (S.view.kind === "sub") openSubsystem(S.view.ss, true); else { S.sel = null; openGlobal(); renderDetails(); }
   };
+  $("exportBtn").onclick = openExport;
+  $("expAll").onclick = () => $("expList").querySelectorAll("input:not(:disabled)").forEach((x) => { x.checked = true; });
+  $("expNone").onclick = () => $("expList").querySelectorAll("input").forEach((x) => { x.checked = false; });
+  $("expGo").onclick = downloadResults;
   $("filterSel").onchange = (ev) => { S.filter = ev.target.value; applyFrame(); if (S.view.kind !== "list") map.fit(true, true); };
   $("optInactive").onchange = (ev) => { map.options.inactive = ev.target.checked; };
   $("optParticles").onchange = (ev) => { map.options.particles = ev.target.checked; };
