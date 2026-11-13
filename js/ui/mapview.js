@@ -244,8 +244,21 @@ export class MapView {
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.w, this.h);
+    if (this.scene.guides) this._drawGuides(ctx);
     if (this.scene.kind === "sub") this._drawSub(ctx);
     else if (this.scene.kind === "global") this._drawGlobal(ctx);
+  }
+
+  /** Cascade view: one faint line per level, labelled with its distance from the medium. */
+  _drawGuides(ctx) {
+    ctx.font = "11px Inter, system-ui, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+    for (const g of this.scene.guides) {
+      const y = Math.round(this._sy(g.y)) + 0.5;
+      if (y < 44 || y > this.h - 8) continue;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(this.w, y);
+      ctx.setLineDash([2, 6]); ctx.strokeStyle = "rgba(125,145,190,0.25)"; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(147,162,198,0.9)"; ctx.fillText(g.label, 12, y - 3);
+    }
   }
 
   _edgeColor(e, alpha) {

@@ -13,9 +13,26 @@ const es = {
   "h.run": "▶ Simular",
   "h.medium": "Medio y fuentes",
   "h.reset": "restaurar",
-  "h.resetTitle": "Restaurar el medio por defecto",
+  "h.resetTitle": "Descartar los cambios y volver al medio seleccionado",
   "h.mediumHint": "Concentración (mM) de cada metabolito disponible. Los extracelulares entran por su reacción de intercambio; los intracelulares se inyectan en su compartimento. Pulsa <b>⚛</b> para marcar átomos.",
   "h.addSupply": "Añadir metabolito…",
+  "h.mediumSel": "Medio de cultivo",
+  "h.fold": "Plegar / desplegar",
+  "medium.builtin": "Predefinidos", "medium.saved": "Guardados",
+  "medium.save": "guardar…", "medium.saveTitle": "Guardar el medio actual, con tus cambios, en este navegador",
+  "medium.delete": "borrar",
+  "medium.savePrompt": "Nombre para este medio:",
+  "medium.copyOf": "{name} (modificado)",
+  "medium.overwrite": "Ya existe «{name}». ¿Sobrescribirlo?",
+  "medium.deleteConfirm": "¿Borrar el medio guardado «{name}»?",
+  "medium.storageError": "No se pudo guardar: el almacenamiento del navegador no está disponible.",
+  "medium.name.default": "Estándar (tipo DMEM/F-12)",
+  "medium.name.plasmax": "Plasmax (fisiológico)",
+  "medium.name.hplm": "HPLM (tipo plasma humano)",
+  "medium.note.default": "Medio de cultivo clásico, rico en nutrientes: glucosa 5,5 mM y aminoácidos muy por encima de los niveles del plasma.",
+  "medium.note.plasmax": "Concentraciones del plasma humano, según la Tabla S1 de <a href=\"https://pubmed.ncbi.nlm.nih.gov/30613774/\" target=\"_blank\" rel=\"noopener\">Vande Voorde et al. 2019</a>. Los ácidos grasos y vitaminas liposolubles que aporta el suero se han añadido aparte.",
+  "medium.note.hplm": "Human Plasma-Like Medium (Cantor et al. 2017), según la misma tabla comparativa de <a href=\"https://pubmed.ncbi.nlm.nih.gov/30613774/\" target=\"_blank\" rel=\"noopener\">Vande Voorde et al. 2019</a>. Los ácidos grasos y vitaminas liposolubles que aporta el suero se han añadido aparte.",
+  "medium.note.user": "Medio guardado en este navegador.",
   "h.perturb": "Knockout / knockdown",
   "h.clearPerturb": "quitar todo",
   "h.perturbHint": "Actividad residual de un gen/enzima o de una reacción: 0 % = knockout. Se compara con la misma simulación sin perturbar (referencia).",
@@ -34,6 +51,37 @@ const es = {
   "h.inactiveTitle": "Mostrar reacciones y metabolitos sin flujo",
   "h.particles": "animación",
   "h.fit": "Encajar mapa",
+  "h.docs": "Docs", "h.docsTitle": "Documentación: métodos, fuentes de datos y experimentos de ejemplo",
+  "h.export": "Descargar", "h.exportTitle": "Descargar los resultados (tablas, gráficas, mapa)",
+  "h.resize": "Arrastra para cambiar el ancho del panel (doble clic: tamaño original)",
+  "group.cascade": "Agrupar: cascada",
+  "crumb.cascade": "Cascada",
+  "cascade.medium": "medio", "cascade.step": "paso {a}", "cascade.steps": "pasos {a}–{b}", "cascade.unreach": "no alcanzable desde el medio",
+  "legend.cascadeHint": "de arriba abajo: pasos de reacción desde los metabolitos del medio (sin contar cofactores)",
+  "cascade.entry": "entrada (lo más cercano al medio)", "cascade.local": "paso {a} dentro de la ruta",
+  "legend.cascadeSub": "de arriba abajo: pasos dentro de la ruta desde sus metabolitos más cercanos al medio",
+  "met.depth": "Cascada: profundidad {d} (pasos desde el medio; {p}/100)", "met.depth0": "Cascada: está en el medio (0/100)",
+  "met.depthNone": "Cascada: no alcanzable desde el medio actual", "met.depthCur": "Cascada: cofactor, no se ordena",
+  "mid.title": "Isotopólogos", "mid.unit": "% de moléculas",
+  "mid.caption": "{n} moléculas muestreadas · estado estacionario isotópico · sin abundancia natural",
+  "mid.approx": "El {p} % de los átomos pasa por reacciones sin mapa atómico: la distribución es aproximada.",
+  "mid.dynamic": "La distribución de isotopólogos se calcula en modo estacionario.",
+  "mid.natural": "abundancia natural · % de moléculas",
+  "mid.naturalCaption": "Sin trazador: distribución esperada por la abundancia natural de isótopos, calculada a partir de la fórmula {f}. Marca un nutriente (⚛) para ver el efecto del trazador.",
+  "mid.naturalIgnored": "No se incluye: {els}.",
+  "mid.none": "Sin átomos del elemento marcado, o el metabolito no se produce.",
+  "exp.title": "Descargar resultados", "exp.hint": "Elige qué incluir. Se descarga un único .zip con un README que describe cada fichero. Los ficheros están en inglés.",
+  "exp.all": "todo", "exp.none": "nada", "exp.download": "Descargar .zip", "exp.working": "Generando… {p} %", "exp.done": "{n} ficheros · {kb} kB",
+  "exp.noResult": "Todavía no hay resultados: ejecuta una simulación.", "exp.pick": "Elige al menos un resultado.",
+  "exp.g.table": "Tablas (CSV)", "exp.g.chart": "Gráficas e imágenes", "exp.g.other": "Otros",
+  "exp.na.ref": "requiere un knockout / knockdown", "exp.na.tracer": "requiere un trazador", "exp.na.steady": "requiere trazador en modo estacionario", "exp.na.dynamic": "requiere modo dinámico",
+  "exp.settings": "Configuración de la simulación (JSON)", "exp.fluxes": "Flujos de todas las reacciones", "exp.exchanges": "Captación y excreción",
+  "exp.pathways": "Resumen por ruta", "exp.metabolites": "Metabolitos: recambio, profundidad, enriquecimiento",
+  "exp.changes": "Cambios de flujo frente a la referencia", "exp.enrichment": "Enriquecimiento átomo a átomo",
+  "exp.isotopologues": "Distribuciones de isotopólogos (M+0, M+1…)", "exp.timecourse": "Serie temporal: medio, biomasa, intercambio",
+  "exp.timecourseLabel": "Serie temporal: enriquecimiento", "exp.chartExchange": "Gráficas de captación y excreción",
+  "exp.chartPathways": "Gráfica de actividad por ruta", "exp.chartChanges": "Gráfica de reacciones más alteradas", "exp.chartFate": "Gráfica del destino de la marca",
+  "exp.chartMid": "Gráfica de isotopólogos", "exp.chartTime": "Gráficas de depleción del medio y biomasa", "exp.map": "Imagen del mapa (PNG)",
   "h.groupTitle": "Cómo se agrupan las reacciones en el mapa global",
   "h.filterTitle": "Mostrar solo lo afectado por el trazador o por el knockout/knockdown",
   "group.pathway": "Agrupar: rutas",
@@ -227,9 +275,26 @@ const en = {
   "h.run": "▶ Simulate",
   "h.medium": "Medium and sources",
   "h.reset": "reset",
-  "h.resetTitle": "Restore the default medium",
+  "h.resetTitle": "Discard changes and go back to the selected medium",
   "h.mediumHint": "Concentration (mM) of each available metabolite. Extracellular ones enter through their exchange reaction; intracellular ones are injected into their compartment. Press <b>⚛</b> to label atoms.",
   "h.addSupply": "Add metabolite…",
+  "h.mediumSel": "Culture medium",
+  "h.fold": "Collapse / expand",
+  "medium.builtin": "Built-in", "medium.saved": "Saved",
+  "medium.save": "save…", "medium.saveTitle": "Save the current medium, with your changes, in this browser",
+  "medium.delete": "delete",
+  "medium.savePrompt": "Name for this medium:",
+  "medium.copyOf": "{name} (modified)",
+  "medium.overwrite": "\"{name}\" already exists. Overwrite it?",
+  "medium.deleteConfirm": "Delete the saved medium \"{name}\"?",
+  "medium.storageError": "Could not save: browser storage is not available.",
+  "medium.name.default": "Standard (DMEM/F-12-like)",
+  "medium.name.plasmax": "Plasmax (physiological)",
+  "medium.name.hplm": "HPLM (human plasma-like)",
+  "medium.note.default": "Classic nutrient-rich culture medium: 5.5 mM glucose and amino acids well above plasma levels.",
+  "medium.note.plasmax": "Human plasma concentrations, from Table S1 of <a href=\"https://pubmed.ncbi.nlm.nih.gov/30613774/\" target=\"_blank\" rel=\"noopener\">Vande Voorde et al. 2019</a>. The fatty acids and fat-soluble vitamins supplied by serum were added separately.",
+  "medium.note.hplm": "Human Plasma-Like Medium (Cantor et al. 2017), from the same comparison table of <a href=\"https://pubmed.ncbi.nlm.nih.gov/30613774/\" target=\"_blank\" rel=\"noopener\">Vande Voorde et al. 2019</a>. The fatty acids and fat-soluble vitamins supplied by serum were added separately.",
+  "medium.note.user": "Medium saved in this browser.",
   "h.perturb": "Knockout / knockdown",
   "h.clearPerturb": "remove all",
   "h.perturbHint": "Residual activity of a gene/enzyme or a reaction: 0 % = knockout. Compared against the same simulation without perturbations (reference).",
@@ -248,6 +313,37 @@ const en = {
   "h.inactiveTitle": "Show reactions and metabolites carrying no flux",
   "h.particles": "animation",
   "h.fit": "Fit map",
+  "h.docs": "Docs", "h.docsTitle": "Documentation: methods, data sources and example experiments",
+  "h.export": "Download", "h.exportTitle": "Download the results (tables, charts, map)",
+  "h.resize": "Drag to change the panel width (double-click: original size)",
+  "group.cascade": "Group: cascade",
+  "crumb.cascade": "Cascade",
+  "cascade.medium": "medium", "cascade.step": "step {a}", "cascade.steps": "steps {a}–{b}", "cascade.unreach": "not reachable from the medium",
+  "legend.cascadeHint": "top to bottom: reaction steps from the medium metabolites (cofactors not counted)",
+  "cascade.entry": "entry (closest to the medium)", "cascade.local": "step {a} inside the pathway",
+  "legend.cascadeSub": "top to bottom: steps inside the pathway from its metabolites closest to the medium",
+  "met.depth": "Cascade: depth {d} (steps from the medium; {p}/100)", "met.depth0": "Cascade: it is in the medium (0/100)",
+  "met.depthNone": "Cascade: not reachable from the current medium", "met.depthCur": "Cascade: cofactor, not ranked",
+  "mid.title": "Isotopologues", "mid.unit": "% of molecules",
+  "mid.caption": "{n} molecules sampled · isotopic steady state · no natural abundance",
+  "mid.approx": "{p} % of the atoms go through reactions without an atom map: the distribution is approximate.",
+  "mid.dynamic": "The isotopologue distribution is computed in steady-state mode.",
+  "mid.natural": "natural abundance · % of molecules",
+  "mid.naturalCaption": "No tracer: distribution expected from natural isotope abundance, computed from the formula {f}. Label a nutrient (⚛) to see the effect of a tracer.",
+  "mid.naturalIgnored": "Not included: {els}.",
+  "mid.none": "No atoms of the labelled element, or the metabolite is not produced.",
+  "exp.title": "Download results", "exp.hint": "Choose what to include. A single .zip is downloaded, with a README describing every file.",
+  "exp.all": "all", "exp.none": "none", "exp.download": "Download .zip", "exp.working": "Building… {p} %", "exp.done": "{n} files · {kb} kB",
+  "exp.noResult": "No results yet: run a simulation first.", "exp.pick": "Choose at least one result.",
+  "exp.g.table": "Tables (CSV)", "exp.g.chart": "Charts and images", "exp.g.other": "Other",
+  "exp.na.ref": "needs a knockout / knockdown", "exp.na.tracer": "needs a tracer", "exp.na.steady": "needs a tracer in steady-state mode", "exp.na.dynamic": "needs dynamic mode",
+  "exp.settings": "Simulation settings (JSON)", "exp.fluxes": "Fluxes of all reactions", "exp.exchanges": "Uptake and secretion",
+  "exp.pathways": "Pathway summary", "exp.metabolites": "Metabolites: turnover, depth, enrichment",
+  "exp.changes": "Flux changes against the reference", "exp.enrichment": "Atom-by-atom enrichment",
+  "exp.isotopologues": "Isotopologue distributions (M+0, M+1…)", "exp.timecourse": "Time course: medium, biomass, exchange",
+  "exp.timecourseLabel": "Time course: enrichment", "exp.chartExchange": "Uptake and secretion charts",
+  "exp.chartPathways": "Pathway activity chart", "exp.chartChanges": "Most changed reactions chart", "exp.chartFate": "Label fate chart",
+  "exp.chartMid": "Isotopologue chart", "exp.chartTime": "Medium depletion and biomass charts", "exp.map": "Map image (PNG)",
   "h.groupTitle": "How reactions are grouped on the global map",
   "h.filterTitle": "Show only what is affected by the tracer or by the knockout/knockdown",
   "group.pathway": "Group: pathways",
@@ -417,21 +513,21 @@ const en = {
 };
 
 export const DICT = { es, en };
-export const LANGS = [["es", "Español"], ["en", "English"]];
-let lang = "es";
+export const LANGS = [["en", "English"], ["es", "Español"]];
+let lang = "en";
 
 export const getLang = () => lang;
 
 export function setLang(l) {
-  lang = DICT[l] ? l : "es";
+  lang = DICT[l] ? l : "en";
   try { localStorage.setItem("metflux.lang", lang); } catch { /* storage unavailable */ }
   if (typeof document !== "undefined") document.documentElement.lang = lang;
 }
 
 export function initLang() {
-  let l = "es";
+  let l = "en";
   try { l = localStorage.getItem("metflux.lang") || l; } catch { /* storage unavailable */ }
-  lang = DICT[l] ? l : "es";
+  lang = DICT[l] ? l : "en";
   document.documentElement.lang = lang;
 }
 
