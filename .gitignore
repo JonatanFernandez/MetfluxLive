@@ -2,3 +2,5 @@ tools/.venv/
 tools/cache/
 node_modules/
 __pycache__/
+Human-GEM-*.zip
+Mouse-GEM-*.zip
