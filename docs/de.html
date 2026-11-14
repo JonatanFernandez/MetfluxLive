@@ -23,6 +23,7 @@
   <li><b>Simulieren</b> löst das Modell sofort mit allem, was im linken Bereich steht (Medium, Tracer, gemessene Flüsse, Knockouts, Ziel und im dynamischen Modus Dauer und Ereignisse), und zeichnet die Karte mit dem neuen Ergebnis neu. Nichts anderes berechnet Flüsse: Karte und Bereiche zeigen nur das letzte Ergebnis.</li>
   <li><b>Auto</b> drückt kurz nach jeder Änderung für Sie auf Simulieren. Es wird für jeden Modus getrennt gespeichert: standardmäßig <b>an</b> im Fließgleichgewicht, wo ein Lauf ein bis zwei Sekunden dauert, und standardmäßig <b>aus</b> im dynamischen Modus, wo er eine halbe Minute oder länger dauert und man meist mehreres (Ereignisse, Tracer) einstellen möchte, bevor man startet. Schalten Sie es auch im dynamischen Modus ein, wenn Sie möchten; eine neue Änderung bricht den laufenden Lauf ab und startet neu.</li>
   <li>Bei ausgeschaltetem Auto bleibt nach einer Änderung das alte Ergebnis sichtbar, auf Simulieren erscheint ein bernsteinfarbener Punkt und in der Statusleiste die Meldung „Parameter geändert“, bis Sie drücken. Der Moduswechsel funktioniert genauso: Neu gerechnet wird nur, wenn Auto für den neuen Modus an ist.</li>
+  <li>Während einer Berechnung zeigt Simulieren „Wird simuliert…“, und die Statuszeile unten rechts wird bernsteinfarben; sie wird grün, wenn das Ergebnis bereit ist.</li>
 </ul>
 <h3>Heller und dunkler Modus</h3>
 <p>Die Mond-/Sonnen-Schaltfläche rechts in der oberen Leiste wechselt zwischen dem dunklen Thema (Standard) und einem hellen Thema mit sanften Pastellflächen. Die Datenfarben (Markierung, Änderung, freie Enthalpie) sind in beiden gleich; nur Hintergrund, Bereiche und neutrale Elemente ändern sich. Der Browser merkt sich die Wahl, die auch für diese Seite gilt.</p>
@@ -345,6 +346,7 @@
   <li>Ändern Sie, was Sie testen möchten, und simulieren Sie erneut.</li>
   <li>Wählen Sie das Szenario in der Liste (das Optionsfeld). Ein blaues Abzeichen auf der Karte zeigt, womit Sie vergleichen.</li>
 </ol>
+<p>Unter der Liste macht <b>Zeigen [X] verglichen mit [Y]</b> beide Seiten ausdrücklich. „Zeigen“ ist die Situation, die auf der Karte und in den Bereichen gezeichnet wird: die aktuelle oder ein beliebiges gespeichertes Szenario, dessen gespeichertes Ergebnis ohne Neuberechnung wieder angezeigt wird (wurde es mit anderen Modelländerungen erstellt, wird es geladen und neu berechnet). „Verglichen mit“ ist die Referenz: Jede Änderung wird von ihr zur gezeigten Situation gemessen, „Flussänderung von „B“ zu „A““ bedeutet also A relativ zu B. ⇅ tauscht beide. Ändern Sie danach irgendetwas, wird die gezeigte Seite wieder zur aktuellen, nicht gespeicherten Situation.</p>
 <p>Ab dann tritt das Szenario überall an die Stelle der „Referenz“:</p>
 <ul>
   <li><b>Karte.</b> „Zeigen: Nur veränderter Fluss“ färbt Reaktionen nach Flussänderung (blau = weniger, orange = mehr). „Veränderte Markierung“ färbt Metaboliten nach der Änderung ihrer mittleren Anreicherung und blendet den Rest aus. In der Gesamt- und der Zellansicht wird jede Gruppe nach der Änderung ihrer flussgewichteten Markierung gefärbt.</li>

@@ -89,6 +89,7 @@
   <li><b>Simulate</b> solves the model now with everything in the left panel (medium, tracers, measured fluxes, knockouts, objective, and in Dynamic the duration and events) and redraws the map with the new result. Nothing else computes fluxes: the map and the panels only display the last result.</li>
   <li><b>Auto</b> presses Simulate for you shortly after every change. It is remembered separately for each mode: <b>on</b> by default in Steady state, where a run takes a second or two, and <b>off</b> by default in Dynamic, where a run takes half a minute or more and you usually want to set several things (events, tracers) before starting. Turn it on in Dynamic too if you prefer; a new change stops the run in progress and starts again.</li>
   <li>With Auto off, a change leaves the old result on screen, an amber dot on Simulate and the message "Parameters changed" in the status bar until you press it. Switching mode works the same way: it re-runs only if Auto is on for the new mode.</li>
+  <li>While a calculation runs, Simulate reads "Simulating…" and the status line at the bottom right turns amber; it turns green when the result is ready.</li>
 </ul>
 <h3>Light and dark mode</h3>
 <p>The moon/sun button at the right of the top bar switches between the dark theme (default) and a light theme with soft pastel surfaces. The data colours (label, change, free energy) are the same in both; only the background, panels and neutral marks change. The choice is remembered by the browser and also applies to this page.</p>
@@ -411,6 +412,7 @@
   <li>Change whatever you want to test and simulate again.</li>
   <li>Pick the scenario in the list (the radio button). A blue badge on the map says what you are comparing with.</li>
 </ol>
+<p>Below the list, <b>Show [X] compared with [Y]</b> makes both sides explicit. "Show" is the situation drawn on the map and in the panels: the current one or any saved scenario, whose stored result is shown again without recomputing (if it was made with other model edits, it is loaded and recomputed). "Compared with" is the reference: every change is measured from it to the situation shown, so "Flux change from «B» to «A»" means A relative to B. ⇅ swaps the two. Changing anything afterwards turns the shown side back into the current, unsaved situation.</p>
 <p>From then on, the scenario takes the place of the "reference" everywhere:</p>
 <ul>
   <li><b>Map.</b> "Show: Changed flux only" colours reactions by flux change (blue = less, orange = more). "Changed label" colours metabolites by the change of their mean enrichment and hides the rest. In the global and cell views each group is coloured by the change of its flux-weighted label.</li>
@@ -759,6 +761,7 @@
   <li><b>Simular</b> resuelve el modelo en ese momento con todo lo que hay en el panel izquierdo (medio, trazadores, flujos medidos, knockouts, objetivo y, en Dinámico, la duración y los eventos) y redibuja el mapa con el resultado nuevo. Nada más calcula flujos: el mapa y los paneles sólo muestran el último resultado.</li>
   <li><b>Auto</b> pulsa Simular por ti poco después de cada cambio. Se recuerda por separado para cada modo: <b>activado</b> por defecto en Estacionario, donde una simulación tarda uno o dos segundos, y <b>desactivado</b> por defecto en Dinámico, donde tarda medio minuto o más y lo normal es preparar varias cosas (eventos, trazadores) antes de empezar. Puedes activarlo también en Dinámico; un cambio nuevo detiene la simulación en curso y empieza otra.</li>
   <li>Con Auto desactivado, un cambio deja en pantalla el resultado anterior, un punto ámbar en Simular y el aviso «Parámetros modificados» en la barra de estado hasta que lo pulses. Cambiar de modo funciona igual: sólo se recalcula si Auto está activado para el modo nuevo.</li>
+  <li>Mientras se calcula, Simular pasa a «Simulando…» y la línea de estado de abajo a la derecha se pone ámbar; se pone verde cuando el resultado está listo.</li>
 </ul>
 <h3>Modo claro y oscuro</h3>
 <p>El botón de luna/sol a la derecha de la barra superior cambia entre el tema oscuro (por defecto) y un tema claro con superficies en tonos pastel suaves. Los colores de los datos (marcaje, cambio, energía libre) son los mismos en ambos; sólo cambian el fondo, los paneles y las marcas neutras. El navegador recuerda la elección, que también se aplica a esta página.</p>
@@ -1081,6 +1084,7 @@
   <li>Cambia lo que quieras probar y vuelve a simular.</li>
   <li>Elige el escenario en la lista (el botón redondo). Una etiqueta azul sobre el mapa indica con qué estás comparando.</li>
 </ol>
+<p>Bajo la lista, <b>Mostrar [X] comparado con [Y]</b> hace explícitos los dos lados. «Mostrar» es la situación que se dibuja en el mapa y en los paneles: la actual o cualquier escenario guardado, cuyo resultado se vuelve a mostrar sin recalcular (si se hizo con otras ediciones del modelo, se carga y se recalcula). «Comparado con» es la referencia: cada cambio se mide desde ella hacia la situación mostrada, así que «Cambio de flujo de «B» a «A»» significa A respecto a B. ⇅ intercambia los dos. Si después cambias cualquier cosa, el lado mostrado vuelve a ser la situación actual, sin guardar.</p>
 <p>A partir de ahí, el escenario hace de «referencia» en todas partes:</p>
 <ul>
   <li><b>Mapa.</b> «Mostrar: Sólo flujo cambiado» colorea las reacciones según el cambio de flujo (azul = menos, naranja = más). «Marcaje cambiado» colorea los metabolitos según el cambio de su enriquecimiento medio y oculta el resto. En las vistas global y celular cada grupo se colorea según el cambio de su marcaje ponderado por flujo.</li>

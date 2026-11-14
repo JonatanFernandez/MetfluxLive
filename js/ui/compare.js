@@ -1,4 +1,5 @@
-// Comparison mode: saved scenarios and the differences between one of them and the current situation.
+// Comparison mode: saved scenarios and the differences between one of them (the reference) and the situation
+// on screen, which is either the current, unsaved one or a saved scenario shown again (S.shown).
 //
 // A scenario keeps its settings (medium, tracers, perturbations, events, model edits…), its result, and the
 // model objects it was computed with, so that it can be compared after the model has been edited further:
@@ -51,6 +52,9 @@ export function createCompare(app) {
   }
 
   const current = () => S.scenarios.find((x) => x.id === S.compare) || null;
+  const shown = () => S.scenarios.find((x) => x.id === S.shown) || null;
+  /** Name of the situation on screen: a saved scenario, or "current situation". */
+  const shownName = () => shown()?.name ?? t("cmp.now");
 
   function setCompare(id) {
     S.compare = id;
@@ -61,6 +65,7 @@ export function createCompare(app) {
 
   function remove(sc) {
     S.scenarios = S.scenarios.filter((x) => x !== sc);
+    if (S.shown === sc.id) S.shown = null;
     if (S.compare === sc.id) setCompare(null); else render();
   }
 
@@ -87,9 +92,47 @@ export function createCompare(app) {
       list.appendChild(row);
     }
     if (!S.scenarios.length) list.innerHTML = `<p class="hint">${t("cmp.empty")}</p>`;
+    renderPicker();
     const sc = current();
     $("compareBadge").hidden = !sc;
-    if (sc) $("compareBadge").innerHTML = t("cmp.badge", { name: esc(sc.name) });
+    if (sc) $("compareBadge").innerHTML = t("cmp.badge", { a: esc(shownName()), b: esc(sc.name) });
+  }
+
+  /** "Show [X] compared with [Y]": both sides explicit, any pair of scenarios. */
+  function renderPicker() {
+    const box = $("cmpPick");
+    const usable = S.scenarios.filter((x) => x.ctx.slug === S.slug);
+    box.hidden = !usable.length;
+    if (!usable.length) return;
+    const show = $("cmpShow"), ref = $("cmpRef");
+    show.textContent = ""; ref.textContent = "";
+    if (!S.shown) show.add(new Option(t("cmp.nowOpt"), ""));
+    for (const x of usable) show.add(new Option(x.name, String(x.id)));
+    show.value = S.shown ? String(S.shown) : "";
+    ref.add(new Option(t("cmp.noneOpt"), ""));
+    for (const x of usable) { const o = new Option(x.name, String(x.id)); o.disabled = x.id === S.shown; ref.add(o); }
+    ref.value = S.compare ? String(S.compare) : "";
+    $("cmpSwap").disabled = !(S.shown && S.compare);
+  }
+
+  async function pickShown(id) {
+    const sc = S.scenarios.find((x) => x.id === id);
+    if (!sc || sc.id === S.shown) { render(); return; }
+    if (S.compare === sc.id) S.compare = null; // a scenario is not compared with itself
+    if (!(await app.show(sc))) render();
+  }
+
+  async function swap() {
+    if (!S.shown || !S.compare) return;
+    const a = S.shown, b = S.compare;
+    S.compare = null;
+    if (await app.show(S.scenarios.find((x) => x.id === b))) setCompare(a);
+  }
+
+  function bindPicker() {
+    $("cmpShow").onchange = (ev) => pickShown(+ev.target.value || null);
+    $("cmpRef").onchange = (ev) => setCompare(+ev.target.value || null);
+    $("cmpSwap").onclick = swap;
   }
 
   // --------------------------------------------------------------- alignment ----
@@ -189,7 +232,7 @@ export function createCompare(app) {
   function summaryHtml(f) {
     if (!f.ref?.scen) return "";
     const sc = f.ref.scen;
-    let h = `<div class="note cmpnote">${t("cmp.summaryNote", { name: esc(sc.name), what: esc(sc.summary) })}${sc.result.frames.length > 1 || S.result.frames.length > 1 ? "<br>" + t("cmp.timeNote", { a: fmtTime(f.ref.t), b: fmtTime(f.t) }) : ""}${sc.opsKey !== app.opsKey() ? "<br>" + t("cmp.modelsDiffer") : ""}</div>`;
+    let h = `<div class="note cmpnote">${t("cmp.summaryNote", { name: esc(sc.name), what: esc(sc.summary), cur: esc(shownName()) })}${sc.result.frames.length > 1 || S.result.frames.length > 1 ? "<br>" + t("cmp.timeNote", { a: fmtTime(f.ref.t), b: fmtTime(f.t) }) : ""}${sc.opsKey !== app.opsKey() ? "<br>" + t("cmp.modelsDiffer") : ""}</div>`;
     const ex = exchangeRows(f).slice(0, 10);
     if (ex.length) {
       const mx = Math.max(...ex.map((r) => Math.abs(r.d)), 1e-12);
@@ -249,7 +292,7 @@ export function createCompare(app) {
     box.hidden = false;
     const sc = ref.scen, a = alignment(sc), rm = a ? a.met[m] : m;
     const eA = ref.metE ? ref.metE[m] : 0, eB = f.metE ? f.metE[m] : 0;
-    let h = `<h4>${t("cmp.metTitle", { name: esc(sc.name) })}</h4>`;
+    let h = `<h4>${t("cmp.metTitle", { name: esc(sc.name), cur: esc(shownName()) })}</h4>`;
     if (rm < 0) { box.innerHTML = h + `<p class="meta">${t("cmp.metMissing")}</p>`; return; }
     const turnR = (ref.v && S.index.turnover(ref.v)[m]) || 0, turn = S.index.turnover(f.v)[m];
     h += `<div class="cards"><div class="card"><div class="lbl">${t("cmp.turnover")}</div><div style="margin-top:6px">${fmtFlux(turnR)} → <b>${fmtFlux(turn)}</b></div></div>`;
@@ -265,7 +308,7 @@ export function createCompare(app) {
       if (!host) return;
       if (!da && !db) { host.innerHTML = `<p class="meta">${t("mid.none")}</p>`; return; }
       const unl = (d, o) => d || (o ? o.map((_, k) => (k ? 0 : 1)) : null); // no tracer: everything M+0
-      host.innerHTML = pairedMid(unl(da, db), unl(db, da)) + `<div class="meta" style="margin-top:6px"><span class="sw a"></span> ${esc(sc.name)} &nbsp; <span class="sw b"></span> ${t("cmp.current")}<br>${t("cmp.midCaption")}</div>`;
+      host.innerHTML = pairedMid(unl(da, db), unl(db, da)) + `<div class="meta" style="margin-top:6px"><span class="sw a"></span> ${esc(sc.name)} &nbsp; <span class="sw b"></span> ${esc(shownName())}<br>${t("cmp.midCaption")}</div>`;
     }, 40);
   }
 
@@ -276,5 +319,5 @@ export function createCompare(app) {
     return { name: f.ref.scen.name, summary: f.ref.scen.summary, exchanges: exchangeRows(f), pathways: pathwayRows(f), label: labelRows(f), refMid: (m) => refMid(f, m), t: f.ref.t };
   }
 
-  return { save, render, attach, setCompare, current, summaryHtml, fillMetCompare, exportData, labelRows, alignment };
+  return { save, render, attach, setCompare, current, shownName, bindPicker, summaryHtml, fillMetCompare, exportData, labelRows, alignment };
 }

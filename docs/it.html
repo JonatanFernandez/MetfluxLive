@@ -23,6 +23,7 @@
   <li><b>Simula</b> risolve il modello in quel momento con tutto ciò che c'è nel pannello sinistro (terreno, traccianti, flussi misurati, knockout, obiettivo e, in Dinamico, la durata e gli eventi) e ridisegna la mappa con il nuovo risultato. Nient'altro calcola flussi: la mappa e i pannelli mostrano solo l'ultimo risultato.</li>
   <li><b>Auto</b> preme Simula per te poco dopo ogni modifica. Si ricorda separatamente per ogni modalità: <b>attivo</b> per impostazione predefinita in Stato stazionario, dove una simulazione richiede uno o due secondi, e <b>disattivo</b> per impostazione predefinita in Dinamico, dove richiede mezzo minuto o più e di solito si vogliono preparare più cose (eventi, traccianti) prima di iniziare. Attivalo anche in Dinamico se preferisci; una nuova modifica interrompe la simulazione in corso e ne avvia un'altra.</li>
   <li>Con Auto disattivo, una modifica lascia sullo schermo il risultato precedente, un punto ambra su Simula e il messaggio «Parametri modificati» nella barra di stato finché non lo premi. Cambiare modalità funziona allo stesso modo: si ricalcola solo se Auto è attivo per la nuova modalità.</li>
+  <li>Durante un calcolo, Simula diventa «Simulazione…» e la riga di stato in basso a destra diventa ambra; diventa verde quando il risultato è pronto.</li>
 </ul>
 <h3>Modalità chiara e scura</h3>
 <p>Il pulsante luna/sole a destra della barra superiore passa dal tema scuro (predefinito) a un tema chiaro con superfici in tenui toni pastello. I colori dei dati (marcatura, variazione, energia libera) sono gli stessi in entrambi; cambiano solo lo sfondo, i pannelli e i segni neutri. Il browser ricorda la scelta, che vale anche per questa pagina.</p>
@@ -345,6 +346,7 @@
   <li>Cambia ciò che vuoi verificare e simula di nuovo.</li>
   <li>Scegli lo scenario nell'elenco (il pulsante di opzione). Un distintivo blu sulla mappa indica con che cosa stai confrontando.</li>
 </ol>
+<p>Sotto l'elenco, <b>Mostra [X] confrontato con [Y]</b> rende espliciti i due lati. «Mostra» è la situazione disegnata sulla mappa e nei pannelli: quella attuale o qualsiasi scenario salvato, il cui risultato memorizzato viene mostrato di nuovo senza ricalcolare (se è stato ottenuto con altre modifiche del modello, viene caricato e ricalcolato). «Confrontato con» è il riferimento: ogni variazione si misura da esso verso la situazione mostrata, quindi «Variazione di flusso da «B» a «A»» significa A rispetto a B. ⇅ scambia i due. Se poi cambi qualcosa, il lato mostrato torna a essere la situazione attuale, non salvata.</p>
 <p>Da quel momento lo scenario prende ovunque il posto del «riferimento»:</p>
 <ul>
   <li><b>Mappa.</b> «Mostra: Solo flusso variato» colora le reazioni secondo la variazione di flusso (blu = meno, arancione = più). «Marcatura variata» colora i metaboliti secondo la variazione del loro arricchimento medio e nasconde il resto. Nelle viste globale e cellula ogni gruppo è colorato secondo la variazione della sua marcatura pesata per il flusso.</li>

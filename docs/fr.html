@@ -23,6 +23,7 @@
   <li><b>Simuler</b> résout le modèle à cet instant avec tout ce qui se trouve dans le panneau de gauche (milieu, traceurs, flux mesurés, knockouts, objectif et, en Dynamique, la durée et les événements) et redessine la carte avec le nouveau résultat. Rien d'autre ne calcule de flux : la carte et les panneaux n'affichent que le dernier résultat.</li>
   <li><b>Auto</b> appuie sur Simuler à votre place peu après chaque modification. Il est mémorisé séparément pour chaque mode : <b>activé</b> par défaut en État stationnaire, où un calcul prend une ou deux secondes, et <b>désactivé</b> par défaut en Dynamique, où il prend une demi-minute ou plus et où l'on veut en général régler plusieurs choses (événements, traceurs) avant de commencer. Activez-le aussi en Dynamique si vous préférez ; une nouvelle modification arrête le calcul en cours et en relance un autre.</li>
   <li>Avec Auto désactivé, une modification laisse l'ancien résultat à l'écran, un point ambre sur Simuler et le message « Paramètres modifiés » dans la barre d'état jusqu'à ce que vous appuyiez. Changer de mode fonctionne de même : le calcul n'est relancé que si Auto est activé pour le nouveau mode.</li>
+  <li>Pendant un calcul, Simuler devient « Simulation… » et la ligne d'état en bas à droite passe à l'ambre ; elle passe au vert quand le résultat est prêt.</li>
 </ul>
 <h3>Mode clair et sombre</h3>
 <p>Le bouton lune/soleil à droite de la barre supérieure passe du thème sombre (par défaut) à un thème clair aux surfaces pastel douces. Les couleurs des données (marquage, variation, énergie libre) sont les mêmes dans les deux ; seuls changent le fond, les panneaux et les éléments neutres. Le navigateur mémorise le choix, qui s'applique aussi à cette page.</p>
@@ -345,6 +346,7 @@
   <li>Changez ce que vous voulez tester et simulez de nouveau.</li>
   <li>Choisissez le scénario dans la liste (le bouton radio). Un badge bleu sur la carte indique avec quoi vous comparez.</li>
 </ol>
+<p>Sous la liste, <b>Afficher [X] comparé à [Y]</b> rend les deux côtés explicites. « Afficher » est la situation dessinée sur la carte et dans les panneaux : l'actuelle ou n'importe quel scénario enregistré, dont le résultat conservé est réaffiché sans recalcul (s'il a été obtenu avec d'autres modifications du modèle, il est chargé et recalculé). « Comparé à » est la référence : chaque variation se mesure d'elle vers la situation affichée, si bien que « Variation de flux de « B » à « A » » signifie A par rapport à B. ⇅ échange les deux. Si vous changez ensuite quoi que ce soit, le côté affiché redevient la situation actuelle, non enregistrée.</p>
 <p>Dès lors, le scénario remplace partout la « référence » :</p>
 <ul>
   <li><b>Carte.</b> « Afficher : Flux modifié seulement » colore les réactions selon la variation de flux (bleu = moins, orange = plus). « Marquage modifié » colore les métabolites selon la variation de leur enrichissement moyen et masque le reste. Dans les vues globale et cellule, chaque groupe est coloré selon la variation de son marquage pondéré par le flux.</li>

@@ -55,7 +55,7 @@ async function boot() {
   try { const q = localStorage.getItem("metflux.quantity"); if (QUANTITIES.includes(q)) S.quantity = q; } catch { /* storage unavailable */ }
   map = new MapView($("map"), { onSelect: onMapSelect, onOpen: onMapOpen, onHover: onMapHover });
   editor = createEditor({ S, setEdits, gotoReaction, gotoMet, refreshDetails: renderDetails });
-  compare = createCompare({ S, capture, opsKey, load: (sc) => loadScenario(sc), redraw: () => { applyFrame(); renderDetails(); }, mediumName, frame });
+  compare = createCompare({ S, capture, opsKey, load: (sc) => loadScenario(sc), show: showScenario, redraw: () => { applyFrame(); renderDetails(); }, mediumName, frame });
   bindUi();
   editor.bind();
   let models;
@@ -258,7 +258,28 @@ async function loadScenario(sc, ask = true) {
   S.sel = null;
   compare.render(); renderDetails();
   await run();
+  S.shown = sc.id; compare.render(); applyFrame(); renderDetails();
   if (lost) { const prev = S.statusFn; setStatus(() => prev() + " " + t("imp.lost", { n: lost })); }
+}
+
+/**
+ * Put a saved scenario on screen again (the "Show" side of a comparison). With the same model edits its stored
+ * result is reused as it is; otherwise the scenario is loaded and recomputed. Replacing an unsaved situation asks first.
+ * @returns whether the scenario is now shown
+ */
+async function showScenario(sc) {
+  if (!sc || sc.ctx.slug !== S.slug) return false;
+  if (!S.shown && S.result && !confirm(t("cmp.loadConfirm", { name: sc.name }))) return false;
+  if (JSON.stringify(sc.ops) !== opsKey()) { await loadScenario(sc, false); return true; }
+  clearTimeout(autoTimer); S.runSeq++; stopPlay();
+  applySettings(sc.settings);
+  S.result = sc.result; S.frameIdx = Math.min(sc.frameIdx ?? sc.result.frames.length - 1, sc.result.frames.length - 1);
+  S.stale = false; S.shown = sc.id; S.sel = null;
+  $("runBtn").classList.remove("pending");
+  compare.attach(); compare.render();
+  setupTimeline(); applyFrame(); renderDetails();
+  setStatus(() => t("status.shown", { name: sc.name }), false, "done");
+  return true;
 }
 
 function setMode(mode, rerun = true) {
@@ -613,9 +634,18 @@ function perturbActivities() {
   return out;
 }
 
-function setStatus(fn, err = false) {
-  S.statusFn = fn; S.statusErr = err;
+/** Status line, bottom right. kind: "busy" (amber, a calculation is running), "done" (green, result ready) or none. */
+function setStatus(fn, err = false, kind = null) {
+  S.statusFn = fn; S.statusErr = err; S.statusKind = kind;
   const s = $("status"); s.textContent = fn(); s.classList.toggle("err", err);
+  s.classList.toggle("busy", kind === "busy" && !err); s.classList.toggle("done", kind === "done" && !err);
+}
+
+/** Simulate button: "Simulating…" while a run is in progress. */
+function setRunning(on) {
+  const b = $("runBtn");
+  b.disabled = on; b.classList.toggle("running", on);
+  b.textContent = t(on ? "h.running" : "h.run");
 }
 
 const statusWhy = (st) => { const k = "st." + st, s = t(k); return s === k ? st : s; };
@@ -625,7 +655,7 @@ async function run() {
   const seq = ++S.runSeq;
   clearTimeout(autoTimer);
   const btn = $("runBtn");
-  btn.disabled = true; btn.classList.remove("pending");
+  setRunning(true); btn.classList.remove("pending");
   stopPlay();
   const t0 = performance.now();
   const pert = perturbActivities();
@@ -636,15 +666,15 @@ async function run() {
     const evList = mode === "dynamic" ? S.events.map((ev) => ({ ...ev })) : [];
     let res;
     if (mode === "steady") {
-      setStatus(() => t("status.fba"));
-      res = await S.sim.runSteady(cfg, S.supplies, S.structures, (phase) => { if (seq === S.runSeq) setStatus(() => t(phase === "ref" ? "status.ref" : "status.fba")); });
+      setStatus(() => t("status.fba"), false, "busy");
+      res = await S.sim.runSteady(cfg, S.supplies, S.structures, (phase) => { if (seq === S.runSeq) setStatus(() => t(phase === "ref" ? "status.ref" : "status.fba"), false, "busy"); });
     } else {
-      setStatus(() => t("status.dyn", { p: 0, t: fmtTime(0) }));
+      setStatus(() => t("status.dyn", { p: 0, t: fmtTime(0) }), false, "busy");
       res = await S.sim.runDynamic(cfg, S.supplies, S.structures, dyn, (p, fr, frames, phase) => {
         if (seq !== S.runSeq) throw SUPERSEDED; // a newer run started: stop computing this one
         const pc = Math.round(100 * p);
-        if (phase === "ref") { setStatus(() => t("status.dynRef", { p: pc })); return; }
-        setStatus(() => t("status.dyn", { p: pc, t: fmtTime(fr.t) }));
+        if (phase === "ref") { setStatus(() => t("status.dynRef", { p: pc }), false, "busy"); return; }
+        setStatus(() => t("status.dyn", { p: pc, t: fmtTime(fr.t) }), false, "busy");
         // show frames as they are computed
         S.result = { frames, pert, evList }; S.frameIdx = frames.length - 1;
         compare.attach();
@@ -660,7 +690,7 @@ async function run() {
     const last = res.frames[res.frames.length - 1];
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
     if (last.status !== "optimal") setStatus(() => t("status.nosol", { why: statusWhy(last.status) }), true);
-    else setStatus(() => t("status.done", { mode: mode === "steady" ? t("status.steady") : t("status.dynamic", { n: res.solves }), s: secs }) + (last.converged === false ? t("status.notconv") : "") + (res.frames.some((f) => f.relaxed) ? t("status.relaxed") : ""));
+    else setStatus(() => t("status.done", { mode: mode === "steady" ? t("status.steady") : t("status.dynamic", { n: res.solves }), s: secs }) + (last.converged === false ? t("status.notconv") : "") + (res.frames.some((f) => f.relaxed) ? t("status.relaxed") : ""), false, "done");
     setupTimeline();
     applyFrame(); renderDetails();
     if (mode === "dynamic" && res.frames.length > 1) { S.frameIdx = 0; $("timeSlider").value = 0; applyFrame(); startPlay(); }
@@ -669,13 +699,14 @@ async function run() {
     if (seq === S.runSeq) setStatus(() => t("status.error", { msg: err.message }), true);
     console.error(err);
   } finally {
-    if (seq === S.runSeq) btn.disabled = false;
+    if (seq === S.runSeq) setRunning(false);
   }
 }
 
 let autoTimer = null;
 function changed() {
   S.stale = true;
+  if (S.shown) { S.shown = null; compare.render(); } // what is on screen is no longer that scenario
   if (S.model) measuredFlags();
   refreshCascade();
   clearTimeout(autoTimer);
@@ -770,8 +801,8 @@ function renderLegend(mode) {
     if (!S.flowData.hasDG) h += `<div class="err">${t("legend.dgMissing")}</div>`;
   } else if (sub && q !== "carbon") h += `<div>${t("legend.qSubOnly")}</div>`;
   if (mode === "tracer" && !energy) h += `<div style="margin-top:6px">${t("legend.enrich")}</div>${ramp([0, 0.05, 0.2, 0.5, 1].map((x) => enrichColor(x)), ["0 %", "5", "20", "50", "100 %"])}<div>${t("legend.uncertain")}</div>`;
-  if (mode === "dlabel" && !energy) h += `<div style="margin-top:6px">${t("legend.dlabel", { name: esc(frame()?.ref?.scen?.name || "") })}</div>${ramp([-1, -0.3, 0, 0.3, 1].map((x) => deltaColor(x)), [t("legend.lessLabel"), t("legend.same"), t("legend.moreLabel")])}`;
-  if (mode === "delta" && !energy) h += `<div style="margin-top:6px">${t(frame()?.ref?.scen ? "legend.deltaScen" : "legend.delta", { name: esc(frame()?.ref?.scen?.name || "") })}</div>${ramp([-1, -0.3, 0, 0.3, 1].map((x) => deltaColor(x)), [t("legend.down"), t("legend.same"), t("legend.up")])}${sub ? `<div>${t("legend.lost")}</div>` : ""}`;
+  if (mode === "dlabel" && !energy) h += `<div style="margin-top:6px">${t("legend.dlabel", { name: esc(frame()?.ref?.scen?.name || ""), cur: esc(compare.shownName()) })}</div>${ramp([-1, -0.3, 0, 0.3, 1].map((x) => deltaColor(x)), [t("legend.lessLabel"), t("legend.same"), t("legend.moreLabel")])}`;
+  if (mode === "delta" && !energy) h += `<div style="margin-top:6px">${t(frame()?.ref?.scen ? "legend.deltaScen" : "legend.delta", { name: esc(frame()?.ref?.scen?.name || ""), cur: esc(compare.shownName()) })}</div>${ramp([-1, -0.3, 0, 0.3, 1].map((x) => deltaColor(x)), [t("legend.down"), t("legend.same"), t("legend.up")])}${sub ? `<div>${t("legend.lost")}</div>` : ""}`;
   if (sub && S.result?.pert?.size) h += `<div>${t("legend.pert")}</div>`;
   if (comps.length) h += `<div class="comps">${comps.map((c) => `<span><i style="border-color:${COMP_COLORS[c] || COMP_COLORS.c}"></i>${esc(compName(c))}</span>`).join("")}</div>`;
   h += `<div style="margin-top:4px">${sub ? t("legend.subHint") : t("legend.globalHint") + (map.scene.cell ? "<br>" + t("legend.cellHint") : "")}</div>`;
@@ -1308,7 +1339,9 @@ function changedHtml(f) {
   if (!n) return `<h4>${t("sum.changed")}</h4><p class="meta">${t("sum.noChange")}</p>`;
   rows.sort((a, b) => b[1] - a[1]);
   const mx = rows[0][1];
-  return `<h4>${t("sum.changed")}${small(t("sum.changedUnit", { n }))}</h4>` +
+  // against a scenario the arrows read "scenario → shown"; against the perturbation reference, "reference → perturbed"
+  const unit = f.ref.scen ? `${t("cmp.metTitle", { name: esc(f.ref.scen.name), cur: esc(compare.shownName()) })} · ${n}` : t("sum.changedUnit", { n });
+  return `<h4>${t("sum.changed")}${small(unit)}</h4>` +
     bars(rows.slice(0, 12).map(([name, d, j]) => [name, `${fmtFlux(f.ref.v[j])} → ${fmtFlux(f.v[j])}`, `rxn:${j}`, d / mx]), "linear-gradient(90deg,#5a96ff,#ff9f5a)", true);
 }
 
@@ -1872,7 +1905,8 @@ function changeLanguage(lang) {
   else if (S.view.kind === "sub" && isCascade()) map.setScene(subScene(S.view.ss), true);
   renderMediumSel(); renderSupplies(); renderMeasured(); renderPerturb(); renderEvents(); renderObjective(); renderCrumbs(); applyFrame(); renderDetails();
   editor.render(); compare.render(); renderEditBadge();
-  if (S.statusFn) setStatus(S.statusFn, S.statusErr);
+  if (S.statusFn) setStatus(S.statusFn, S.statusErr, S.statusKind);
+  if ($("runBtn").classList.contains("running")) $("runBtn").textContent = t("h.running");
 }
 
 function bindUi() {
@@ -1925,7 +1959,8 @@ function bindUi() {
   $("exportBtn").onclick = openExport;
   $("importBtn").onclick = () => { $("importFile").value = ""; $("importFile").click(); };
   $("importFile").onchange = (ev) => { const file = ev.target.files[0]; if (file) importFile(file); };
-  $("saveScenario").onclick = () => compare.save();
+  $("saveScenario").onclick = () => { const sc = compare.save(); if (sc && !S.stale) { S.shown = sc.id; compare.render(); } };
+  compare.bindPicker();
   $("stopCompare").onclick = () => compare.setCompare(null);
   $("compareBadge").onclick = () => { S.sel = null; renderDetails(); };
   $("expAll").onclick = () => $("expList").querySelectorAll("input:not(:disabled)").forEach((x) => { x.checked = true; });

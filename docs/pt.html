@@ -23,6 +23,7 @@
   <li><b>Simular</b> resolve o modelo nesse momento com tudo o que está no painel esquerdo (meio, traçadores, fluxos medidos, knockouts, objetivo e, no modo Dinâmico, a duração e os eventos) e redesenha o mapa com o novo resultado. Nada mais calcula fluxos: o mapa e os painéis só mostram o último resultado.</li>
   <li><b>Auto</b> pressiona Simular por você pouco depois de cada alteração. É lembrado separadamente para cada modo: <b>ligado</b> por padrão em Estado estacionário, onde uma simulação leva um ou dois segundos, e <b>desligado</b> por padrão em Dinâmico, onde leva meio minuto ou mais e normalmente você quer preparar várias coisas (eventos, traçadores) antes de começar. Ligue-o também em Dinâmico se preferir; uma nova alteração interrompe a simulação em curso e começa outra.</li>
   <li>Com Auto desligado, uma alteração deixa o resultado anterior na tela, um ponto âmbar em Simular e a mensagem «Parâmetros alterados» na barra de estado até você pressioná-lo. Mudar de modo funciona igual: só recalcula se Auto estiver ligado para o novo modo.</li>
+  <li>Durante um cálculo, Simular passa a «Simulando…» e a linha de estado embaixo à direita fica âmbar; fica verde quando o resultado está pronto.</li>
 </ul>
 <h3>Modo claro e escuro</h3>
 <p>O botão de lua/sol à direita da barra superior alterna entre o tema escuro (padrão) e um tema claro com superfícies em tons pastel suaves. As cores dos dados (marcação, alteração, energia livre) são as mesmas nos dois; só mudam o fundo, os painéis e as marcas neutras. O navegador lembra a escolha, que também se aplica a esta página.</p>
@@ -345,6 +346,7 @@
   <li>Mude o que quiser testar e simule de novo.</li>
   <li>Escolha o cenário na lista (o botão de opção). Um distintivo azul no mapa indica com o que está comparando.</li>
 </ol>
+<p>Abaixo da lista, <b>Mostrar [X] comparado com [Y]</b> torna explícitos os dois lados. «Mostrar» é a situação desenhada no mapa e nos painéis: a atual ou qualquer cenário salvo, cujo resultado guardado é mostrado de novo sem recalcular (se foi feito com outras edições do modelo, é carregado e recalculado). «Comparado com» é a referência: cada alteração mede-se dela para a situação mostrada, de modo que «Alteração de fluxo de «B» para «A»» significa A em relação a B. ⇅ troca os dois. Se depois você mudar qualquer coisa, o lado mostrado volta a ser a situação atual, não salva.</p>
 <p>A partir daí, o cenário ocupa o lugar da «referência» em todo lado:</p>
 <ul>
   <li><b>Mapa.</b> «Mostrar: Só fluxo alterado» colore as reações pela alteração de fluxo (azul = menos, laranja = mais). «Marcação alterada» colore os metabólitos pela alteração do seu enriquecimento médio e oculta o resto. Nas vistas global e de célula, cada grupo é colorido pela alteração da sua marcação ponderada pelo fluxo.</li>

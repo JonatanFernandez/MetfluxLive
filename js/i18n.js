@@ -692,17 +692,17 @@ const enEdit = {
   "cmp.otherModel": "Computed with another model.", "cmp.pickTitle": "Compare the current situation with «{name}»",
   "cmp.loadTitle": "Load the settings of «{name}»", "cmp.loadConfirm": "Load the settings of «{name}» (medium, tracers, perturbations, events and model edits)? The current ones are replaced; save them as a scenario first if you need them.",
   "cmp.removeTitle": "Delete this scenario", "cmp.removeConfirm": "Delete scenario «{name}»?",
-  "cmp.badge": "⇄ Comparing with «{name}»", "cmp.badgeTitle": "Show the comparison summary",
-  "cmp.summaryNote": "Comparison: <b>{name}</b> ({what}) → current. Arrows read «{name}» → now.", "cmp.timeNote": "Times: {a} in the scenario, {b} now.",
+  "cmp.badge": "⇄ «{a}» compared with «{b}»", "cmp.badgeTitle": "Show the comparison summary",
+  "cmp.summaryNote": "Comparison: <b>{name}</b> ({what}) → <b>{cur}</b>. Arrows read «{name}» → «{cur}».", "cmp.timeNote": "Times: {a} in the scenario, {b} now.",
   "cmp.modelsDiffer": "The two use different model edits: reactions and metabolites are matched by ID; those only in one side count as 0.",
   "cmp.exchanges": "Exchanges that change", "cmp.exchUnit": "mmol/gDW/h, + uptake / − secretion",
   "cmp.pathways": "Pathways that change most", "cmp.pathUnit": "Σ|flux|",
   "cmp.label": "Labelling that changes", "cmp.labelUnit": "mean enrichment, %", "cmp.labelSame": "No metabolite changes its labelling by more than 0.5 points.",
-  "cmp.metTitle": "«{name}» → current", "cmp.metMissing": "This metabolite does not exist in the scenario's model.",
+  "cmp.metTitle": "«{name}» → «{cur}»", "cmp.metMissing": "This metabolite does not exist in the scenario's model.",
   "cmp.turnover": "Turnover", "cmp.enrich": "Mean enrichment", "cmp.noLabelEither": "Neither situation has a tracer.",
   "cmp.current": "current", "cmp.midCaption": "Mass isotopologue distribution in both situations (sampled molecules, as above).",
-  "filter.dlabel": "Changed label", "legend.dlabel": "Label change against «{name}» (mean enrichment)",
-  "legend.lessLabel": "less label", "legend.moreLabel": "more label", "legend.deltaScen": "Flux change against «{name}»",
+  "filter.dlabel": "Changed label", "legend.dlabel": "Label change from «{name}» to «{cur}» (mean enrichment)",
+  "legend.lessLabel": "less label", "legend.moreLabel": "more label", "legend.deltaScen": "Flux change from «{name}» to «{cur}»",
   "sum.vsScen": "vs «{name}» ({x})", "tip.labelScen": "Labelled in «{name}»: {x} %", "tip.refScen": " · «{name}»: {x}",
   // export / import
   "exp.g.session": "Session (to import elsewhere)",
@@ -824,17 +824,17 @@ const esEdit = {
   "cmp.otherModel": "Calculado con otro modelo.", "cmp.pickTitle": "Comparar la situación actual con «{name}»",
   "cmp.loadTitle": "Cargar los ajustes de «{name}»", "cmp.loadConfirm": "¿Cargar los ajustes de «{name}» (medio, trazadores, perturbaciones, eventos y ediciones del modelo)? Se reemplazan los actuales; guárdalos antes como escenario si los necesitas.",
   "cmp.removeTitle": "Borrar este escenario", "cmp.removeConfirm": "¿Borrar el escenario «{name}»?",
-  "cmp.badge": "⇄ Comparando con «{name}»", "cmp.badgeTitle": "Ver el resumen de la comparación",
-  "cmp.summaryNote": "Comparación: <b>{name}</b> ({what}) → actual. Las flechas se leen «{name}» → ahora.", "cmp.timeNote": "Tiempos: {a} en el escenario, {b} ahora.",
+  "cmp.badge": "⇄ «{a}» comparado con «{b}»", "cmp.badgeTitle": "Ver el resumen de la comparación",
+  "cmp.summaryNote": "Comparación: <b>{name}</b> ({what}) → <b>{cur}</b>. Las flechas se leen «{name}» → «{cur}».", "cmp.timeNote": "Tiempos: {a} en el escenario, {b} ahora.",
   "cmp.modelsDiffer": "Los dos usan ediciones del modelo distintas: reacciones y metabolitos se emparejan por ID; los que sólo están en un lado cuentan como 0.",
   "cmp.exchanges": "Intercambios que cambian", "cmp.exchUnit": "mmol/gDW/h, + captación / − excreción",
   "cmp.pathways": "Rutas que más cambian", "cmp.pathUnit": "Σ|flujo|",
   "cmp.label": "Marcaje que cambia", "cmp.labelUnit": "enriquecimiento medio, %", "cmp.labelSame": "Ningún metabolito cambia su marcaje en más de 0,5 puntos.",
-  "cmp.metTitle": "«{name}» → actual", "cmp.metMissing": "Este metabolito no existe en el modelo del escenario.",
+  "cmp.metTitle": "«{name}» → «{cur}»", "cmp.metMissing": "Este metabolito no existe en el modelo del escenario.",
   "cmp.turnover": "Recambio", "cmp.enrich": "Enriquecimiento medio", "cmp.noLabelEither": "Ninguna de las dos situaciones tiene trazador.",
   "cmp.current": "actual", "cmp.midCaption": "Distribución de isotopólogos de masa en ambas situaciones (moléculas muestreadas, como arriba).",
-  "filter.dlabel": "Marcaje cambiado", "legend.dlabel": "Cambio de marcaje frente a «{name}» (enriquecimiento medio)",
-  "legend.lessLabel": "menos marca", "legend.moreLabel": "más marca", "legend.deltaScen": "Cambio de flujo frente a «{name}»",
+  "filter.dlabel": "Marcaje cambiado", "legend.dlabel": "Cambio de marcaje de «{name}» a «{cur}» (enriquecimiento medio)",
+  "legend.lessLabel": "menos marca", "legend.moreLabel": "más marca", "legend.deltaScen": "Cambio de flujo de «{name}» a «{cur}»",
   "sum.vsScen": "vs «{name}» ({x})", "tip.labelScen": "Marcado en «{name}»: {x} %", "tip.refScen": " · «{name}»: {x}",
   "exp.g.session": "Sesión (para importar en otro sitio)",
   "exp.sessionHint": "Ediciones del modelo, medio, trazadores, flujos medidos, perturbaciones, eventos y escenarios guardados; ábrelo con <b>Importar</b> para repetir los cálculos. Un único JSON se descarga tal cual.",
@@ -970,11 +970,36 @@ const esQty = {
   "dg.uncertain": "incertidumbre grande: toma el signo con cautela",
   "tip.dg": "ΔG′m {x} ± {sd} kJ/mol (sentido directo)",
   "tip.dgGroup": "disipa {d} J/gDW/h · cuesta arriba {u} · ΔG′m conocido para el {c} % de su flujo",
+
 };
 Object.assign(en, enEdit);
 Object.assign(es, esEdit);
 Object.assign(en, enQty);
 Object.assign(es, esQty);
+Object.assign(es, {
+  "h.running": "Simulando…",
+  "status.shown": "Mostrando el escenario «{name}» (resultado guardado)",
+  "cmp.now": "situación actual",
+  "cmp.nowOpt": "Situación actual (sin guardar)",
+  "cmp.noneOpt": "— nada (sin comparar) —",
+  "cmp.showLbl": "Mostrar",
+  "cmp.refLbl": "comparado con",
+  "cmp.showTitle": "Situación que se dibuja en el mapa y en los paneles",
+  "cmp.refTitle": "Referencia: los cambios se miden desde ella hacia la situación mostrada",
+  "cmp.swapTitle": "Intercambiar los dos escenarios"
+});
+Object.assign(en, {
+  "h.running": "Simulating…",
+  "status.shown": "Showing scenario «{name}» (stored result)",
+  "cmp.now": "current situation",
+  "cmp.nowOpt": "Current situation (not saved)",
+  "cmp.noneOpt": "— nothing (no comparison) —",
+  "cmp.showLbl": "Show",
+  "cmp.refLbl": "compared with",
+  "cmp.showTitle": "Situation drawn on the map and in the panels",
+  "cmp.refTitle": "Reference: the changes are measured from it to the situation shown",
+  "cmp.swapTitle": "Swap the two scenarios"
+});
 
 export const DICT = { es, en, pt, it, fr, de, el };
 export const LANGS = [["en", "English"], ["es", "Español"], ["pt", "Português"], ["it", "Italiano"], ["fr", "Français"], ["de", "Deutsch"], ["el", "Ελληνικά"]];
