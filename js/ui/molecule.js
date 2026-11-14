@@ -91,7 +91,7 @@ export function renderMolecule(container, struct, opts = {}) {
     }
     if (shown(i)) {
       const h = struct.h[i], q = struct.q ? struct.q[i] : 0;
-      const t = el("text", { x: X[i], y: Y[i] + 0.02, class: "atom", fill: opts.enrich && en > 0.25 ? "#10141f" : ELEMENT_COLOR[sym] || "#e8eefc" }, g);
+      const t = el("text", { x: X[i], y: Y[i] + 0.02, class: opts.enrich && en > 0.25 ? "atom" : `atom el-${ELEMENT_COLOR[sym] ? sym : "x"}`, fill: opts.enrich && en > 0.25 ? "#10141f" : ELEMENT_COLOR[sym] || "#e8eefc" }, g);
       t.textContent = sym + (h ? "H" + (h > 1 ? sub(h) : "") : "") + (q ? (Math.abs(q) > 1 ? Math.abs(q) : "") + (q > 0 ? "⁺" : "⁻") : "");
     }
   };

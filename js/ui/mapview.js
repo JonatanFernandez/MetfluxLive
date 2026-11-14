@@ -2,11 +2,43 @@
 // Flux is encoded as edge width, particle speed and node size; isotope enrichment as colour.
 
 const UNIT = 64; // px per layout unit at zoom 1
-export const COMP_COLORS = {
+const COMP_DARK = {
   c: "#8fa3c8", m: "#ff9f5a", e: "#5fd38d", s: "#5fd38d", r: "#b48cff", x: "#3fd0c9",
   l: "#ff7eb6", g: "#f2d45c", n: "#6aa9ff", i: "#ff6b6b",
 };
-const FLUX_RGB = [76, 201, 240];
+const COMP_LIGHT = {
+  c: "#6f82aa", m: "#e07f3c", e: "#3c9e64", s: "#3c9e64", r: "#8d68d6", x: "#2a9e98",
+  l: "#d65c94", g: "#b8981e", n: "#4a82d6", i: "#d65656",
+};
+/** Compartment colours of the current theme (mutated in place by setMapTheme). */
+export const COMP_COLORS = { ...COMP_DARK };
+// neutral colours of the map; the data ramps (enrichment, change, free energy) are shared by both themes
+const THEMES = {
+  dark: {
+    flux: [76, 201, 240], particle: "rgba(190,240,255,0.85)", blend: "lighter", halo: "rgba(8,12,24,0.92)",
+    inactiveEdge: "rgba(125,145,190,0.13)", structEdge: "rgba(125,145,190,0.10)", guide: "rgba(125,145,190,0.25)", guideText: "rgba(147,162,198,0.9)",
+    metOn: "#1d3350", metOff: "#141c30", rxnOn: "#e8eefc", rxnTransport: "#9fb4d8", rxnOff: "#2a3552",
+    labelOn: "#eef3ff", labelOff: "rgba(170,185,215,0.6)", rxnLabelOn: "#b8c6e6", rxnLabelOff: "rgba(140,155,190,0.5)", groupLabelOff: "rgba(165,180,212,0.62)",
+    hover: "rgba(255,255,255,0.55)", selected: "#ffffff", pulse: [255, 255, 255], gene: "#b48cff", ko: "#ff5d6c",
+    groupOff: "#151d33", groupRing: "rgba(235,242,255,0.9)", groupRingOff: "rgba(130,148,190,0.45)", groupListOnly: "rgba(160,175,210,0.45)",
+    groupFill: (s) => `rgb(${28 + 30 * s},${60 + 90 * s},${92 + 110 * s})`, unknown: [70, 80, 108],
+  },
+  light: {
+    flux: [43, 124, 170], particle: "rgba(30,96,140,0.75)", blend: "source-over", halo: "rgba(247,248,251,0.92)",
+    inactiveEdge: "rgba(90,105,140,0.18)", structEdge: "rgba(90,105,140,0.13)", guide: "rgba(90,105,140,0.3)", guideText: "rgba(95,108,135,0.95)",
+    metOn: "#d3e3f0", metOff: "#eef1f6", rxnOn: "#3a4560", rxnTransport: "#7f8fb2", rxnOff: "#c9d0dd",
+    labelOn: "#263046", labelOff: "rgba(90,102,128,0.65)", rxnLabelOn: "#4a5672", rxnLabelOff: "rgba(110,122,148,0.55)", groupLabelOff: "rgba(95,108,135,0.7)",
+    hover: "rgba(40,50,70,0.45)", selected: "#283044", pulse: [40, 60, 90], gene: "#8d68d6", ko: "#d04452",
+    groupOff: "#e6eaf1", groupRing: "rgba(45,62,92,0.75)", groupRingOff: "rgba(120,134,165,0.45)", groupListOnly: "rgba(120,134,165,0.45)",
+    groupFill: (s) => `rgb(${222 - 150 * s},${234 - 100 * s},${244 - 60 * s})`, unknown: [196, 202, 214],
+  },
+};
+let TH = THEMES.dark;
+/** Switch the neutral colours of every map (and COMP_COLORS) to "dark" or "light". */
+export function setMapTheme(name) {
+  TH = THEMES[name] || THEMES.dark;
+  Object.assign(COMP_COLORS, name === "light" ? COMP_LIGHT : COMP_DARK);
+}
 // enrichment ramp: unlabelled slate -> amber -> hot magenta
 const RAMP = [[118, 136, 176], [255, 190, 60], [255, 120, 50], [255, 45, 120]];
 
@@ -22,6 +54,20 @@ const D_UP = [255, 159, 90], D_DOWN = [90, 150, 255], D_SAME = [124, 138, 170];
 export function deltaColor(d, alpha = 1) {
   const k = d ? Math.min(1, 0.3 + Math.abs(d) * 1.2) : 0, to = d > 0 ? D_UP : D_DOWN;
   const c = D_SAME.map((x, i) => Math.round(x + (to[i] - x) * k));
+  return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
+}
+// free energy: violet (uphill at 1 mM) - slate (near equilibrium) - amber - red (strongly dissipating); NaN = unknown
+const G_DOWN = [[124, 138, 170], [255, 196, 70], [255, 80, 60]], G_UP = [176, 120, 255];
+export function energyColor(g, alpha = 1) {
+  if (!Number.isFinite(g)) return `rgba(${TH.unknown[0]},${TH.unknown[1]},${TH.unknown[2]},${alpha})`;
+  let c;
+  if (g >= 0) {
+    const t = Math.min(1, g) * 2, i = Math.min(1, Math.floor(t)), f = t - i;
+    c = G_DOWN[i].map((x, k) => Math.round(x + (G_DOWN[i + 1][k] - x) * f));
+  } else {
+    const k = Math.min(1, -g);
+    c = G_DOWN[0].map((x, i) => Math.round(x + (G_UP[i] - x) * k));
+  }
   return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
 }
 const hexA = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
@@ -88,13 +134,17 @@ export class MapView {
 
   /**
    * Push per-frame values.
-   * sub scenes: { v, turnover, metE, uncertain, ref, mask: { rxn, met }, perturb: Map }
+   * sub scenes: { v, turnover, metE, uncertain, ref, refE (label of the compared scenario), mask: { rxn, met }, perturb: Map }
    * global:     { gFlux, gE, gD, gHas, flows, minE }
-   * both:       { mode: "flux" | "tracer" | "delta" }
+   * both:       { mode: "flux" | "tracer" | "delta" | "dlabel" }
    */
   setData(d) {
     const sc = this.scene;
-    this.mode = d.mode || "flux";
+    // "dlabel" (label difference against a compared scenario) is drawn with the delta colours
+    this.dlabel = d.mode === "dlabel";
+    // free energy (dG'm per reaction, or per group) is drawn with the delta machinery and its own palette
+    this.energy = !!(d.dG || d.energy);
+    this.mode = this.dlabel || this.energy ? "delta" : d.mode || "flux";
     this.tracerOn = this.mode === "tracer";
     this.masked = !!(d.mask || d.gHas);
     const logScale = (x, max, dec = 4, floor = 0.04) => (x > 0 && max > 0 ? Math.min(1, Math.max(floor, 1 + Math.log10(x / max) / dec)) : 0);
@@ -109,6 +159,7 @@ export class MapView {
         if (n.type === 0) {
           n.flux = d.turnover ? d.turnover[n.ref] : 0; n.s = logScale(n.flux, tmax);
           n.e = d.metE ? d.metE[n.ref] : 0; n.unc = d.uncertain ? d.uncertain[n.ref] : 0;
+          n.de = this.dlabel ? Math.max(-1, Math.min(1, 3 * (n.e - (d.refE ? d.refE[n.ref] : 0)))) : 0;
           n.hidden = !!mask && !mask.met[n.ref];
         } else {
           n.flux = d.v ? Math.abs(d.v[n.ref]) : 0; n.s = logScale(n.flux, max); n.dir = d.v ? Math.sign(d.v[n.ref]) : 0;
@@ -118,12 +169,24 @@ export class MapView {
           n.pert = d.perturb ? d.perturb.get(n.ref) : undefined;
         }
       }
+      if (d.dG) { // reactions coloured by dG'm in the direction they run: -40 kJ/mol and below is full red
+        for (const n of sc.nodes) {
+          if (n.type !== 1) continue;
+          const g = d.dG[n.ref], run = d.v && d.v[n.ref] ? Math.sign(d.v[n.ref]) * g : g;
+          n.d = Number.isFinite(g) ? Math.max(-1, Math.min(1, -run / 40)) : NaN; n.lost = false;
+        }
+      }
+      if (this.dlabel) { // a reaction takes the mean label change of the metabolites it touches
+        const sum = new Map();
+        for (const e of sc.edges) { const o = sum.get(e.r) || [0, 0]; o[0] += sc.nodes[e.m].de; o[1]++; sum.set(e.r, o); }
+        for (const [i, o] of sum) { sc.nodes[i].d = o[0] / o[1]; sc.nodes[i].lost = false; }
+      }
       for (const e of sc.edges) {
         const r = sc.nodes[e.r], m = sc.nodes[e.m];
         e.flux = Math.abs(e.f);
         e.s = logScale(e.flux, max);
         e.out = e.f > 0; // reaction -> metabolite
-        e.e = m.e; e.d = r.d; e.lost = r.lost;
+        e.e = m.e; e.d = this.dlabel ? m.de : r.d; e.lost = r.lost;
         e.hidden = r.hidden || m.hidden;
       }
       if (mask) { // a metabolite touched only by affected reactions outside this map would float alone
@@ -136,7 +199,7 @@ export class MapView {
       let max = 0;
       for (const n of sc.nodes) { n.flux = d.gFlux ? d.gFlux[n.ref] : 0; if (n.flux > max) max = n.flux; }
       for (const n of sc.nodes) {
-        n.s = logScale(n.flux, max); n.e = d.gE ? d.gE[n.ref] : 0; n.d = d.gD ? d.gD[n.ref] : 0;
+        n.s = logScale(n.flux, max); n.e = d.gE ? d.gE[n.ref] : 0; n.d = d.energy ? d.energy[n.ref] : d.gD ? d.gD[n.ref] : 0;
         n.hidden = !!d.gHas && !d.gHas[n.ref];
       }
       const byRef = new Map(sc.nodes.map((n, i) => [n.ref, i]));
@@ -184,7 +247,9 @@ export class MapView {
       this.hooks.onHover?.(h >= 0 ? this.scene.nodes[h] : null, ev.clientX, ev.clientY);
     });
     c.addEventListener("pointerup", (ev) => {
-      const wasDrag = drag && drag.moved;
+      // a click that started elsewhere (e.g. on a search result lying over the map) is not a click on the map
+      if (!drag) return;
+      const wasDrag = drag.moved;
       drag = null; c.style.cursor = this.hover >= 0 ? "pointer" : "grab";
       if (wasDrag) return;
       const r = c.getBoundingClientRect();
@@ -256,15 +321,17 @@ export class MapView {
       const y = Math.round(this._sy(g.y)) + 0.5;
       if (y < 44 || y > this.h - 8) continue;
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(this.w, y);
-      ctx.setLineDash([2, 6]); ctx.strokeStyle = "rgba(125,145,190,0.25)"; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = "rgba(147,162,198,0.9)"; ctx.fillText(g.label, 12, y - 3);
+      ctx.setLineDash([2, 6]); ctx.strokeStyle = TH.guide; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = TH.guideText; ctx.fillText(g.label, 12, y - 3);
     }
   }
 
+  _dc(d, alpha) { return this.energy ? energyColor(d, alpha) : deltaColor(d, alpha); }
+
   _edgeColor(e, alpha) {
-    if (this.mode === "delta") return deltaColor(e.d, alpha);
+    if (this.mode === "delta") return this._dc(e.d, alpha);
     if (this.tracerOn) return enrichColor(e.e, alpha);
-    return `rgba(${FLUX_RGB[0]},${FLUX_RGB[1]},${FLUX_RGB[2]},${alpha})`;
+    return `rgba(${TH.flux[0]},${TH.flux[1]},${TH.flux[2]},${alpha})`;
   }
 
   _curve(ax, ay, bx, by, bend) {
@@ -274,7 +341,7 @@ export class MapView {
 
   _drawParticles(ctx, list) {
     // list: [ax, ay, cx, cy, bx, by, s, phase, color]
-    ctx.globalCompositeOperation = "lighter";
+    ctx.globalCompositeOperation = TH.blend;
     for (const p of list) {
       const [ax, ay, cx, cy, bx, by, s, phase, color] = p;
       const len = Math.hypot(bx - ax, by - ay);
@@ -299,7 +366,7 @@ export class MapView {
     for (const b of boxes) if (bx < b[0] + b[2] && bx + w > b[0] && by < b[1] + b[3] && by + h > b[1]) return false;
     boxes.push([bx - 3, by - 1, w + 6, h + 2]);
     ctx.textAlign = align; ctx.textBaseline = "middle";
-    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(8,12,24,0.92)"; ctx.strokeText(text, x, y);
+    ctx.lineWidth = 3; ctx.strokeStyle = TH.halo; ctx.strokeText(text, x, y);
     ctx.fillStyle = color; ctx.fillText(text, x, y);
     return true;
   }
@@ -321,7 +388,7 @@ export class MapView {
         if (e.s > 0 || e.hidden || (!onScreen(e.r) && !onScreen(e.m))) continue;
         ctx.moveTo(sx[e.r], sy[e.r]); ctx.lineTo(sx[e.m], sy[e.m]);
       }
-      ctx.strokeStyle = "rgba(125,145,190,0.13)"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = TH.inactiveEdge; ctx.lineWidth = 1; ctx.stroke();
     }
     // flux that existed in the reference and is gone now
     if (this.mode === "delta") {
@@ -330,7 +397,7 @@ export class MapView {
         if (e.s > 0 || !e.lost || e.hidden || (!onScreen(e.r) && !onScreen(e.m))) continue;
         ctx.moveTo(sx[e.r], sy[e.r]); ctx.lineTo(sx[e.m], sy[e.m]);
       }
-      ctx.setLineDash([5, 4]); ctx.strokeStyle = deltaColor(-1, 0.75); ctx.lineWidth = 1.6; ctx.stroke(); ctx.setLineDash([]);
+      ctx.setLineDash([5, 4]); ctx.strokeStyle = this._dc(-1, 0.75); ctx.lineWidth = 1.6; ctx.stroke(); ctx.setLineDash([]);
     }
     // active edges
     const parts = [];
@@ -350,7 +417,7 @@ export class MapView {
       ctx.lineTo(tx - Math.cos(ang - 0.45) * ah, ty - Math.sin(ang - 0.45) * ah);
       ctx.lineTo(tx - Math.cos(ang + 0.45) * ah, ty - Math.sin(ang + 0.45) * ah);
       ctx.closePath(); ctx.fillStyle = this._edgeColor(e, (0.55 + 0.45 * e.s) * d); ctx.fill();
-      if (this.options.particles && d === 1) parts.push([sx[a], sy[a], cx, cy, sx[b], sy[b], e.s, e.phase, this.mode === "delta" ? deltaColor(e.d, 0.9) : this.tracerOn ? enrichColor(Math.max(e.e, 0.02), 0.9) : "rgba(190,240,255,0.85)"]);
+      if (this.options.particles && d === 1) parts.push([sx[a], sy[a], cx, cy, sx[b], sy[b], e.s, e.phase, this.mode === "delta" ? this._dc(e.d, 0.9) : this.tracerOn ? enrichColor(Math.max(e.e, 0.02), 0.9) : TH.particle]);
     }
     this._drawParticles(ctx, parts);
 
@@ -362,19 +429,23 @@ export class MapView {
       ctx.globalAlpha = a;
       if (n.type === 0) {
         ctx.beginPath(); ctx.arc(sx[i], sy[i], r, 0, 6.283);
-        ctx.fillStyle = n.s ? (this.tracerOn ? enrichColor(n.e) : "#1d3350") : "#141c30";
+        ctx.fillStyle = n.s ? (this.dlabel ? this._dc(n.de) : this.tracerOn ? enrichColor(n.e) : TH.metOn) : TH.metOff;
         ctx.fill();
         ctx.lineWidth = n.s ? 2 : 1.2;
-        ctx.strokeStyle = COMP_COLORS[n.comp] || "#8fa3c8";
+        ctx.strokeStyle = COMP_COLORS[n.comp] || COMP_COLORS.c;
         if (n.unc) ctx.setLineDash([3, 2.5]);
         ctx.globalAlpha = a * (n.s ? 1 : 0.5); ctx.stroke(); ctx.setLineDash([]);
       } else {
         ctx.save(); ctx.translate(sx[i], sy[i]); ctx.rotate(Math.PI / 4);
-        ctx.fillStyle = this.mode === "delta" ? deltaColor(n.lost ? -1 : n.d, n.s ? 1 : 0.7) : n.s ? (n.transport ? "#9fb4d8" : "#e8eefc") : "#2a3552";
+        ctx.fillStyle = this.mode === "delta" ? this._dc(n.lost ? -1 : n.d, n.s ? 1 : 0.7) : n.s ? (n.transport ? TH.rxnTransport : TH.rxnOn) : TH.rxnOff;
         ctx.fillRect(-r, -r, 2 * r, 2 * r); ctx.restore();
+        if (this.marks && this.marks.has(n.ref)) { // reactions of the selected gene
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 6, 0, 6.283);
+          ctx.strokeStyle = TH.gene; ctx.lineWidth = 2; ctx.stroke();
+        }
         if (n.pert !== undefined) { // knocked out / knocked down
           ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 3, 0, 6.283);
-          ctx.strokeStyle = "#ff5d6c"; ctx.lineWidth = 2; if (n.pert > 0) ctx.setLineDash([4, 3]);
+          ctx.strokeStyle = TH.ko; ctx.lineWidth = 2; if (n.pert > 0) ctx.setLineDash([4, 3]);
           ctx.stroke(); ctx.setLineDash([]);
         }
       }
@@ -399,7 +470,7 @@ export class MapView {
       const n = ns[i], r = this._radius(n);
       const active = n.s > 0, hl = near.has(i);
       const size = n.type === 0 ? (hl ? 12.5 : 11) : 9.5;
-      const col = n.type === 0 ? (active || hl ? "#eef3ff" : "rgba(170,185,215,0.6)") : (active || hl ? "#b8c6e6" : "rgba(140,155,190,0.5)");
+      const col = n.type === 0 ? (active || hl ? TH.labelOn : TH.labelOff) : (active || hl ? TH.rxnLabelOn : TH.rxnLabelOff);
       if (this._label(ctx, n.label, sx[i], sy[i] + r + size * 0.75, size, col, boxes)) drawn++;
     };
     for (const i of near) if (this._vis(ns[i])) drawLabel(i);
@@ -413,12 +484,12 @@ export class MapView {
       ctx.beginPath(); ctx.arc(sx[i], sy[i], this._radius(ns[i]) + extra, 0, 6.283);
       ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
     };
-    ring(this.hover, "rgba(255,255,255,0.55)", 4);
-    ring(this.selected, "#ffffff", 5);
+    ring(this.hover, TH.hover, 4);
+    ring(this.selected, TH.selected, 5);
     if (this.pulse) {
       const u = (performance.now() - this.pulse.t0) / 1600;
       if (u > 3) this.pulse = null;
-      else { const f = u % 1; ring(this.pulse.node, `rgba(255,255,255,${0.8 * (1 - f)})`, 6 + 26 * f); }
+      else { const f = u % 1; ring(this.pulse.node, `rgba(${TH.pulse.join(",")},${0.8 * (1 - f)})`, 6 + 26 * f); }
     }
   }
 
@@ -455,7 +526,7 @@ export class MapView {
     // structural edges
     ctx.beginPath();
     for (const e of sc.edges) { if (ns[e.a].hidden || ns[e.b].hidden) continue; ctx.moveTo(sx[e.a], sy[e.a]); ctx.lineTo(sx[e.b], sy[e.b]); }
-    ctx.strokeStyle = "rgba(125,145,190,0.10)"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.strokeStyle = TH.structEdge; ctx.lineWidth = 1; ctx.stroke();
     // carbon flows
     const parts = [], near = new Set();
     if (sel >= 0) near.add(sel);
@@ -469,7 +540,7 @@ export class MapView {
       ctx.beginPath(); ctx.moveTo(sx[f.a], sy[f.a]); ctx.quadraticCurveTo(cx, cy, sx[f.b], sy[f.b]);
       ctx.strokeStyle = this._edgeColor(f, (0.16 + 0.6 * f.s) * d);
       ctx.lineWidth = 0.7 + 6 * f.s * f.s; ctx.lineCap = "round"; ctx.stroke();
-      if (this.options.particles && d === 1 && f.s > 0.25) parts.push([sx[f.a], sy[f.a], cx, cy, sx[f.b], sy[f.b], f.s, f.phase, this.mode === "delta" ? deltaColor(f.d, 0.9) : this.tracerOn ? enrichColor(Math.max(f.e, 0.02), 0.9) : "rgba(190,240,255,0.8)"]);
+      if (this.options.particles && d === 1 && f.s > 0.25) parts.push([sx[f.a], sy[f.a], cx, cy, sx[f.b], sy[f.b], f.s, f.phase, this.mode === "delta" ? this._dc(f.d, 0.9) : this.tracerOn ? enrichColor(Math.max(f.e, 0.02), 0.9) : TH.particle]);
     }
     this._drawParticles(ctx, parts);
     for (let i = 0; i < ns.length; i++) {
@@ -479,14 +550,14 @@ export class MapView {
       ctx.globalAlpha = a;
       if (n.s > 0) {
         const g = ctx.createRadialGradient(sx[i], sy[i], r * 0.4, sx[i], sy[i], r * (1.5 + n.s));
-        const col = delta ? deltaColor(n.d, 0.45 * n.s) : this.tracerOn ? enrichColor(n.e, 0.5 * n.s) : `rgba(76,201,240,${0.42 * n.s})`;
-        g.addColorStop(0, col); g.addColorStop(1, "rgba(0,0,0,0)");
+        const col = delta ? this._dc(n.d, 0.45 * n.s) : this.tracerOn ? enrichColor(n.e, 0.5 * n.s) : `rgba(${TH.flux.join(",")},${0.42 * n.s})`;
+        g.addColorStop(0, col); g.addColorStop(1, TH.blend === "lighter" ? "rgba(0,0,0,0)" : "rgba(255,255,255,0)");
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx[i], sy[i], r * (1.5 + n.s), 0, 6.283); ctx.fill();
       }
       ctx.beginPath(); ctx.arc(sx[i], sy[i], r, 0, 6.283);
-      ctx.fillStyle = delta ? deltaColor(n.d, n.s > 0 ? 1 : 0.55) : n.s > 0 ? (this.tracerOn ? enrichColor(n.e) : `rgb(${28 + 30 * n.s},${60 + 90 * n.s},${92 + 110 * n.s})`) : "#151d33";
+      ctx.fillStyle = delta ? this._dc(n.d, n.s > 0 ? 1 : 0.55) : n.s > 0 ? (this.tracerOn ? enrichColor(n.e) : TH.groupFill(n.s)) : TH.groupOff;
       ctx.fill();
-      ctx.lineWidth = 1.5; ctx.strokeStyle = n.listOnly ? "rgba(160,175,210,0.45)" : n.s > 0 ? "rgba(235,242,255,0.9)" : "rgba(130,148,190,0.45)";
+      ctx.lineWidth = 1.5; ctx.strokeStyle = n.listOnly ? TH.groupListOnly : n.s > 0 ? TH.groupRing : TH.groupRingOff;
       if (n.listOnly) ctx.setLineDash([3, 3]);
       ctx.stroke(); ctx.setLineDash([]);
       ctx.globalAlpha = 1;
@@ -507,7 +578,7 @@ export class MapView {
     const rel = z / (this.homeZoom || 1);
     const draw = (i) => {
       const n = ns[i], r = this._radius(n), hl = near.has(i) && sel >= 0;
-      this._label(ctx, n.label, sx[i], sy[i] + r + 9, hl ? 12.5 : 11, n.s > 0 || hl ? "#eef3ff" : "rgba(165,180,212,0.62)", boxes);
+      this._label(ctx, n.label, sx[i], sy[i] + r + 9, hl ? 12.5 : 11, n.s > 0 || hl ? TH.labelOn : TH.groupLabelOff, boxes);
     };
     if (sel >= 0) for (const i of near) if (!ns[i].hidden) draw(i);
     let k = 0;

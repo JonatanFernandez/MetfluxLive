@@ -44,6 +44,9 @@ export class Tracer {
         this.baseW[i] = carbonCount(b.f);
       }
     });
+    // Carriers whose atoms never come from the molecule they carry: an unmapped CoA atom in a product is
+    // taken as unlabelled instead of receiving the average of the leftover substrate atoms (the acyl chain).
+    this.noPool = Uint8Array.from(model.bases, (b) => (b.n === "CoA" ? 1 : 0));
     const nm = model.mets.length;
     this.off = new Int32Array(nm + 1);
     for (let i = 0; i < nm; i++) this.off[i + 1] = this.off[i] + this.baseN[model.mets[i].b];
@@ -66,8 +69,9 @@ export class Tracer {
    * Build the propagation program for a flux distribution.
    * @param v       Float64Array of reaction fluxes
    * @param inputs  [{ met, flux, label: Float64Array(nAtoms)|null }] uptake / injections entering `met`
+   * @param fixed   optional Uint8Array over metabolites whose atoms keep the values given to advance() (e0)
    */
-  compile(v, inputs, eps = 1e-9) {
+  compile(v, inputs, eps = 1e-9, fixed = null) {
     const { model, off } = this;
     const mets = model.mets, rxns = model.rxns;
     const rp = this.rep, orb = this.orbit, nA = this.nAtoms;
@@ -151,7 +155,7 @@ export class Tracer {
       const cls = (code) => (code === 0 ? 1 : code);
       let need = null;
       for (let q = 0; q < nLoc; q++) {
-        if (isSub[q]) continue;
+        if (isSub[q] || this.noPool[mets[r.m[q]].b]) continue;
         const coef = Math.abs(r.c[q]), el = this.baseEl[mets[r.m[q]].b];
         for (let a = 0; a < el.length; a++) {
           const left = coef - used[q][a];
@@ -188,6 +192,8 @@ export class Tracer {
         for (const sm of p.mets) link(sm, r.m[q]);
       }
     }
+
+    if (fixed) for (let m = 0; m < mets.length; m++) if (fixed[m]) den[m] = 0; // not unknowns: keep e0
 
     // CSR by destination
     const nE = eSrc.length;
@@ -361,7 +367,9 @@ export class Tracer {
     const { off } = this, mets = this.model.mets;
     const codes = new Set([...elements].map(elCode));
     const metE = new Float32Array(mets.length), uncertain = new Uint8Array(mets.length);
-    for (const m of sol.order) {
+    // every metabolite, not only those fed by the labelled inputs right now: in a dynamic run a pool keeps
+    // the label it already has when the flux towards it stops
+    for (let m = 0; m < mets.length; m++) {
       const b = mets[m].b, el = this.baseEl[b];
       let s = 0, n = 0;
       for (let a = 0; a < el.length; a++) if (el[a] === 0 || codes.has(el[a])) { s += sol.e[off[m] + a]; n++; }

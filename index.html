@@ -4,30 +4,63 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MetfluxLive</title>
+  <script>try { if (localStorage.getItem("metflux.theme") === "light") document.documentElement.dataset.theme = "light"; } catch { /* storage unavailable */ }</script>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
   <header id="topbar">
-    <div class="brand"><span class="logo"></span>Metflux<b>Live</b></div>
-    <select id="modelSelect" data-i18n-title="h.model"></select>
-    <div class="search">
-      <input id="search" type="search" data-i18n-ph="h.search" autocomplete="off" spellcheck="false">
-      <div id="searchResults" class="dropdown" hidden></div>
+    <div class="tb-side">
+      <div class="brand"><span class="logo"></span>Metflux<b>Live</b></div>
+      <select id="modelSelect" data-i18n-title="h.model"></select>
+      <div class="search">
+        <input id="search" type="search" data-i18n-ph="h.search" autocomplete="off" spellcheck="false">
+        <div id="searchResults" class="dropdown" hidden></div>
+      </div>
     </div>
-    <div class="spacer"></div>
-    <a id="docsBtn" class="btn" href="docs.html" target="_blank" rel="noopener" data-i18n="h.docs" data-i18n-title="h.docsTitle"></a>
-    <button id="exportBtn" data-i18n="h.export" data-i18n-title="h.exportTitle"></button>
-    <div class="segmented" id="modeToggle" role="tablist" data-i18n-aria="h.modeAria">
-      <button data-mode="steady" class="on" data-i18n="h.steady"></button>
-      <button data-mode="dynamic" data-i18n="h.dynamic"></button>
+    <div class="tb-center">
+      <div class="segmented" id="modeToggle" role="tablist" data-i18n-aria="h.modeAria">
+        <button data-mode="steady" class="on" data-i18n="h.steady"></button>
+        <button data-mode="dynamic" data-i18n="h.dynamic"></button>
+      </div>
+      <button id="methodsBtn" class="icon" data-i18n-title="h.methodsTitle">?</button>
+      <div class="runbox">
+        <button id="runBtn" class="primary" data-i18n="h.run" data-i18n-title="h.runTitle"></button>
+        <button id="autoBtn" role="switch" aria-checked="true" data-i18n-title="h.autoTitle"><i class="sw-track"><i></i></i><span data-i18n="h.auto"></span></button>
+      </div>
     </div>
-    <button id="methodsBtn" class="icon" data-i18n-title="h.methodsTitle">?</button>
-    <button id="runBtn" class="primary" data-i18n="h.run"></button>
-    <select id="langSel" data-i18n-title="h.lang"></select>
+    <div class="tb-side right">
+      <a id="docsBtn" class="btn" href="docs.html" target="_blank" rel="noopener" data-i18n="h.docs" data-i18n-title="h.docsTitle"></a>
+      <button id="editBtn" class="toggle" data-i18n="h.edit" data-i18n-title="h.editTitle"></button>
+      <button id="importBtn" data-i18n="h.import" data-i18n-title="h.importTitle"></button>
+      <input id="importFile" type="file" accept=".json,.zip,application/json,application/zip" hidden>
+      <button id="exportBtn" data-i18n="h.export" data-i18n-title="h.exportTitle"></button>
+      <button id="themeBtn" class="icon theme" role="switch" aria-checked="true" data-i18n-title="h.themeTitle" data-i18n-aria="h.themeTitle">
+        <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1Z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
+      </button>
+      <select id="langSel" data-i18n-title="h.lang"></select>
+    </div>
   </header>
 
   <main>
     <aside id="left">
+      <section id="secEdits" class="fold edits" hidden>
+        <h2><span data-i18n="h.edits"></span> <button id="discardEdits" class="link" data-i18n="ed.discard" hidden></button></h2>
+        <p class="hint" id="editSummary"></p>
+        <div id="editTools">
+          <p class="hint" data-i18n-html="ed.hint"></p>
+          <div class="row ed-buttons">
+            <button id="addRxnBtn" data-i18n="ed.addRxn"></button>
+            <button id="addMetBtn" data-i18n="ed.addMet"></button>
+          </div>
+          <div class="add">
+            <input id="removeSearch" type="search" data-i18n-ph="ed.removePh" autocomplete="off" spellcheck="false">
+            <div id="removeResults" class="dropdown" hidden></div>
+          </div>
+        </div>
+        <div id="editList"></div>
+        <div id="editIssues"></div>
+      </section>
       <section id="secMedium" class="fold">
         <h2><span data-i18n="h.medium"></span> <button id="resetMedium" class="link" data-i18n="h.reset" data-i18n-title="h.resetTitle"></button></h2>
         <div class="row medium-bar">
@@ -44,6 +77,19 @@
         <div id="tracerList"></div>
         <div id="supplyList"></div>
       </section>
+      <section id="secMeasured" class="fold">
+        <h2><span data-i18n="h.measured"></span> <button id="resetMeasured" class="link" data-i18n="h.reset" data-i18n-title="meas.resetTitle"></button></h2>
+        <div class="row medium-bar">
+          <select id="measuredSel" class="grow" data-i18n-title="h.measured"></select>
+          <label class="tol" data-i18n-title="meas.tolTitle">± <input id="measTol" type="number" min="0" max="100" step="5"> %</label>
+        </div>
+        <p class="hint" id="measuredNote"></p>
+        <div class="add">
+          <input id="addMeasured" type="search" data-i18n-ph="h.addMeasured" autocomplete="off" spellcheck="false">
+          <div id="measuredResults" class="dropdown" hidden></div>
+        </div>
+        <div id="measuredList"></div>
+      </section>
       <section id="secPerturb" class="fold">
         <h2><span data-i18n="h.perturb"></span> <button id="clearPerturb" class="link" data-i18n="h.clearPerturb" hidden></button></h2>
         <p class="hint" data-i18n="h.perturbHint"></p>
@@ -54,7 +100,13 @@
         <div id="perturbList"></div>
       </section>
       <section id="secObjective" class="fold">
-        <h2><span data-i18n="h.objective"></span></h2>
+        <h2><span data-i18n="h.objective"></span> <a class="link" data-docs="objectives" target="_blank" data-i18n="obj.help"></a></h2>
+        <div class="row medium-bar">
+          <select id="objPreset" class="grow" data-i18n-title="obj.presetTitle"></select>
+          <button id="saveObjective" class="link" data-i18n="medium.save" data-i18n-title="obj.saveTitle"></button>
+          <button id="deleteObjective" class="link" data-i18n="medium.delete" hidden></button>
+        </div>
+        <p class="hint" id="objNote"></p>
         <div class="row">
           <select id="objSense"><option value="max" data-i18n="h.max"></option><option value="min" data-i18n="h.min"></option></select>
           <div class="add grow">
@@ -65,6 +117,12 @@
         <div id="objCurrent" class="chip"></div>
         <label class="check"><input id="pfba" type="checkbox" checked> <span data-i18n="h.pfba"></span></label>
       </section>
+      <section id="secCompare" class="fold">
+        <h2><span data-i18n="h.compare"></span> <button id="stopCompare" class="link" data-i18n="cmp.stop" hidden></button></h2>
+        <p class="hint" data-i18n-html="cmp.hint"></p>
+        <button id="saveScenario" data-i18n="cmp.save" data-i18n-title="cmp.saveTitle"></button>
+        <div id="scenarioList"></div>
+      </section>
       <section id="dynSection" class="fold" hidden>
         <h2><span data-i18n="h.dynParams"></span></h2>
         <label class="field"><span class="t" data-i18n="h.dynHours"></span> <span><input id="dynHours" type="number" min="0.1" step="1" value="24"> h</span></label>
@@ -72,28 +130,50 @@
         <label class="field"><span class="t" data-i18n="h.dynPool"></span> <span><input id="dynPool" type="number" min="0.01" step="0.1" value="0.5"> µmol/gDW</span></label>
         <p class="hint" data-i18n="h.dynHint"></p>
       </section>
+      <section id="secEvents" class="fold" hidden>
+        <h2><span data-i18n="h.events"></span> <button id="clearEvents" class="link" data-i18n="h.clearPerturb" hidden></button></h2>
+        <p class="hint" data-i18n="h.eventsHint"></p>
+        <div class="add">
+          <input id="addEvent" type="search" data-i18n-ph="h.addEvent" autocomplete="off" spellcheck="false">
+          <div id="eventResults" class="dropdown" hidden></div>
+        </div>
+        <button id="addMediumEvent" class="link" data-i18n="ev.addMedium"></button>
+        <div id="eventList"></div>
+      </section>
     </aside>
     <div class="resizer" id="resLeft" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-title="h.resize"></div>
 
     <section id="stage">
       <canvas id="map"></canvas>
       <nav id="crumbs"></nav>
+      <div id="badges"><span id="editBadge" class="badge-chip edit" hidden></span><span id="compareBadge" class="badge-chip cmp" hidden data-i18n-title="cmp.badgeTitle"></span></div>
       <div id="viewOpts">
         <select id="groupSel" data-i18n-title="h.groupTitle">
+          <option value="cascade" data-i18n="group.cascade"></option>
           <option value="pathway" data-i18n="group.pathway"></option>
           <option value="cell" data-i18n="group.cell"></option>
-          <option value="cascade" data-i18n="group.cascade"></option>
         </select>
         <select id="filterSel" data-i18n-title="h.filterTitle">
           <option value="all" data-i18n="filter.all"></option>
           <option value="label" data-i18n="filter.label"></option>
           <option value="delta" data-i18n="filter.delta"></option>
+          <option value="dlabel" data-i18n="filter.dlabel"></option>
         </select>
         <label class="check" data-i18n-title="h.inactiveTitle"><input id="optInactive" type="checkbox" checked> <span data-i18n="h.inactive"></span></label>
         <label class="check"><input id="optParticles" type="checkbox" checked> <span data-i18n="h.particles"></span></label>
         <button id="fitBtn" class="icon" data-i18n-title="h.fit">⤢</button>
       </div>
-      <div id="legend"></div>
+      <div id="legendBox">
+        <label class="qty"><span data-i18n="qty.label"></span>
+          <select id="qtySel">
+            <optgroup data-i18n-label="qty.gAtoms"><option value="carbon" data-i18n="qty.carbon"></option><option value="nitrogen" data-i18n="qty.nitrogen"></option></optgroup>
+            <optgroup data-i18n-label="qty.gRedox"><option value="redox" data-i18n="qty.redox"></option><option value="nadh" data-i18n="qty.nadh"></option><option value="nadph" data-i18n="qty.nadph"></option><option value="qh2" data-i18n="qty.qh2"></option></optgroup>
+            <optgroup data-i18n-label="qty.gEnergy"><option value="atp" data-i18n="qty.atp"></option><option value="dg" data-i18n="qty.dg"></option></optgroup>
+          </select>
+          <a class="qhelp" data-docs="carbonflow" target="_blank" data-i18n-title="qty.help">?</a>
+        </label>
+        <div id="legend"></div>
+      </div>
       <div id="timeline" hidden>
         <button id="playBtn" class="icon">▶</button>
         <input id="timeSlider" type="range" min="0" max="0" value="0">
@@ -122,6 +202,88 @@
       </div>
       <div id="molCanvas"></div>
       <footer><span id="molName"></span><span class="spacer"></span><button value="cancel" data-i18n="h.cancel"></button><button id="molApply" value="ok" class="primary" data-i18n="h.molApply"></button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="rxnDialog" class="editor">
+    <form method="dialog">
+      <header><h3 id="rxnTitle"></h3><a class="link" href="docs.html" data-docs="editing" target="_blank" rel="noopener" data-i18n="ed.requirements"></a><button class="icon" value="cancel" data-i18n-aria="h.close">✕</button></header>
+      <p class="hint" id="rxnHint"></p>
+      <div class="ed-grid">
+        <label><span data-i18n="ed.f.id"></span><input id="rxId" type="text" spellcheck="false"></label>
+        <label><span data-i18n="ed.f.name"></span><input id="rxName" type="text"></label>
+        <label><span data-i18n="ed.f.pathway"></span><input id="rxSub" type="text" list="subList" data-i18n-ph="ed.f.pathwayPh"><datalist id="subList"></datalist></label>
+        <label><span>EC</span><input id="rxEc" type="text" spellcheck="false" placeholder="1.1.1.27"></label>
+      </div>
+      <div id="rxEqFixed" class="eq" hidden></div>
+      <div id="rxEqBox" class="eqbox">
+        <div>
+          <h4 data-i18n="ed.substrates"></h4>
+          <div id="rxSubs"></div>
+          <div class="add"><input id="rxAddS" type="search" data-i18n-ph="ed.addMetPh" autocomplete="off" spellcheck="false"><div id="rxAddSRes" class="dropdown" hidden></div></div>
+        </div>
+        <div class="arrow"><button type="button" id="rxSwap" class="icon" data-i18n-title="ed.swap">⇄</button></div>
+        <div>
+          <h4 data-i18n="ed.products"></h4>
+          <div id="rxProds"></div>
+          <div class="add"><input id="rxAddP" type="search" data-i18n-ph="ed.addMetPh" autocomplete="off" spellcheck="false"><div id="rxAddPRes" class="dropdown" hidden></div></div>
+        </div>
+      </div>
+      <p class="hint"><button type="button" id="rxNewMet" class="link" data-i18n="ed.newMetLink"></button></p>
+      <div class="ed-grid">
+        <label><span data-i18n="ed.f.lb"></span><input id="rxLb" type="number" step="any"></label>
+        <label><span data-i18n="ed.f.ub"></span><input id="rxUb" type="number" step="any"></label>
+        <div class="row" style="align-self:end"><button type="button" id="rxIrrev" class="link" data-i18n="ed.irrev"></button><button type="button" id="rxRev" class="link" data-i18n="ed.rev"></button></div>
+        <label class="wide"><span data-i18n="ed.f.gpr"></span><input id="rxGpr" type="text" spellcheck="false" placeholder="LDHA or LDHB or (LDHA and LDHB)"></label>
+      </div>
+      <div id="rxMapBox">
+        <h4 data-i18n="ed.atomMap"></h4>
+        <div class="row radios">
+          <label class="check"><input type="radio" name="rxMap" value="auto"> <span data-i18n="ed.map.auto"></span></label>
+          <label class="check"><input type="radio" name="rxMap" value="smiles"> <span data-i18n="ed.map.smiles"></span></label>
+          <label class="check"><input type="radio" name="rxMap" value="none"> <span data-i18n="ed.map.noneOpt"></span></label>
+        </div>
+        <p class="hint" data-i18n-html="ed.map.hint"></p>
+        <div class="row"><button type="button" id="rxAutoBtn" data-i18n="ed.map.compute"></button><span id="rxMapStatus" class="hint grow"></span></div>
+        <div id="rxSmilesBox" hidden>
+          <textarea id="rxSmiles" rows="3" spellcheck="false" placeholder="[CH3:1][C:2](=[O:3])[C:4](=[O:5])[OH:6]>>[CH3:1][CH:2]([OH:3])[C:4](=[O:5])[OH:6]"></textarea>
+          <button type="button" id="rxSmilesRead" data-i18n="ed.map.read"></button>
+        </div>
+      </div>
+      <label class="check" id="rxUnbalWrap" hidden><input type="checkbox" id="rxUnbal"> <span data-i18n="ed.unbalancedOk"></span></label>
+      <div id="rxIssues" class="issues"></div>
+      <footer><span class="spacer"></span><button value="cancel" data-i18n="h.cancel"></button><button id="rxSave" value="ok" class="primary" data-i18n="ed.save"></button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="metDialog" class="editor">
+    <form method="dialog">
+      <header><h3 id="metTitle"></h3><a class="link" href="docs.html" data-docs="editing" target="_blank" rel="noopener" data-i18n="ed.requirements"></a><button class="icon" value="cancel" data-i18n-aria="h.close">✕</button></header>
+      <div class="row radios">
+        <label class="check"><input type="radio" name="mtKind" value="new"> <span data-i18n="ed.kindNew"></span></label>
+        <label class="check"><input type="radio" name="mtKind" value="comp"> <span data-i18n="ed.kindComp"></span></label>
+      </div>
+      <div class="ed-grid">
+        <label><span data-i18n="ed.f.comp"></span><select id="mtComp"></select></label>
+        <label><span data-i18n="ed.f.metId"></span><code id="mtId"></code></label>
+      </div>
+      <div id="mtCompBox">
+        <div class="add"><input id="mtBaseSearch" type="search" data-i18n-ph="ed.pickBasePh" autocomplete="off" spellcheck="false"><div id="mtBaseRes" class="dropdown" hidden></div></div>
+        <div id="mtBase" class="chip"></div>
+      </div>
+      <div id="mtNewBox">
+        <div class="ed-grid">
+          <label class="wide"><span data-i18n="ed.f.name"></span><input id="mtName" type="text"></label>
+          <label><span data-i18n="ed.f.formula"></span><input id="mtFormula" type="text" spellcheck="false" placeholder="C6H12O6"></label>
+          <label><span data-i18n="ed.f.charge"></span><input id="mtCharge" type="number" step="1"></label>
+        </div>
+        <label class="block"><span data-i18n="ed.f.smiles"></span><textarea id="mtSmiles" rows="2" spellcheck="false" placeholder="CC(O)C(C)=O"></textarea></label>
+        <div class="row"><button type="button" id="mtSmilesRead" data-i18n="ed.readSmiles"></button><span id="mtSmilesInfo" class="hint grow"></span></div>
+        <p class="hint" data-i18n-html="ed.smilesHint"></p>
+        <div id="mtPreview" class="molbox"></div>
+      </div>
+      <div id="mtIssues" class="issues"></div>
+      <footer><span class="spacer"></span><button value="cancel" data-i18n="h.cancel"></button><button id="mtSave" value="ok" class="primary" data-i18n="ed.save"></button></footer>
     </form>
   </dialog>
 

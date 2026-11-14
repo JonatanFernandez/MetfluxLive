@@ -79,7 +79,10 @@ export function cascadeGlobal(model, index, gNodes, gEdges, D) {
     const md = median(ds);
     level.set(n.ss, md < 0 ? D.max + 1 : md);
   }
-  const sorted = [...gNodes].sort((a, b) => level.get(a.ss) - level.get(b.ss) || b.n - a.n);
+  // The exchange with the outside (the medium) and the transport into the cell come first, on rows of their own.
+  const mediumRow = gNodes.filter((n) => index.isExchangeSub[n.ss]);
+  const transportRow = gNodes.filter((n) => index.isTransportSub[n.ss] && !index.isExchangeSub[n.ss]);
+  const sorted = gNodes.filter((n) => !index.isExchangeSub[n.ss] && !index.isTransportSub[n.ss]).sort((a, b) => level.get(a.ss) - level.get(b.ss) || b.n - a.n);
   const GAP = 1.15;
   let total = 0;
   for (const n of sorted) total += 2 * n.r + GAP;
@@ -91,6 +94,9 @@ export function cascadeGlobal(model, index, gNodes, gEdges, D) {
     cur.push(n); w += 2 * n.r + GAP;
   }
   if (cur.length) rows.push(cur);
+  const kinds = rows.map(() => null);
+  if (transportRow.length) { rows.unshift(transportRow); kinds.unshift("transport"); }
+  if (mediumRow.length) { rows.unshift(mediumRow); kinds.unshift("medium"); }
   const byId = new Map(gNodes.map((n) => [n.ss, n]));
   const nb = new Map();
   for (const [a, b] of gEdges) {
@@ -101,7 +107,7 @@ export function cascadeGlobal(model, index, gNodes, gEdges, D) {
   untangle(idRows, nb, 10);
   const pos = new Map(), guides = [];
   let y = 0;
-  idRows.forEach((row) => {
+  idRows.forEach((row, k) => {
     const ns = row.map((id) => byId.get(id));
     const rmax = ns.reduce((m, n) => Math.max(m, n.r), 0);
     let width = 0;
@@ -112,7 +118,7 @@ export function cascadeGlobal(model, index, gNodes, gEdges, D) {
     // alternate nodes are nudged up and down so that neighbouring labels do not collide
     ns.forEach((n, i) => { pos.set(n.ss, [x + n.r + gap / 2, y + (i % 2 ? 0.42 : -0.1)]); x += 2 * n.r + gap; });
     const ds = ns.map((n) => level.get(n.ss));
-    guides.push({ y: y - rmax - 0.55, from: Math.min(...ds), to: Math.max(...ds) });
+    guides.push({ y: y - rmax - 0.55, from: Math.min(...ds), to: Math.max(...ds), kind: kinds[k] });
     y += rmax + 1.75;
   });
   return { pos, level, guides, width: W };
@@ -121,9 +127,10 @@ export function cascadeGlobal(model, index, gNodes, gEdges, D) {
 /**
  * Cascade layout of one pathway map: metabolites in rows by level, reactions between the rows they connect.
  * @param L layout.subs[ss] { m, r } (metabolite and reaction indices of the map)
- * @returns { mx, my, rx, ry, guides }
+ * @returns { m, mx, my, r, rx, ry, guides }: m and r are those of L followed by the medium metabolites and
+ *   transport reactions added on top
  */
-export function cascadeSub(model, L, D) {
+export function cascadeSub(model, L, D, index) {
   const DX = 2.5, DY = 2.5, WRAP = 12;
   const inMap = new Map(L.m.map((m, k) => [m, k]));
   // Levels are counted inside the pathway: its metabolites closest to the medium are the entry (level 0)
@@ -179,10 +186,44 @@ export function cascadeSub(model, L, D) {
     });
     y += DY + (lines - 1) * DY * 0.55;
   });
+  // ---- on top: the medium metabolites that feed this pathway, and the transport that brings them in
+  const allM = [...L.m], allR = [...L.r], posR = new Map(L.r.map((j, k) => [j, k]));
+  const extComp = index.roleComp.ext, yT = -DY * 0.85, yM = -DY * 1.7;
+  const feeds = []; // { e: medium metabolite, target: metabolite of the map, rxns: [position in allR] }
+  if (extComp) for (const m of L.m) {
+    for (const e of index.metsOfBase[model.mets[m].b]) {
+      if (e === m || inMap.has(e) || D.depth[e] !== 0 || model.mets[e].c !== extComp) continue;
+      const shared = [];
+      for (let p = index.rxnStart[e]; p < index.rxnStart[e + 1]; p++) { const j = index.rxnList[p]; if (model.rxns[j].m.includes(m)) shared.push(j); }
+      if (!shared.length) continue;
+      // transporters already drawn in the map move up; otherwise the two simplest ones are added
+      let use = shared.filter((j) => posR.has(j));
+      if (!use.length) use = shared.sort((a, b) => model.rxns[a].m.length - model.rxns[b].m.length).slice(0, 2);
+      feeds.push({ e, target: m, rxns: use.map((j) => { if (!posR.has(j)) { posR.set(j, allR.length); allR.push(j); } return posR.get(j); }) });
+    }
+  }
+  const lifted = new Map(); // reaction position -> x
+  if (feeds.length) {
+    // one node per medium metabolite, even when it feeds several metabolites of the map
+    const byExt = new Map();
+    for (const f of feeds) (byExt.get(f.e) || byExt.set(f.e, []).get(f.e)).push(f);
+    const ext = [...byExt].map(([e, fs]) => ({ e, fs, x: fs.reduce((a, f) => a + mx[inMap.get(f.target)], 0) / fs.length })).sort((a, b) => a.x - b.x);
+    const xs = ext.map((o) => o.x);
+    for (let i = 1; i < xs.length; i++) if (xs[i] - xs[i - 1] < DX * 0.9) xs[i] = xs[i - 1] + DX * 0.9;
+    const shift = (ext.reduce((a, o) => a + o.x, 0) - xs.reduce((a, x) => a + x, 0)) / ext.length;
+    ext.forEach((o, i) => {
+      const x = xs[i] + shift, at = allM.length;
+      allM.push(o.e); mx[at] = x; my[at] = yM;
+      for (const f of o.fs) f.rxns.forEach((k, q) => { if (!lifted.has(k)) lifted.set(k, (x + mx[inMap.get(f.target)]) / 2 + (q - (f.rxns.length - 1) / 2) * 0.95); });
+    });
+    guides.unshift({ y: yM - DY * 0.42, kind: "medium" }, { y: yT - DY * 0.42, kind: "transport" });
+  }
   // reactions: between their metabolites
-  const rx = new Array(L.r.length), ry = new Array(L.r.length);
+  const rx = new Array(allR.length), ry = new Array(allR.length);
+  for (const [k, x] of lifted) { rx[k] = x; ry[k] = yT; }
   L.r.forEach((j, k) => {
     const ms = rxnMets[k];
+    if (lifted.has(k)) return;
     if (!ms.length) { rx[k] = 0; ry[k] = y; return; }
     let sx = 0, sy = 0, y0 = Infinity, y1 = -Infinity;
     for (const m of ms) { const i = inMap.get(m); sx += mx[i]; sy += my[i]; y0 = Math.min(y0, my[i]); y1 = Math.max(y1, my[i]); }
@@ -191,14 +232,14 @@ export function cascadeSub(model, L, D) {
   });
   // push apart reactions that landed on the same spot
   const band = new Map();
-  L.r.forEach((_, k) => { const b = Math.round(ry[k] / 0.7); (band.get(b) || band.set(b, []).get(b)).push(k); });
+  allR.forEach((_, k) => { const b = Math.round(ry[k] / 0.7); (band.get(b) || band.set(b, []).get(b)).push(k); });
   for (const ks of band.values()) {
     ks.sort((a, b) => rx[a] - rx[b]);
     for (let i = 1; i < ks.length; i++) if (rx[ks[i]] - rx[ks[i - 1]] < 0.95) rx[ks[i]] = rx[ks[i - 1]] + 0.95;
   }
   // metabolites and reactions never share a spot
-  L.r.forEach((_, k) => {
-    for (let i = 0; i < L.m.length; i++) if (Math.abs(mx[i] - rx[k]) < 0.5 && Math.abs(my[i] - ry[k]) < 0.5) { ry[k] += 0.75; break; }
+  allR.forEach((_, k) => {
+    for (let i = 0; i < allM.length; i++) if (Math.abs(mx[i] - rx[k]) < 0.5 && Math.abs(my[i] - ry[k]) < 0.5) { ry[k] += 0.75; break; }
   });
-  return { mx, my, rx, ry, guides };
+  return { m: allM, mx, my, r: allR, rx, ry, guides };
 }

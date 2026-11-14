@@ -1,18 +1,22 @@
 // Simulation orchestration: medium -> bounds -> FBA (worker) -> isotope propagation.
 import { packNetwork } from "./core/fba.js";
 import { applyMedium, findExchanges, uptakeCapacity, UNLIMITED } from "./core/medium.js";
+import { TRACE_SECRETION, FREE_SECRETION, atpMaintenanceRxn } from "./core/measured.js";
 import { Tracer } from "./core/tracer.js";
 import { t } from "./i18n.js";
 
 export class Simulator {
-  constructor(model, structures, atommaps) {
+  /** @param backend optional replacement for the solver worker: async ({ type, ... }) => result (used by the tests) */
+  constructor(model, structures, atommaps, backend) {
     this.model = model;
     this.tracer = new Tracer(model, structures, atommaps);
     this.exchanges = findExchanges(model);
     this.baseLb = Float64Array.from(model.rxns, (r) => r.lb);
     this.baseUb = Float64Array.from(model.rxns, (r) => r.ub);
-    this.worker = new Worker(new URL("./core/solver.worker.js", import.meta.url), { type: "module" });
+    this.ngamRxn = atpMaintenanceRxn(model);
     this.pending = new Map();
+    if (backend) { this._call = backend; this.ready = backend({ type: "init", net: packNetwork(model) }); return; }
+    this.worker = new Worker(new URL("./core/solver.worker.js", import.meta.url), { type: "module" });
     this.seq = 0;
     this.worker.onmessage = (ev) => {
       const p = this.pending.get(ev.data.id);
@@ -27,7 +31,7 @@ export class Simulator {
     this.ready = this._call({ type: "init", net: packNetwork(model) });
   }
 
-  dispose() { this.worker.terminate(); }
+  dispose() { this.worker?.terminate(); }
 
   _call(msg) {
     const id = ++this.seq;
@@ -63,7 +67,7 @@ export class Simulator {
   }
 
   _key(cfg, supplies) {
-    return JSON.stringify([cfg.objective, cfg.maximize, cfg.parsimonious, supplies.map((it) => [it.met, it.conc, it.vmax, it.km, it.unlimited ? 1 : 0, it.hold ? 1 : 0])]);
+    return JSON.stringify([cfg.objective, cfg.maximize, cfg.parsimonious, cfg.measured || null, supplies.map((it) => [it.met, it.conc, it.vmax, it.km, it.unlimited ? 1 : 0, it.hold ? 1 : 0])]);
   }
 
   /** The unperturbed reference is reused while medium and objective stay the same. */
@@ -85,6 +89,10 @@ export class Simulator {
         if (e.dir < 0) lb[e.rxn] = Math.max(lb[e.rxn], -lim); else ub[e.rxn] = Math.min(ub[e.rxn], lim);
       }
     }
+    const measured = cfg.measured?.items?.length || cfg.measured?.ngam > 0 ? cfg.measured : null;
+    // a perturbed cell keeps the measured phenotype of the reference; only if that becomes impossible are the
+    // measured fluxes relaxed (below), as in any other case
+    if (measured) this._applyMeasured(measured, medium, lb, ub, capLimit, !!cfg.relaxed, cfg.objective);
     if (pertCaps) {
       for (const [j, cap] of pertCaps) {
         ub[j] = Math.min(ub[j], cap); lb[j] = Math.max(lb[j], -cap);
@@ -92,12 +100,55 @@ export class Simulator {
       }
     }
     await this.ready;
-    const res = await this._call({
+    let res = await this._call({
       type: "solve",
       params: { lb, ub, objective: cfg.objective, maximize: cfg.maximize, parsimonious: cfg.parsimonious, sources },
     });
+    // the measured fluxes belong to cells in a rich medium: when they cannot be met (a nutrient removed or
+    // exhausted, a perturbation…) they are relaxed instead of leaving the user without a solution
+    if (measured && res.status !== "optimal" && !cfg.relaxed) {
+      res = await this._solve({ ...cfg, relaxed: true }, supplies, concOverride, capLimit, pertCaps);
+      res.relaxed = true;
+      return res;
+    }
     res.srcItems = srcItems;
     return res;
+  }
+
+  /**
+   * Pin exchange fluxes to measured values (± tol). They replace the uptake ceilings that the medium gives.
+   * An uptake is only applied when the metabolite is in the medium, and never above what is physically left
+   * (dynamic mode). Relaxed (when the pinned problem has no solution): uptakes keep only their measured
+   * maximum and secretions are left free. The objective's own exchange is never capped as a trace.
+   */
+  _applyMeasured(meas, medium, lb, ub, capLimit, perturbed, objective) {
+    const tol = Math.max(0, meas.tol ?? 0.2), present = new Map(medium.map((it) => [it.met, it]));
+    // unmeasured organic products: traces only
+    if (meas.ngam > 0 && this.ngamRxn >= 0) lb[this.ngamRxn] = Math.max(lb[this.ngamRxn], Math.min(meas.ngam, ub[this.ngamRxn]));
+    const measuredMets = new Set(meas.items.map((x) => x.met));
+    for (const [met, e] of this.exchanges) {
+      // exchanges added by a model edit are left free: the user put them there to be used
+      if (measuredMets.has(met) || e.rxn === objective || this.model.rxns[e.rxn].user || FREE_SECRETION.has(this.model.bases[this.model.mets[met].b].n)) continue;
+      if (e.dir < 0) ub[e.rxn] = Math.min(ub[e.rxn], TRACE_SECRETION); else lb[e.rxn] = Math.max(lb[e.rxn], -TRACE_SECRETION);
+    }
+    for (const { met, rate } of meas.items) {
+      const e = this.exchanges.get(met);
+      if (!e || !rate) continue;
+      let lo, hi; // range of uptake (positive) or secretion (negative), in "uptake" terms
+      if (rate > 0) {
+        const it = present.get(met);
+        if (!it || (!it.unlimited && !(it.conc > 0))) continue; // nothing to take up
+        hi = rate * (1 + tol); lo = perturbed ? 0 : rate * (1 - tol);
+        const avail = capLimit?.get(met);
+        if (avail !== undefined) { hi = Math.min(hi, avail); lo = Math.min(lo, hi); }
+      } else {
+        if (perturbed) continue;
+        lo = rate * (1 + tol); hi = rate * (1 - tol);
+      }
+      // uptake = dir · v
+      const a = lo * e.dir, b = hi * e.dir;
+      lb[e.rxn] = Math.min(a, b); ub[e.rxn] = Math.max(a, b);
+    }
   }
 
   /** Tracer inputs: every uptake and injection, labelled where the user marked atoms. */
@@ -128,7 +179,7 @@ export class Simulator {
   }
 
   _frame(t, res, inputs, prog, sol, elements, extra = {}) {
-    const frame = { t, v: res.v, status: res.status, objective: res.objective, inputs, sourceFlux: res.sourceFlux, srcItems: res.srcItems, elements, ...extra };
+    const frame = { t, v: res.v, status: res.status, objective: res.objective, inputs, sourceFlux: res.sourceFlux, srcItems: res.srcItems, elements, relaxed: !!res.relaxed, ...extra };
     if (sol) {
       const sum = this.tracer.summarize(prog, sol, elements);
       frame.e = Float32Array.from(sol.e.subarray(0, this.tracer.nAtoms));
@@ -168,7 +219,7 @@ export class Simulator {
   async runDynamic(cfg, supplies, structures, dyn, onProgress) {
     if (!cfg.perturb?.length) return this._dynamic(cfg, supplies, structures, dyn, (p, f, fs) => onProgress?.(p, f, fs, "run"));
     // perturbed run: an unperturbed run on the same time grid is the reference for every frame
-    const key = "d|" + JSON.stringify([dyn.hours, dyn.biomass, dyn.pool, dyn.frames]) + this._key(cfg, supplies);
+    const key = "d|" + JSON.stringify([dyn.hours, dyn.biomass, dyn.pool, dyn.frames, (dyn.events || []).map((ev) => [ev.t, ev.type, ev.met, ev.conc, ev.items])]) + this._key(cfg, supplies);
     const ref = await this._reference(key, () => this._dynamic(cfg, supplies, structures, dyn, (p, f, fs) => onProgress?.(p, f, fs, "ref"), null, true));
     const f0 = ref.frames[0];
     const caps = f0 && f0.status === "optimal" ? this._caps(cfg.perturb, f0.v) : null;
@@ -181,58 +232,126 @@ export class Simulator {
     return res;
   }
 
+  /**
+   * @param dyn.events scheduled changes of the medium, applied at their time t (hours):
+   *   { t, type: "add", met, conc, vmax, km, label?, fraction? }   add `conc` mM of an extracellular metabolite
+   *   { t, type: "medium", items: [{ met, conc, vmax, km, unlimited, hold }] }   replace the whole medium (unlabelled)
+   */
   async _dynamic(cfg, supplies, structures, dyn, onProgress, pertCaps, noTracer) {
     const { model, exchanges, tracer } = this;
-    const elements = this._elements(supplies, structures);
-    const nF = dyn.frames || 30;
-    const t0 = 10 / 3600, T = dyn.hours;
+    const T = dyn.hours;
+    const events = (dyn.events || []).filter((ev) => ev.t < T).map((ev) => ({ ...ev, t: Math.max(0, ev.t) })).sort((a, b) => a.t - b.t);
+    const hasLabel = (it) => !!(it.label && it.label.some((x) => x > 0));
+    const elements = this._elements([...supplies, ...events.filter((ev) => ev.type === "add")], structures);
+
+    // ---- state of the medium: concentration and isotopic make-up of every component
+    // A component is a mix of batches (what was there, what was added later); uptake does not tell them apart.
+    const injections = supplies.filter((it) => !exchanges.has(it.met));
+    const st = new Map(), outConc = new Map(), instant = new Set();
+    const tracked = (s) => !s.unlimited && !s.hold; // finite and not replenished: it gets depleted
+    const put = (it, labelled) => {
+      const conc = it.unlimited ? 1 : it.conc;
+      st.set(it.met, {
+        conc, vmax: it.vmax, km: it.km, unlimited: !!it.unlimited, hold: !!it.hold,
+        batches: conc > 0 ? [{ amt: conc, label: labelled && hasLabel(it) ? Float64Array.from(it.label, (x) => (x > 0 ? 1 : 0)) : null, frac: it.fraction ?? 1 }] : [],
+      });
+    };
+    for (const it of supplies) if (exchanges.has(it.met)) put(it, true);
+    const apply = (ev) => {
+      if (ev.type === "medium") {
+        const keep = new Set(ev.items.map((it) => it.met));
+        for (const [met, s] of st) if (!keep.has(met)) { s.conc = 0; s.unlimited = false; s.hold = false; s.batches = []; }
+        for (const it of ev.items) if (exchanges.has(it.met)) put(it, false);
+        outConc.clear(); // secreted products are washed away with the old medium
+      } else if (exchanges.has(ev.met) && ev.conc > 0) {
+        let s = st.get(ev.met);
+        if (!s) st.set(ev.met, (s = { conc: 0, vmax: ev.vmax, km: ev.km, unlimited: false, hold: false, batches: [] }));
+        if (s.unlimited) return;
+        s.conc += ev.conc;
+        s.batches.push({ amt: ev.conc, label: hasLabel(ev) ? Float64Array.from(ev.label, (x) => (x > 0 ? 1 : 0)) : null, frac: ev.fraction ?? 1 });
+      }
+    };
+    const supplyList = () => [...injections, ...[...st].map(([met, s]) => ({ met, conc: s.conc, vmax: s.vmax, km: s.km, unlimited: s.unlimited, hold: s.hold }))];
+    const mkInputs = (res) => {
+      const inputs = [];
+      for (const [met, ex] of exchanges) {
+        const up = res.v[ex.rxn] * ex.dir;
+        if (!(up > 1e-9)) continue;
+        const s = st.get(met);
+        let label = null, batches = null;
+        if (s && s.batches.some((b) => b.label)) {
+          const tot = s.batches.reduce((a, b) => a + b.amt, 0), n = tracer.atomsOf(met);
+          label = new Float64Array(n);
+          for (const b of s.batches) if (b.label) for (let a = 0; a < n; a++) label[a] += (b.amt * b.frac * b.label[a]) / tot;
+          batches = s.batches.map((b) => ({ w: b.amt / tot, label: b.label, frac: b.frac }));
+        }
+        inputs.push({ met, flux: up, label, batches });
+      }
+      res.srcItems.forEach((it, i) => {
+        if (res.sourceFlux[i] > 1e-9) inputs.push({ met: it.met, flux: res.sourceFlux[i], label: hasLabel(it) ? Float64Array.from(it.label, (x) => x * (it.fraction ?? 1)) : null });
+      });
+      return inputs;
+    };
+
+    // ---- time grid: logarithmic from 10 s after the start and after every event, when label moves fastest
+    const t0 = 10 / 3600;
+    const cuts = [0, ...new Set(events.map((ev) => ev.t).filter((t) => t > 0)), T];
+    const nSeg = cuts.length - 1, per = nSeg === 1 ? dyn.frames || 30 : Math.max(10, Math.min(20, Math.floor(90 / nSeg)));
     const times = [0];
-    for (let i = 0; i < nF; i++) times.push(t0 * Math.pow(T / t0, i / (nF - 1)));
-    const conc = new Map(); // extracellular concentrations (mM)
-    const tracked = new Set();
-    const held = new Set(); // replenished components (e.g. O2 through gas exchange) keep their concentration
-    for (const it of supplies) {
-      if (!exchanges.has(it.met) || it.unlimited) continue;
-      conc.set(it.met, it.conc);
-      if (it.hold) held.add(it.met); else tracked.add(it.met);
+    for (let g = 0; g < nSeg; g++) {
+      const a = cuts[g], len = cuts[g + 1] - a;
+      if (len <= t0 * 1.5) { times.push(cuts[g + 1]); continue; }
+      for (let i = 0; i < per; i++) times.push(i === per - 1 ? cuts[g + 1] : a + t0 * Math.pow(len / t0, i / (per - 1)));
     }
+
     const isBiomassObj = !!model.rxns[cfg.objective].obj;
-    let X = dyn.biomass, res = null, prog = null, lastCaps = null, e = null, solveMs = 0, solves = 0;
+    // a measured uptake replaces the kinetic ceiling of the medium (see _applyMeasured)
+    const measUp = new Map();
+    if (cfg.measured?.items) for (const x of cfg.measured.items) if (x.rate > 0) measUp.set(x.met, x.rate * (1 + (cfg.measured.tol ?? 0.2)));
+    let X = dyn.biomass, res = null, prog = null, lastCaps = null, e = null, solveMs = 0, solves = 0, labelOn = false;
     const frames = [];
     const poolOf = (m) => {
       if (model.mets[m].c !== "e") return dyn.pool;
-      if (tracked.has(m)) return 0; // defined directly by the (labelled) medium input
-      return (conc.get(m) || 0) / X;
+      const s = st.get(m);
+      if (s) return tracked(s) ? 0 : s.conc / X; // a depleting component is defined directly by its (labelled) input
+      return (outConc.get(m) || 0) / X;
+    };
+    const snapshot = () => {
+      const c = new Map(outConc);
+      for (const [met, s] of st) if (!s.unlimited) c.set(met, s.conc);
+      return c;
     };
     for (let k = 1; k < times.length; k++) {
       const dt = times[k] - times[k - 1];
+      let need = !res;
+      for (const ev of events) if (ev.t === times[k - 1]) { apply(ev); need = true; }
       // uptake capacity cannot exceed what is physically left in the medium
       const caps = new Map(), limit = new Map();
-      for (const it of supplies) {
-        if (!tracked.has(it.met)) continue;
-        const c = conc.get(it.met);
-        const avail = c / (X * dt);
-        caps.set(it.met, Math.min(uptakeCapacity(c, it.vmax, it.km), avail));
-        limit.set(it.met, avail);
+      for (const [met, s] of st) {
+        if (!tracked(s)) continue;
+        instant.add(met);
+        const avail = s.conc / (X * dt);
+        caps.set(met, Math.min(measUp.get(met) ?? uptakeCapacity(s.conc, s.vmax, s.km), avail));
+        limit.set(met, avail);
       }
-      let need = !res;
       if (!need) for (const [m, cap] of caps) {
-        const prev = lastCaps.get(m), ex = exchanges.get(m);
+        const prev = lastCaps.get(m) ?? 0, ex = exchanges.get(m);
         const used = res.v[ex.rxn] * ex.dir;
         // re-solve only when a binding capacity moved noticeably (each solve costs seconds)
         if (used > cap * 1.08 || (used > prev * 0.98 && cap > prev * 1.08)) { need = true; break; }
       }
       if (need) {
-        res = await this._solve(cfg, supplies, conc, limit, pertCaps);
+        res = await this._solve(cfg, supplyList(), null, limit, pertCaps);
         solveMs += res.ms; solves++;
         lastCaps = caps;
         if (res.status !== "optimal") {
-          frames.push({ t: times[k], v: res.v, status: res.status, objective: 0, inputs: [], conc: new Map(conc), biomass: X });
+          frames.push({ t: times[k], v: res.v, status: res.status, objective: 0, inputs: [], conc: snapshot(), biomass: X });
           break;
         }
-        const inputs = this._inputs(res, supplies);
-        res.inputs = inputs;
-        prog = !noTracer && inputs.some((i) => i.label) ? tracer.compile(res.v, inputs) : null;
+        res.inputs = mkInputs(res);
+        // once label has entered the cell it keeps being tracked, also after it is gone from the medium
+        labelOn ||= res.inputs.some((i) => i.label);
+        prog = !noTracer && labelOn ? tracer.compile(res.v, res.inputs) : null;
       }
       let sol = null;
       if (prog) { sol = tracer.advance(prog, e, dt, poolOf); e = sol.e; }
@@ -240,14 +359,23 @@ export class Simulator {
       for (const [met, ex] of exchanges) {
         const up = res.v[ex.rxn] * ex.dir;
         if (Math.abs(up) < 1e-12) continue;
-        if (held.has(met) || (up > 0 && !tracked.has(met))) continue; // replenished / unlimited components
-        conc.set(met, Math.max(0, (conc.get(met) || 0) - up * X * dt));
+        const s = st.get(met);
+        if (!s) { if (up < 0) outConc.set(met, (outConc.get(met) || 0) - up * X * dt); continue; }
+        if (!tracked(s)) continue; // replenished / unlimited components
+        const next = Math.max(0, s.conc - up * X * dt);
+        if (up > 0) { const f = s.conc > 0 ? next / s.conc : 0; for (const b of s.batches) b.amt *= f; }
+        else { // secreted into a medium component: counted as unlabelled
+          let b = s.batches.find((x) => !x.label);
+          if (!b) s.batches.push((b = { amt: 0, label: null, frac: 1 }));
+          b.amt += next - s.conc;
+        }
+        s.conc = next;
       }
       if (isBiomassObj) X *= Math.exp(res.objective * dt);
-      const frame = this._frame(times[k], res, res.inputs, prog, sol, elements, { conc: new Map(conc), biomass: X });
+      const frame = this._frame(times[k], res, res.inputs, prog, sol, elements, { conc: snapshot(), biomass: X });
       frames.push(frame);
       onProgress?.(k / (times.length - 1), frame, frames);
     }
-    return { frames, solveMs, solves };
+    return { frames, solveMs, solves, instant, events: events.map((ev) => ({ t: ev.t, type: ev.type, met: ev.met })) };
   }
 }

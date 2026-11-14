@@ -74,6 +74,8 @@ const KINETICS = {
   ascorbate: [0.002, 0.05], uridine: [0.002, 0.01], uracil: [0.002, 0.01],
 };
 const KIN_FALLBACK = [0.005, 0.05];
+/** Uptake kinetics [Vmax, Km] used for a metabolite added by hand: the built-in value when there is one. */
+export const kineticsFor = (name) => KINETICS[name] || [0.5, 1];
 for (const [name, conc, vmax, km] of DEFAULT_MEDIUM) if (conc !== null) KINETICS[name] = [vmax, km];
 
 function plasmaLike(col) {
@@ -107,7 +109,7 @@ export function uptakeCapacity(conc, vmax, km) {
 export function findExchanges(model) {
   const ex = new Map();
   model.rxns.forEach((r, j) => {
-    if (r.m.length !== 1) return;
+    if (r.m.length !== 1 || r.removed) return;
     const met = model.mets[r.m[0]];
     if (met.c !== "e" && met.c !== "s") return;
     if (!ex.has(r.m[0])) ex.set(r.m[0], { rxn: j, dir: r.c[0] < 0 ? -1 : 1 });

@@ -1,6 +1,14 @@
-tools/.venv/
-tools/cache/
+# Only what the web app needs is published: index.html, docs.html, css/, js/, data/ and vendor/.
+
+# Local preprocessing and tests: Python scripts, their virtual environments and caches,
+# the Node test scripts and the package.json they need
+tools/
+package.json
 node_modules/
 __pycache__/
+*.pyc
+.venv*/
+
+# source models (downloaded by hand, converted into data/<slug>/*.json)
 Human-GEM-*.zip
 Mouse-GEM-*.zip
