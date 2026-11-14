@@ -1,0 +1,668 @@
+<article data-lang="it" hidden>
+<h1>Documentazione di MetfluxLive</h1>
+<p class="lead">Che cosa calcola l'applicazione, da dove provengono i dati, come leggere i risultati e una serie di esperimenti in silico da provare.</p>
+
+<h2 id="it-what">1. Che cos'è MetfluxLive</h2>
+<p>MetfluxLive è uno strumento da browser per esplorare un modello metabolico di cellula intera. Scegli un terreno di coltura, l'applicazione prevede la velocità di ogni reazione della cellula (i <em>flussi</em>) e li disegna come una mappa animata. Inoltre puoi marcare gli atomi di un nutriente e vedere dove finiscono, spegnere enzimi e seguire il consumo del terreno nel tempo.</p>
+<p>Tutto funziona nel browser: non c'è un server che fa calcoli e nulla di ciò che inserisci lascia il tuo computer. I terreni salvati e le preferenze restano nella memoria locale del browser.</p>
+<div class="note">I numeri sono <b>previsioni del modello</b>, non misure. Mostrano ciò che la rete <em>può</em> fare sotto le ipotesi spiegate più avanti. Usali per formulare ipotesi e progettare esperimenti, non per sostituirli.</div>
+
+<h2 id="it-start">2. Primi passi</h2>
+<ol>
+  <li>Apri l'applicazione. Carica Human-GEM, il terreno standard ed esegue una prima simulazione.</li>
+  <li>Al centro c'è la cellula: ogni bolla è una via dentro un compartimento; le linee luminose in movimento sono carbonio che scorre tra di esse; il selettore <b>Linee</b>, sotto la mappa, le cambia in azoto, tutti i trasportatori redox insieme, NADH, NADPH, ubichinolo, ATP o energia libera (<a href="#it-carbonflow">come si calcolano</a>). Un doppio clic su una bolla apre la mappa della sua via.</li>
+  <li>Il pannello sinistro è l'esperimento: terreno, knockout e obiettivo. Cambia una concentrazione e i flussi si ricalcolano da soli finché <b>Auto</b>, accanto a <b>Simula</b>, è attivo (<a href="#it-run">vedi sotto</a>).</li>
+  <li>Il pannello destro spiega ciò che è selezionato: il riepilogo, un metabolita, una reazione, una via o un gene.</li>
+  <li>Usa la ricerca (<kbd>Ctrl</kbd>+<kbd>K</kbd>) per andare a qualsiasi metabolita, reazione, enzima o via.</li>
+</ol>
+
+<h2 id="it-ui">3. L'interfaccia</h2>
+<h3 id="it-run">Simula e Auto</h3>
+<p>Al centro della barra superiore ci sono la modalità (<b>Stato stazionario</b> / <b>Dinamico</b>, <a href="#it-modes">sezione 7</a>), il <b>?</b> con un riassunto dei metodi, e <b>Simula</b> con il suo interruttore <b>Auto</b>.</p>
+<ul>
+  <li><b>Simula</b> risolve il modello in quel momento con tutto ciò che c'è nel pannello sinistro (terreno, traccianti, flussi misurati, knockout, obiettivo e, in Dinamico, la durata e gli eventi) e ridisegna la mappa con il nuovo risultato. Nient'altro calcola flussi: la mappa e i pannelli mostrano solo l'ultimo risultato.</li>
+  <li><b>Auto</b> preme Simula per te poco dopo ogni modifica. Si ricorda separatamente per ogni modalità: <b>attivo</b> per impostazione predefinita in Stato stazionario, dove una simulazione richiede uno o due secondi, e <b>disattivo</b> per impostazione predefinita in Dinamico, dove richiede mezzo minuto o più e di solito si vogliono preparare più cose (eventi, traccianti) prima di iniziare. Attivalo anche in Dinamico se preferisci; una nuova modifica interrompe la simulazione in corso e ne avvia un'altra.</li>
+  <li>Con Auto disattivo, una modifica lascia sullo schermo il risultato precedente, un punto ambra su Simula e il messaggio «Parametri modificati» nella barra di stato finché non lo premi. Cambiare modalità funziona allo stesso modo: si ricalcola solo se Auto è attivo per la nuova modalità.</li>
+</ul>
+<h3>Modalità chiara e scura</h3>
+<p>Il pulsante luna/sole a destra della barra superiore passa dal tema scuro (predefinito) a un tema chiaro con superfici in tenui toni pastello. I colori dei dati (marcatura, variazione, energia libera) sono gli stessi in entrambi; cambiano solo lo sfondo, i pannelli e i segni neutri. Il browser ricorda la scelta, che vale anche per questa pagina.</p>
+<h3>Tre modi di organizzare la mappa</h3>
+<div class="tablebox"><table>
+  <tr><th>Raggruppa</th><th>Che cosa si vede</th><th>Utile per</th></tr>
+  <tr><td><b>Cellula</b></td><td>Reazioni raggruppate per compartimento e via, disposte come una cellula: citosol, mitocondrio, reticolo, Golgi, lisosoma, perossisoma, nucleo e il terreno esterno. Le reazioni che attraversano una membrana stanno su di essa.</td><td>Vedere dove avvengono le cose e che cosa viene trasportato.</td></tr>
+  <tr><td><b>Vie</b></td><td>Una bolla per via, collocate in modo che le vie che condividono metaboliti siano vicine.</td><td>Una panoramica delle vie attive.</td></tr>
+  <tr><td><b>Cascata</b> (predefinito)</td><td>Vie in righe, ordinate per il numero di passi di reazione che le separano dal terreno: nutrienti in alto, prodotti lontani in basso. Dentro una via la stessa idea dà una catena dall'alto in basso come nei libri di testo.</td><td>Leggere il metabolismo come un flusso dai nutrienti ai prodotti.</td></tr>
+</table></div>
+<h3>Leggere la mappa</h3>
+<ul>
+  <li><b>Lo spessore della linea e la velocità delle particelle</b> mostrano il flusso in scala logaritmica, così i flussi piccoli restano visibili.</li>
+  <li><b>Nella mappa di una via</b>, i cerchi sono metaboliti e i rombi reazioni. Il colore dell'anello di un metabolita è il suo compartimento. I cofattori come ATP o acqua sono nascosti per mantenere la mappa leggibile.</li>
+  <li><b>Con un tracciante</b>, il colore passa dal grigio (non marcato) all'ambra fino al magenta (completamente marcato).</li>
+  <li><b>Con un knockout</b>, scegliendo «Solo flusso variato» il colore indica aumento (arancione) o diminuzione (blu) rispetto alla cellula non perturbata; un anello rosso segna le reazioni perturbate.</li>
+</ul>
+<h3 id="it-carbonflow">Che cosa portano le linee tra i gruppi</h3>
+<p>Nelle viste Cellula, Vie e Cascata una linea unisce due gruppi (bolle) quando uno di essi <b>produce qualcosa che l'altro usa</b>. Il selettore <b>Linee</b>, in basso a sinistra della mappa, sceglie che cosa sia quel qualcosa:</p>
+<div class="tablebox"><table>
+  <tr><th>Linee</th><th>Che cos'è una linea</th><th>Unità</th></tr>
+  <tr><td><b>Carbonio</b> (predefinito)</td><td>Atomi di carbonio che un gruppo passa a un altro, senza contare gli atomi dei trasportatori (CoA, nucleotidi, tiamina, lipoammide…).</td><td>mmol C/gDW/h</td></tr>
+  <tr><td><b>Azoto</b></td><td>Lo stesso per gli atomi di azoto. Qui l'ammonio conta come portatore di azoto.</td><td>mmol N/gDW/h</td></tr>
+  <tr><td><b>Tutti i trasportatori redox</b></td><td>La somma delle linee di tutti i trasportatori redox: NADH, NADPH, ubichinolo, FADH<sub>2</sub>, vitamina K ridotta e (contati per metà, perché portano un elettrone) i citocromi c e b5 e le ferredossine. La mappa complessiva del potere riducente.</td><td>mmol coppie di e<sup>−</sup>/gDW/h</td></tr>
+  <tr><td><b>NADH</b>, <b>NADPH</b>, <b>Ubichinolo</b></td><td>Cofattore ridotto prodotto da un gruppo e ossidato da un altro: da dove viene il potere riducente e dove va.</td><td>mmol/gDW/h</td></tr>
+  <tr><td><b>ATP</b></td><td>ATP, GTP, UTP e CTP prodotti da un gruppo e spesi da un altro.</td><td>mmol/gDW/h</td></tr>
+  <tr><td><b>Energia libera (ΔG′<sub>m</sub>)</b></td><td>Nessuna linea: ogni gruppo ha la dimensione dell'energia libera dissipata dalle sue reazioni e il colore indica se procedono in discesa o in salita (vedi sotto).</td><td>J/gDW/h</td></tr>
+</table></div>
+<p>Il <b>?</b> accanto al selettore apre questa sezione. Il browser ricorda la scelta.</p>
+
+<h4>Come si calcola una linea</h4>
+<p>Le linee si costruiscono dalla soluzione dei flussi, un pool di metabolita alla volta:</p>
+<ol>
+  <li>Per un pool (per esempio il piruvato nel citosol), ogni reazione attiva che lo tocca o lo produce (flusso × coefficiente &gt; 0) o lo consuma. Le produzioni si sommano per gruppo (P<sub>A</sub>), e così i consumi (C<sub>B</sub>).</li>
+  <li>Si assume che il pool sia ben mescolato: una molecola prodotta dal gruppo A ha la stessa probabilità di essere usata da qualsiasi consumatore. Il gruppo A invia quindi a B la quota
+    <div class="formula">F(A→B) = w × P<sub>A</sub> × C<sub>B</sub> / max(P, C)</div>
+    dove P e C sono la produzione e il consumo totali del pool (uguali allo stato stazionario) e w è ciò che porta una molecola: i suoi atomi di carbonio o azoto trasferibili, oppure 1 per un cofattore.</li>
+  <li>Le quote di tutti i pool si sommano per ogni coppia di gruppi. Il flusso dentro un gruppo non viene disegnato.</li>
+</ol>
+<p>Il numero di atomi è quindi un <b>peso</b>, non una normalizzazione: una mol/h di glucosio (6 C) pesa il doppio di una mol/h di piruvato (3 C). La <b>direzione</b> viene dalla soluzione dei flussi stessa, cioè da quale gruppo produce il pool e quale lo consuma. L'ipotesi di buon mescolamento è la stessa che usa il tracciante. Una linea non sa quale atomo va dove; si limita a ripartire ogni pool tra i suoi consumatori.</p>
+
+<h4>Atomi trasferibili: escludere i trasportatori</h4>
+<p>Molti intermedi sono legati a un trasportatore che viene riciclato e non passa mai da una via all'altra: il CoA dell'acetil-CoA e del malonil-CoA, l'UDP dell'UDP-glucosio, la tiamina difosfato degli addotti della piruvato deidrogenasi, la lipoammide delle 2-ossoacido deidrogenasi, il tRNA degli amminoacidi caricati, la carnitina, il tetraidrofolato, il glutatione. Contare i loro atomi farebbe pesare, per esempio, il malonil-CoA 24 C quando solo 3 appartengono al malonato.</p>
+<p>Per escluderli, l'applicazione esegue il tracciante sulla soluzione dei flussi attuale con una marcatura speciale: ogni atomo di un trasportatore è «marcato» (1), ogni atomo dei nutrienti no (0). La marcatura con cui finisce ogni atomo è la quota di quella posizione che proviene da un trasportatore. Gli atomi trasferibili di un metabolita sono allora i suoi atomi dell'elemento per (1 − quella quota). Nella simulazione predefinita ciò dà 1,9 carboni trasferibili per l'acetil-CoA mitocondriale, 2,9 per il malonil-CoA, 6 per l'UDP-glucosio e 2 per l'addotto idrossietil-tiamina difosfato. Poiché il tracciante segue le mappe atomiche, una molecola prodotta in parte da un trasportatore conta in parte: l'IMP ha 9,6 carboni trasferibili su 10, perché una parte viene da nucleotidi adeninici riciclati.</p>
+<p>I trasportatori sono i cofattori organici nascosti nelle mappe (nucleotidi, NAD(P), FAD, CoA, ubichinone, citocromo c, tioredossina) più la tiamina difosfato, la lipoammide e la lipoil-proteina, l'ACP, i tRNA, la carnitina, il tetraidrofolato e il glutatione. I cicli chiusi che non ricevono atomi dall'esterno (due reazioni in vie diverse che trasformano avanti e indietro la stessa molecola) contano anch'essi come trasportatori, perché i loro atomi si limitano a girare. I portatori inorganici dell'elemento restano inclusi: CO<sub>2</sub> e bicarbonato per il carbonio, ammonio per l'azoto, così decarbossilazioni e deaminazioni compaiono come linee.</p>
+<p>Nella simulazione predefinita di Human-GEM (vista Vie) le linee di carbonio più spesse sono il glucosio dal terreno alla glicolisi (4,4 mmol C/gDW/h) e il lattato dalla glicolisi al terreno (4,0), seguite dagli amminoacidi che vanno in proteina attraverso i tRNA caricati e dalla glutammina che alimenta il ciclo di Krebs come 2-ossoglutarato. Le linee di azoto più spesse sono la glutammina dal terreno (0,34 mmol N/gDW/h), gli amminoacidi verso la proteina e l'ammonio rilasciato dalla glutamminasi nel terreno.</p>
+
+<h4>Cofattori redox e ATP</h4>
+<p>Per NADH, NADPH, ubichinolo e ATP i pool seguiti sono il cofattore ridotto (o i trifosfati) e w = 1. Una linea da A a B dice che A riduce (o fosforila) il cofattore e B lo ossida (o lo idrolizza). Nella simulazione predefinita:</p>
+<ul>
+  <li>il NADH va dalla glicolisi alla fosforilazione ossidativa (0,37 mmol/gDW/h);</li>
+  <li>il NADPH va dall'enzima malico («Pyruvate metabolism») e dalla via dei pentoso fosfati alla sintesi di acidi grassi e colesterolo;</li>
+  <li>l'ubichinolo va dalla succinato deidrogenasi (ciclo di Krebs) al complesso III;</li>
+  <li>l'ATP va dalla glicolisi (0,91) e dalla fosforilazione ossidativa (0,56) al mantenimento e alla biomassa («Artificial reactions»).</li>
+</ul>
+<p>I quattro trifosfati vanno insieme perché la nucleoside difosfato chinasi trasforma l'ATP in GTP, UTP e CTP. Una linea dai gruppi che producono ATP verso «Nucleotide metabolism», e da lì alla sintesi proteica, mostra quel passaggio di testimone.</p>
+<p><b>Tutti i trasportatori redox.</b> Questa opzione somma gli equivalenti riducenti di tutti i trasportatori, in coppie di elettroni (un NADH, NADPH, ubichinolo o FADH<sub>2</sub> = una coppia = un idruro; un citocromo o una ferredossina ridotti = mezza coppia). Ogni trasportatore continua a essere accoppiato da produttore a consumatore per conto suo, quindi il NADH prodotto in una via non viene mai accoppiato con il NADPH usato in un'altra: nella cellula sono pool distinti e si scambiano solo tramite enzimi specifici (transidrogenasi, enzima malico), che compaiono come reazioni proprie. L'etichetta di una linea indica il trasportatore che contribuisce di più. Nella simulazione predefinita il totale è 1,27 mmol di coppie/gDW/h: NADH 0,94, ubichinolo 0,17, NADPH 0,15. Le linee più spesse sono glicolisi → fosforilazione ossidativa (0,37, NADH), sintesi della serina → glicolisi (0,21, il NADH della fosfoglicerato deidrogenasi usato dalla lattato deidrogenasi) e ciclo di Krebs → fosforilazione ossidativa (0,19, soprattutto ubichinolo). Il glutatione è escluso: il GSH viene anche prodotto e consumato come molecola (sintesi, coniugazione, biomassa), e ciò verrebbe contato come traffico redox.</p>
+
+<h4 id="it-dg">Energia libera (ΔG′<sub>m</sub>)</h4>
+<p>Con <b>Energia libera</b> selezionata non ci sono linee, perché l'energia libera non passa da una via all'altra come un atomo. Invece ogni reazione j ha un'energia di Gibbs trasformata stimata ΔG′<sub>m</sub>, e il prodotto v<sub>j</sub> × ΔG′<sub>m,j</sub> (mmol/gDW/h × kJ/mol = J/gDW/h) è l'energia libera che la reazione dissipa procedendo (se negativo) o che dovrebbe ricevere (se positivo).</p>
+<ul>
+  <li><b>Viste globali</b>: la dimensione di una bolla è l'energia libera dissipata dalle sue reazioni; il colore la confronta con l'energia che richiederebbero i suoi passi in salita, dal rosso (tutto in discesa) attraverso l'ardesia fino al viola (soprattutto in salita). Grigio: attiva, ma nessuna reazione ha una stima.</li>
+  <li><b>Mappa di una via</b>: ogni reazione è colorata secondo il ΔG′<sub>m</sub> nel verso in cui procede, dal rosso (−40 kJ/mol o meno, lontano dall'equilibrio) attraverso l'ardesia (vicino all'equilibrio) fino al viola (in salita). La scheda della reazione dà il valore, la sua incertezza e l'energia dissipata. L'etichetta di un gruppo dà l'energia dissipata, la parte in salita e la quota del suo flusso con una stima.</li>
+</ul>
+<p><b>Da dove vengono i valori.</b> Il ΔG′<sub>m</sub> è stimato una volta sola, offline, con eQuilibrator 3 e il metodo del contributo dei componenti (Noor et al. 2013; Beber et al. 2022), tramite <code>tools/build_thermo.py</code>. I metaboliti sono abbinati tramite i loro identificatori MetaNetX, ChEBI, HMDB, BiGG o KEGG e, altrimenti, tramite l'InChIKey della struttura del modello. Condizioni: 37 °C, forza ionica 0,25 M, pMg 3 e il pH di ogni compartimento (citosol, nucleo e RE 7,2; matrice 8,0; spazio intermembrana 6,9; perossisoma 7,0; Golgi 6,4; lisosoma 4,7; terreno 7,4; Casey et al. 2010, Porcelli et al. 2005). Ogni reagente è a 1 mM (l'acqua a 1). Le reazioni che attraversano una membrana usano il metodo multicompartimento di Haraldsdóttir et al. (2012), con un potenziale di matrice di −160 mV rispetto al citosol (Zorova et al. 2018) e un potenziale di membrana plasmatica di −60 mV (Yang &amp; Brackenbury 2013 riportano da −10 a −90 mV). Due coppie redox usano potenziali medi misurati invece della stima: il citocromo c, +0,25 V (Loveridge et al. 2026), collocato nello spazio intermembrana dove realmente si trova; e l'ubichinone di membrana, +0,065 V a pH 7 (Urban &amp; Klingenberg 1969), perché la stima per quel lungo chinone isoprenoide si discosta molto (dava +74 kJ/mol alla succinato deidrogenasi).</p>
+<p><b>Copertura.</b> In Human-GEM si trovano 2.295 metaboliti su 4.102 e 6.476 reazioni su 12.748 hanno una stima. Le altre coinvolgono proteine, gruppi R, lipidi descritti come classi o composti assenti da eQuilibrator. Nella simulazione predefinita, le reazioni con una stima portano il 94 % del flusso attivo.</p>
+<p><b>Che cosa mostra la simulazione predefinita.</b> La cellula dissipa circa 330 J/gDW/h attraverso le reazioni con una stima. La maggior parte è nella glicolisi (126) e nei trasportatori (112), poi nella fosforilazione ossidativa (42). Esochinasi (−20,8 kJ/mol), piruvato chinasi (−24,5), ATP sintasi (−13,6) e citocromo ossidasi (−35,4) procedono in discesa. Alcuni passi che le cellule compiono in quel verso risultano in salita a 1 mM: gliceraldeide-3-fosfato deidrogenasi (+18,8), complesso I (+16,2) e complesso III (+9,7). Nelle cellule, l'1,3-bisfosfoglicerato basso e rapporti NADH/NAD<sup>+</sup> o QH<sub>2</sub>/Q diversi da 1 li fanno lavorare vicino all'equilibrio. Alcuni passi in salita indicano invece un problema del modello: il trasportatore mitocondriale del difosfato (+61,8 kJ/mol) sposta PPi<sup>4−</sup> nella matrice carica negativamente come uniporto, cosa che il potenziale di membrana impedisce; nella cellula sarebbe uno scambiatore.</p>
+<div class="note"><b>Limiti del ΔG′<sub>m</sub>.</b> (1) Lo standard di 1 mM è una convenzione, non una misura: una reazione con |ΔG′<sub>m</sub>| sotto circa 10 kJ/mol può procedere in entrambi i versi a concentrazioni reali, e «in salita» significa «richiede concentrazioni lontane da 1 mM», non «impossibile». (2) Le stime hanno incertezze, mostrate nella scheda della reazione; oltre 20 kJ/mol il segno non è affidabile. (3) I flussi non sono vincolati dalla termodinamica: l'FBA può scegliere un verso che il ΔG′<sub>m</sub> sfavorisce, e questa vista si limita a mostrarlo. (4) Il pH dei compartimenti e i potenziali di membrana sono valori tipici, uguali per ogni linea cellulare; i potenziali di RE, Golgi, lisosoma e perossisoma sono posti a 0. (5) Le reazioni aggiunte nell'editor del modello non hanno stima. (6) L'entalpia (ΔH) non è mostrata: le sue stime sono molto più scarse di quelle di ΔG e, per il verso di una reazione, conta il ΔG.</div>
+
+<h4>Visualizzazione</h4>
+<ul>
+  <li><b>Vista Cellula</b>: il pool di ogni compartimento è separato, e i trasportatori sono gruppi a sé posti sulle membrane, così una linea va dalla glicolisi citosolica al trasportatore mitocondriale del piruvato e poi al ciclo di Krebs. <b>Vie e Cascata</b>: i pool di tutti i compartimenti sono uniti e le reazioni di trasporto ignorate, così lo stesso carbonio va direttamente dalla glicolisi al ciclo di Krebs.</li>
+  <li>Si tengono solo le 220 linee più grandi (320 nella vista Cellula). Spessore e velocità delle particelle sono logaritmici, relativi alla linea più grande: le linee sotto circa 1/350 di essa sono nascoste, e le particelle si muovono solo sulle linee sopra circa 1/90. Selezionare una bolla mantiene luminose le sue linee e attenua le altre.</li>
+  <li><b>Colore</b>: flusso semplice in ciano. Con un tracciante dello stesso elemento (un tracciante <sup>13</sup>C e le linee Carbonio, un tracciante <sup>15</sup>N e le linee Azoto), il colore è la frazione marcata di ciò che la linea porta, pesata per la produzione. In «Solo flusso variato», il colore è la variazione media dei due gruppi che unisce.</li>
+  <li>Nella mappa di una via le linee sono sempre flussi di reazione; lì il selettore conta solo per l'energia libera, che colora ogni reazione.</li>
+  <li><b>Scarica</b> › <i>pathway_flows.csv</i> elenca le linee di ogni grandezza tra vie, e <i>fluxes.csv</i> acquista colonne di ΔG′<sub>m</sub>.</li>
+</ul>
+<div class="note"><b>Limiti.</b> (1) La quota di trasportatore dipende dalle mappe atomiche; dove una reazione non ne ha, gli atomi rimanenti vengono mescolati (come nel tracciante), quindi la quota di una molecola prodotta da tale reazione è approssimata. (2) I gruppi sono le vie (sottosistemi) assegnate dal modello: una reazione archiviata in una via inattesa porta lì le sue linee. Apri una bolla per vedere quali reazioni portano le sue linee. (3) Il pFBA sceglie una strada tra più strade ugualmente corte. L'applicazione scioglie apposta uno di questi pareggi: le copie di una reazione che usano un desossinucleotide invece del ribonucleotide (esochinasi con dATP, piruvato chinasi con dADP) costano lo 0,1 % in più, perché le cellule mantengono i desossinucleotidi intorno all'1 % dei livelli dei ribonucleotidi o meno (Traut 1994). Senza di ciò, un ciclo dATP/dADP poteva sostituire ATP/ADP nella glicolisi e far passare le sue linee per «Purine metabolism». Restano altri pareggi: nel modello la piruvato chinasi produce anche GTP da GDP (lo stesso enzima), e il pFBA la usa perché risparmia il passo della nucleoside difosfato chinasi.</div>
+<h3>Altri controlli</h3>
+<ul>
+  <li><b>Mostra</b>: tutto, solo ciò che porta marcatura, solo il flusso variato (dopo un knockout o rispetto a uno scenario confrontato) o solo la marcatura variata rispetto a uno scenario confrontato.</li>
+  <li><b>Pannelli</b>: trascina il bordo tra un pannello laterale e la mappa per cambiarne la larghezza; un doppio clic sul bordo la ripristina. Le sezioni del pannello sinistro si comprimono cliccando sul titolo.</li>
+  <li><b>Lingua</b>: inglese, spagnolo, portoghese, italiano, francese, tedesco o greco (in alto a destra). I nomi di metaboliti, reazioni e vie vengono dal modello e restano in inglese. Quando la finestra è stretta o le etichette sono lunghe, la barra superiore si compatta da sola: Modifica, Importa e Scarica diventano icone (il suggerimento conserva il nome completo), poi si nasconde il nome dell'applicazione.</li>
+  <li><b>Scarica</b>: esporta tabelle, grafici, la mappa e la sessione (vedi <a href="#it-download">sezione 15</a>). <b>Importa</b> ricarica una sessione o un file di modifiche del modello.</li>
+  <li><b>Confronta</b> (pannello sinistro): scenari salvati con cui confrontare (<a href="#it-compare">sezione 11</a>). <b>✎ Modifica modello</b> (barra superiore): aggiungere o rimuovere reazioni, enzimi e metaboliti (<a href="#it-editing">sezione 12</a>).</li>
+</ul>
+
+<h2 id="it-data">4. Fonti dei dati</h2>
+<div class="tablebox"><table>
+  <tr><th>Che cosa</th><th>Fonte</th><th>Usato per</th></tr>
+  <tr><td>Human-GEM 2.1.1</td><td><a href="https://github.com/SysBioChalmers/Human-GEM" target="_blank" rel="noopener">SysBioChalmers/Human-GEM</a>; Robinson et al., <i>Sci. Signal.</i> 2020</td><td>La rete umana: 12.748 reazioni, 8.374 metaboliti (uno per compartimento), 2.870 geni, 146 vie, più le regole gene–reazione e le strutture dei metaboliti.</td></tr>
+  <tr><td>Mouse-GEM 1.8.0</td><td><a href="https://github.com/SysBioChalmers/Mouse-GEM" target="_blank" rel="noopener">SysBioChalmers/Mouse-GEM</a>; Wang et al., <i>PNAS</i> 2021</td><td>La rete del topo. Condivide gli identificatori con Human-GEM, quindi le strutture vengono riutilizzate.</td></tr>
+  <tr><td>Mappe atomo per atomo</td><td>Calcolate per questa applicazione con <a href="https://github.com/rxn4chemistry/rxnmapper" target="_blank" rel="noopener">RXNMapper</a> (Schwaller et al., <i>Sci. Adv.</i> 2021) e RDKit, più correzioni curate a mano per il metabolismo centrale</td><td>Seguire i singoli atomi attraverso ogni reazione.</td></tr>
+  <tr><td>Plasmax e HPLM</td><td>Tabella S1 di <a href="https://pubmed.ncbi.nlm.nih.gov/30613774/" target="_blank" rel="noopener">Vande Voorde et al., <i>Sci. Adv.</i> 2019</a>; HPLM originariamente da Cantor et al., <i>Cell</i> 2017</td><td>Terreni fisiologici.</td></tr>
+  <tr><td>Terreno standard</td><td>Segue a grandi linee DMEM / Ham's F-12</td><td>Terreno predefinito.</td></tr>
+  <tr><td>Flussi di scambio misurati</td><td>Jain et al., <i>Science</i> 2012 (linee NCI-60), valori per linea dalla Tabella S1 Q di Aurich et al., <i>PLoS Comput. Biol.</i> 2017</td><td>L'assorbimento e la secrezione predefiniti di glucosio, lattato, glutammina e altri 15 metaboliti (<a href="#it-measured">sezione 5</a>).</td></tr>
+  <tr><td>Mantenimento di ATP</td><td>Kilburn, Lilly &amp; Webb, <i>J. Cell Sci.</i> 1969, valore come usato da Zielinski et al., <i>Sci. Rep.</i> 2017</td><td>L'ATP che la cellula spende che cresca o no.</td></tr>
+  <tr><td>Cinetica di assorbimento (V<sub>max</sub>, K<sub>m</sub>)</td><td>Ordini di grandezza per cellule di mammifero in coltura, fissati a mano</td><td>Assorbimento massimo dei componenti del terreno il cui scambio non è stato misurato (vitamine, cistina, istidina…), e di tutti quando i flussi misurati sono disattivati. <b>Non sono valori misurati.</b></td></tr>
+  <tr><td>Risolutore lineare</td><td><a href="https://highs.dev" target="_blank" rel="noopener">HiGHS</a>, compilato in WebAssembly</td><td>Risolvere il problema di bilancio dei flussi.</td></tr>
+</table></div>
+<p>I modelli vengono convertiti una volta, offline, nei file JSON di <code>data/</code>; l'applicazione ha bisogno solo di quei file.</p>
+<h3>Quanto sono buone le mappe atomiche?</h3>
+<p>Delle 11.094 reazioni di Human-GEM che non sono semplici scambi, 10.554 hanno una mappa atomica:</p>
+<div class="tablebox"><table>
+  <tr><th>Metodo</th><th>Reazioni</th><th>Affidabilità</th></tr>
+  <tr><td>Identità (la stessa molecola su entrambi i lati: trasporto)</td><td class="num">4.172</td><td>Esatta.</td></tr>
+  <tr><td>RXNMapper</td><td class="num">5.196</td><td>Di solito corretta; il pannello della reazione mostra un punteggio di affidabilità.</td></tr>
+  <tr><td>Massima sottostruttura comune</td><td class="num">1.138</td><td>Minore: usata per reazioni generiche con «gruppi R» e molecole molto grandi.</td></tr>
+  <tr><td>Parziale</td><td class="num">48</td><td>Solo alcuni atomi sono mappati.</td></tr>
+</table></div>
+<p>Transchetolasi, transaldolasi, 6-fosfogluconato deidrogenasi e aconitasi sono state verificate e corrette a mano. Due errori sistematici del mappatore automatico sono corretti in ogni reazione che toccano:</p>
+<ul>
+  <li><b>Transaminasi</b> (34 reazioni): RXNMapper tende ad attribuire lo scheletro carbonioso di un chetoacido all'altro amminoacido, per esempio i carboni del piruvato al 2-ossoglutarammato prodotto dalla glutammina. Lo scheletro di ogni coppia amminoacido ↔ chetoacido è ora mantenuto per sottostruttura comune.</li>
+  <li><b>La porzione CoA</b> (circa 200 trasferimenti di acile): in ogni trasferimento di acile il CoA passa intatto, quindi gli atomi del CoA di un prodotto vengono presi dal CoA di un substrato. Dove ciò è impossibile (pseudometaboliti come «acyl-CoA pool»), gli atomi di CoA non mappati contano come non marcati invece di ricevere marcatura dalla catena acilica.</li>
+</ul>
+<p>Prima di queste correzioni, il glucosio marcato produceva succinato e fumarato M+1 spuri, e il CoA stesso risultava marcato al 40 %. Dove manca la mappa, la marcatura è distribuita in parti uguali tra i prodotti e il metabolita è disegnato con contorno tratteggiato.</p>
+
+<h2 id="it-measured">5. Valori misurati e loro fonti</h2>
+<p>Lasciato a sé, l'FBA sceglie il modo più economico di crescere. Per una cellula tumorale in coltura ciò significa assorbire una frazione del glucosio consumato dalle cellule reali e non secernere affatto lattato, così la marcatura di un tracciante di glucosio arriva a malapena al ciclo di Krebs. Per questo, per impostazione predefinita, l'applicazione fissa gli scambi principali a valori misurati in linee tumorali umane. Scegli «Nessuno» in «Flussi di scambio misurati» per disattivarli.</p>
+<h3>Flussi di scambio NCI-60</h3>
+<p>Jain et al. hanno misurato il consumo e il rilascio di più di 100 metaboliti da parte delle 60 linee del pannello NCI-60 (<i>Science</i> 2012). I valori per linea usati qui sono quelli pubblicati nella Tabella S1 Q di Aurich et al. (<i>PLoS Comput. Biol.</i> 2017), che li hanno applicati come limiti di ±20 % attorno a ogni misura. L'applicazione prende la mediana sulle 59 linee con dati e tiene i 18 scambi il cui verso è lo stesso in tutto il pannello. Aspartato, prolina, glicina, ornitina e glicerolo sono assorbiti da alcune linee e rilasciati da altre, quindi sono esclusi.</p>
+<div class="tablebox"><table>
+  <tr><th>Metabolita</th><th>Direzione</th><th>Mediana (fmol/cellula/h)</th><th>Intervallo interquartile</th><th>Usato (mmol/gDW/h)</th></tr>
+  <tr><td>glucosio</td><td>assorbimento</td><td class="num">278</td><td class="num">171–399</td><td class="num">0,928</td></tr>
+  <tr><td>L-lattato</td><td>secrezione</td><td class="num">353</td><td class="num">241–568</td><td class="num">1,180</td></tr>
+  <tr><td>glutammina</td><td>assorbimento</td><td class="num">71</td><td class="num">38–99</td><td class="num">0,237</td></tr>
+  <tr><td>serina</td><td>assorbimento</td><td class="num">8,90</td><td class="num">6,48–14</td><td class="num">0,0297</td></tr>
+  <tr><td>alanina</td><td>secrezione</td><td class="num">13</td><td class="num">4,39–23</td><td class="num">0,0428</td></tr>
+  <tr><td>glutammato</td><td>secrezione</td><td class="num">8,12</td><td class="num">3,38–15</td><td class="num">0,0271</td></tr>
+  <tr><td>leucina</td><td>assorbimento</td><td class="num">5,66</td><td class="num">3,91–8,59</td><td class="num">0,0189</td></tr>
+  <tr><td>lisina</td><td>assorbimento</td><td class="num">5,41</td><td class="num">4,27–8,50</td><td class="num">0,0180</td></tr>
+  <tr><td>isoleucina</td><td>assorbimento</td><td class="num">4,74</td><td class="num">3,05–6,57</td><td class="num">0,0158</td></tr>
+  <tr><td>valina</td><td>assorbimento</td><td class="num">4,04</td><td class="num">3,09–6,21</td><td class="num">0,0135</td></tr>
+  <tr><td>treonina</td><td>assorbimento</td><td class="num">3,78</td><td class="num">2,69–6,04</td><td class="num">0,0126</td></tr>
+  <tr><td>arginina</td><td>assorbimento</td><td class="num">3,68</td><td class="num">2,09–5,83</td><td class="num">0,0123</td></tr>
+  <tr><td>tirosina</td><td>assorbimento</td><td class="num">2,57</td><td class="num">2,04–4,20</td><td class="num">0,0086</td></tr>
+  <tr><td>fenilalanina</td><td>assorbimento</td><td class="num">1,90</td><td class="num">1,54–3,18</td><td class="num">0,0063</td></tr>
+  <tr><td>metionina</td><td>assorbimento</td><td class="num">1,70</td><td class="num">1,30–2,53</td><td class="num">0,0057</td></tr>
+  <tr><td>asparagina</td><td>assorbimento</td><td class="num">1,67</td><td class="num">0,88–2,13</td><td class="num">0,0056</td></tr>
+  <tr><td>triptofano</td><td>assorbimento</td><td class="num">0,45</td><td class="num">0,36–0,89</td><td class="num">0,0015</td></tr>
+  <tr><td>colina</td><td>assorbimento</td><td class="num">0,66</td><td class="num">0,40–1,02</td><td class="num">0,0022</td></tr>
+</table></div>
+<ul>
+  <li><b>Conversione delle unità.</b> Le velocità per cellula sono convertite con una massa secca di 0,3 ng per cellula, la media approssimativa NCI-60 usata da Zielinski et al. (<i>Sci. Rep.</i> 2017): mmol/gDW/h = fmol/cellula/h ÷ 300. È una media: per una linea particolare i flussi assoluti possono scostarsi della differenza tra la sua massa e questa.</li>
+  <li><b>Margine.</b> Ogni flusso può variare del ±20 % attorno al valore, come in Aurich et al. Puoi cambiare il margine, modificare, aggiungere o rimuovere righe.</li>
+  <li><b>Condizioni di coltura.</b> Le linee NCI-60 sono coltivate in RPMI-1640 con il 5 % di siero fetale bovino e glutammina 2 mM (come descritto da Dolfi et al., <i>Cancer Metab.</i> 2013, per le stesse linee). Quando usi un altro terreno, la cellula mantiene il fenotipo che aveva in RPMI.</li>
+  <li><b>Prodotti non misurati.</b> Con un set misurato attivo, i metaboliti organici non misurati possono essere secreti solo in tracce (0,001 mmol/gDW/h). Nei dati NCI-60 gli scambi misurati di glucosio, lattato e amminoacidi rappresentano oltre il 99 % del flusso di scambio osservato (Zielinski et al. 2017). Senza questo limite l'FBA smaltisce il carbonio in eccesso nella forma più economica, per esempio sorbitolo. CO<sub>2</sub>, ammoniaca, urea, acqua e ioni inorganici non sono limitati.</li>
+  <li><b>Quando non si possono rispettare.</b> Se un flusso misurato diventa impossibile (togli il glucosio dal terreno, un nutriente si esaurisce in modalità dinamica, un knockout blocca la produzione di lattato…), i flussi misurati vengono rilassati: gli assorbimenti mantengono solo il loro massimo e le secrezioni diventano libere. La barra di stato e il riepilogo lo segnalano.</li>
+  <li><b>Mouse-GEM</b> usa gli stessi valori. Sono stati misurati in cellule umane.</li>
+</ul>
+<h3>Mantenimento di ATP</h3>
+<p>Le cellule spendono ATP che crescano o no: pompe ioniche, ricambio proteico e così via. Human-GEM lascia questo a zero. Con il set NCI-60 attivo, la reazione di idrolisi dell'ATP citosolico (<code>MAR03964</code>) deve portare almeno 1,07 mmol/gDW/h, il valore che Zielinski et al. hanno ricavato dalle misure di Kilburn, Lilly &amp; Webb (<i>J. Cell Sci.</i> 1969) in cellule LS di topo. Ciò impone la respirazione e il giro del ciclo di Krebs che le cellule reali hanno. Senza di esso, un tracciante di glucosio marca il fumarato allo 0 % invece di circa il 9 % M+2.</p>
+<h3>Che cosa resta assunto</h3>
+<ul>
+  <li>La cinetica di assorbimento (V<sub>max</sub>, K<sub>m</sub>) dei componenti del terreno non misurati, e di tutti quando il set misurato è disattivato.</li>
+  <li>La composizione del terreno «Standard», che approssima soltanto il DMEM/F-12.</li>
+  <li>In modalità dinamica, la dimensione dei pool intracellulari.</li>
+</ul>
+
+<h2 id="it-fba">6. L'analisi del bilancio dei flussi, in parole semplici</h2>
+<p>Una cellula esegue migliaia di reazioni contemporaneamente. Raramente conosciamo la velocità di ciascuna, ma sappiamo due cose solide: la <b>ricetta</b> di ogni reazione (che cosa consuma e che cosa produce) e il fatto che una cellula non può creare né distruggere materia.</p>
+<p>L'analisi del bilancio dei flussi (FBA) parte da qui. Pensa alla cellula come alla rete idrica di una città:</p>
+<ul>
+  <li><b>I tubi sono reazioni</b>; la portata di un tubo è il flusso, in millimoli per grammo di peso secco cellulare all'ora (mmol/gDW/h).</li>
+  <li><b>Gli incroci sono metaboliti.</b> In ogni incrocio ciò che entra deve eguagliare ciò che esce: nulla si accumula e nulla appare dal nulla. È l'ipotesi di <em>stato stazionario</em>.</li>
+  <li><b>Alcuni tubi sono a senso unico</b>, e ognuno ha una capacità massima. I tubi che portano i nutrienti dal terreno sono limitati da ciò che il terreno offre.</li>
+</ul>
+<p>Queste regole lasciano molti schemi di flusso possibili. Per sceglierne uno, l'FBA assume che la cellula <em>cerchi di ottenere qualcosa</em> — per impostazione predefinita, crescere il più in fretta possibile — e trova lo schema che lo fa meglio. «Crescere» è a sua volta una reazione, la <b>reazione di biomassa</b>, che consuma amminoacidi, nucleotidi, lipidi ed energia nelle proporzioni di cui ha bisogno una nuova cellula.</p>
+<div class="formula">massimizzare  v<sub>biomassa</sub><br>soggetto a  S · v = 0   (ogni metabolita è bilanciato)<br>           inferiore<sub>j</sub> ≤ v<sub>j</sub> ≤ superiore<sub>j</sub>   (verso e capacità di ogni reazione)</div>
+<p>È un programma lineare, che un computer risolve esattamente in pochi secondi anche per 12.748 reazioni.</p>
+<h3>Che cosa l'FBA può e non può dirti</h3>
+<ul>
+  <li><b>Non richiede cinetica enzimatica</b>, ed è per questo che funziona per una cellula intera. Per la stessa ragione non sa nulla di quantità di enzimi, regolazione o concentrazioni dei metaboliti nella cellula.</li>
+  <li>Il miglior tasso di crescita è unico, ma <b>i flussi che lo raggiungono spesso non lo sono</b>: possono esserci più strade ugualmente buone. Per questo l'applicazione usa per impostazione predefinita l'<b>FBA parsimonioso</b> (pFBA): tra tutte le soluzioni migliori prende quella con il flusso totale minore, nell'idea che le cellule evitino di produrre enzimi che non servono. Ciò elimina anche i cicli interni senza senso.</li>
+  <li>L'obiettivo è un'ipotesi. La crescita è ragionevole per cellule che proliferano in coltura; descrive male un neurone o un epatocita a riposo. Puoi scegliere un altro obiettivo predefinito o qualsiasi reazione (vedi sotto).</li>
+  <li>Ciò che entra ed esce dalla cellula è la parte del metabolismo più facile da misurare. Fissare quegli scambi a misure (<a href="#it-measured">sezione 5</a>) toglie all'FBA gran parte della sua libertà e rende i flussi interni molto più realistici.</li>
+</ul>
+
+<h3 id="it-objectives">Scegliere l'obiettivo</h3>
+<p>L'FBA ha bisogno di un obiettivo: ciò che si assume la cellula produca nella massima quantità possibile. La crescita è l'ipotesi abituale per le cellule che proliferano, ma la maggior parte delle cellule di un organismo non cresce: produce ATP, esporta un prodotto o elimina scorie. Per questo la sezione <b>Obiettivo cellulare</b> offre, oltre alla crescita, un insieme di <b>funzioni cellulari</b> del tipo dei «compiti metabolici» usati nei modelli di fegato e di cellule umane (Gille et al. 2010; Richelle et al. 2021), gli obiettivi che hai salvato e una ricerca per usare qualsiasi reazione. Tutti gli obiettivi predefiniti sono stati verificati in Human-GEM e Mouse-GEM: danno un ottimo finito e non banale.</p>
+<p>La maggior parte delle funzioni è espressa come <b>rilascio di un prodotto</b> (la sua reazione di scambio, massimizzata). Quando l'obiettivo è il rilascio di un metabolita, l'applicazione chiude l'assorbimento di quello stesso metabolita: altrimenti un terreno che lo contiene (glucosio, urea, creatina o GSH in Plasmax…) semplicemente attraverserebbe la cellula, e l'obiettivo misurerebbe il terreno invece della cellula. Anche il suo tasso misurato, se c'è, viene messo da parte. Il valore è allora la sintesi netta.</p>
+<div class="tablebox"><table>
+  <tr><th>Obiettivo</th><th>Reazione (massimizzata)</th><th>Cellula e funzione</th><th class="num">Valore*</th><th>Che cosa lo limita*</th></tr>
+  <tr><td colspan="5"><b>Crescita, energia e stress</b></td></tr>
+  <tr><td>Crescita (biomassa generica) — predefinito</td><td>biomassa (<code>MAR13082</code>; Mouse-GEM <code>MAR00021</code>)</td><td>Cellule in proliferazione</td><td class="num">0,037 h⁻¹</td><td>O<sub>2</sub>, amminoacidi</td></tr>
+  <tr><td>Massima produzione di ATP</td><td><code>MAR03964</code>, idrolisi dell'ATP citosolico</td><td>Stress energetico, cellule che non crescono; un obiettivo alternativo classico (Schuetz et al. 2007)</td><td class="num">13,2</td><td>O<sub>2</sub> (abbassalo per modellare l'ipossia)</td></tr>
+  <tr><td>Massima sintesi di glutatione</td><td><code>MAR09351</code>, rilascio di GSH</td><td>Stress ossidativo (Lu 2013)</td><td class="num">0,020</td><td>cisteina, cistina, metionina</td></tr>
+  <tr><td colspan="5"><b>Fegato e metabolismo lipidico</b></td></tr>
+  <tr><td>Uscita di urea</td><td><code>MAR09438</code></td><td>Epatocita: smaltimento dell'ammonio</td><td class="num">0,30</td><td>apporto di azoto (glutammina)</td></tr>
+  <tr><td>Uscita di glucosio</td><td><code>MAR09034</code></td><td>Fegato, rene: gluconeogenesi a digiuno</td><td class="num">0,27</td><td>carbonio degli amminoacidi</td></tr>
+  <tr><td>Uscita di corpi chetonici</td><td><code>MAR09134</code>, β-idrossibutirrato</td><td>Fegato: chetogenesi a digiuno</td><td class="num">0,99</td><td>glucosio e O<sub>2</sub></td></tr>
+  <tr><td>Uscita di acidi biliari</td><td><code>MAR09281</code>, glicocolato</td><td>Epatocita</td><td class="num">0,098</td><td>carbonio, O<sub>2</sub></td></tr>
+  <tr><td>Uscita di colesterolo</td><td><code>MAR09285</code></td><td>Fegato: sintesi di colesterolo per le lipoproteine</td><td class="num">0,096</td><td>carbonio</td></tr>
+  <tr><td>Lipogenesi de novo</td><td><code>MAR00611</code>, rilascio di palmitato</td><td>Epatocita, adipocita</td><td class="num">0,21</td><td>glucosio</td></tr>
+  <tr><td colspan="5"><b>Neuroni e cellule endocrine</b></td></tr>
+  <tr><td>Rilascio di glutammato</td><td><code>MAR09071</code></td><td>Neurone glutammatergico</td><td class="num">0,55</td><td>apporto di azoto</td></tr>
+  <tr><td>Rilascio di GABA</td><td><code>MAR09091</code></td><td>Neurone GABAergico</td><td class="num">0,55</td><td>apporto di azoto</td></tr>
+  <tr><td>Rilascio di dopamina</td><td><code>MAR09092</code></td><td>Neurone dopaminergico</td><td class="num">0,019</td><td>tirosina, fenilalanina</td></tr>
+  <tr><td>Uscita di cortisolo</td><td><code>MAR09293</code></td><td>Corteccia surrenale</td><td class="num">0,095</td><td>carbonio, O<sub>2</sub></td></tr>
+  <tr><td colspan="5"><b>Altri tipi cellulari</b></td></tr>
+  <tr><td>Uscita di ossido nitrico</td><td><code>MAR09381</code></td><td>Endotelio, macrofago attivato</td><td class="num">0,55</td><td>apporto di azoto (arginina)</td></tr>
+  <tr><td>Sintesi dell'eme</td><td><code>MAR09107</code></td><td>Precursore eritroide</td><td class="num">0,11</td><td>carbonio, O<sub>2</sub></td></tr>
+  <tr><td>Uscita di creatina</td><td><code>MAR09290</code></td><td>Rene, fegato</td><td class="num">0,20</td><td>apporto di azoto</td></tr>
+</table></div>
+<p>* Human-GEM, terreno standard, flussi di scambio misurati su «Nessuno», in mmol/gDW/h salvo diversa indicazione (Mouse-GEM dà gli stessi valori entro il 5 %). Con la crescita come obiettivo, tutte le altre funzioni sono vicine a 0. Nel terreno standard molte funzioni sono limitate dalla glutammina e dagli amminoacidi che offre; in un terreno più ricco o fisiologico cambiano.</p>
+<h4 id="it-objlist">Che cosa rappresenta ciascun obiettivo</h4>
+<p>Le stesse spiegazioni compaiono sotto il selettore quando si sceglie un obiettivo.</p>
+<dl class="objs">
+  <dt class="grp">Crescita, energia e stress</dt>
+  <dt>Crescita (biomassa generica)</dt><dd>Massimizza la reazione di biomassa del modello: la cellula cresce quanto permettono il terreno e i tassi misurati. L'obiettivo abituale per le cellule in proliferazione.</dd>
+  <dt>Massima produzione di ATP (stress energetico)</dt><dd>Massimizza l'idrolisi di ATP citosolico (MAR03964, la reazione di mantenimento) invece della crescita: il massimo ATP che la cellula può ricavare da ciò che assorbe. Un obiettivo alternativo classico, per cellule che non crescono e per lo stress energetico; con meno O₂ nel terreno mostra come cambia l'apporto di ATP in ipossia. La crescita è 0.</dd>
+  <dt>Massima sintesi di glutatione (stress ossidativo)</dt><dd>Massimizza l'uscita netta di glutatione (la sua esportazione, MAR09351), che la cellula può sostenere solo producendo GSH da glutammato, cisteina e glicina; le cellule aumentano la sintesi di GSH sotto stress ossidativo. Non si usa la glutatione sintetasi stessa: il modello allora produce GSH e lo scinde subito di nuovo, un ciclo futile. Nel terreno standard il valore (~0,02 mmol/gDW/h) è fissato dall'apporto di cisteina, cistina e metionina, come nelle cellule reali. La crescita è 0.</dd>
+  <dt class="grp">Fegato e metabolismo lipidico</dt>
+  <dt>Uscita di urea (epatocita, smaltimento dell'ammonio)</dt><dd>Massimizza il rilascio di urea (MAR09438): il ciclo dell'urea che smaltisce l'azoto di amminoacidi e ammonio, la principale funzione azotata dell'epatocita.</dd>
+  <dt>Uscita di glucosio (gluconeogenesi)</dt><dd>Massimizza il rilascio netto di glucosio (MAR09034) con il suo assorbimento chiuso: gluconeogenesi da amminoacidi, lattato o glicerolo, come in fegato e rene a digiuno. Che il terreno contenga glucosio o no, non può semplicemente attraversare la cellula.</dd>
+  <dt>Uscita di corpi chetonici (β-idrossibutirrato)</dt><dd>Massimizza il rilascio di (R)-3-idrossibutanoato (MAR09134), il principale corpo chetonico prodotto dal fegato da acidi grassi e amminoacidi chetogenici a digiuno.</dd>
+  <dt>Uscita di acidi biliari (glicocolato)</dt><dd>Massimizza il rilascio di glicocolato (MAR09281): sintesi di acidi biliari dal colesterolo e coniugazione con glicina, una funzione dell'epatocita.</dd>
+  <dt>Uscita di colesterolo (sintesi)</dt><dd>Massimizza il rilascio di colesterolo (MAR09285): la capacità di sintesi de novo del colesterolo, che il fegato esporta nelle lipoproteine.</dd>
+  <dt>Lipogenesi de novo (palmitato)</dt><dd>Massimizza il rilascio di palmitato (MAR00611): la capacità di sintesi de novo di acidi grassi da glucosio e amminoacidi, come in epatociti e adipociti.</dd>
+  <dt class="grp">Neuroni e cellule endocrine</dt>
+  <dt>Rilascio di glutammato (neurone glutammatergico)</dt><dd>Massimizza il rilascio di glutammato (MAR09071), il trasmettitore dei neuroni glutammatergici.</dd>
+  <dt>Rilascio di GABA (neurone GABAergico)</dt><dd>Massimizza il rilascio di 4-amminobutirrato (GABA, MAR09091), il trasmettitore dei neuroni GABAergici, prodotto dal glutammato.</dd>
+  <dt>Rilascio di dopamina (neurone dopaminergico)</dt><dd>Massimizza il rilascio di dopamina (MAR09092), prodotta dalla tirosina; l'apporto di amminoacidi aromatici fissa il valore.</dd>
+  <dt>Uscita di cortisolo (corteccia surrenale)</dt><dd>Massimizza il rilascio di cortisolo (MAR09293): steroidogenesi dal colesterolo nella corteccia surrenale.</dd>
+  <dt class="grp">Altri tipi cellulari</dt>
+  <dt>Uscita di ossido nitrico (endotelio, macrofago)</dt><dd>Massimizza il rilascio di ossido nitrico (MAR09381) da parte dell'ossido nitrico sintasi a partire da arginina, come nelle cellule endoteliali e nei macrofagi attivati.</dd>
+  <dt>Sintesi dell'eme (precursore eritroide)</dt><dd>Massimizza il rilascio di eme (MAR09107): la via di sintesi dell'eme (glicina + succinil-CoA, ferro), il principale compito metabolico dei precursori eritroidi.</dd>
+  <dt>Uscita di creatina</dt><dd>Massimizza il rilascio di creatina (MAR09290), prodotta da arginina, glicina e metionina in rene e fegato.</dd>
+</dl>
+<div class="note"><b>Flussi misurati e funzioni cellulari.</b> I tassi misurati caricati per impostazione predefinita (NCI-60) appartengono a cellule tumorali in proliferazione e vi fissano gli scambi di glucosio, lattato, glutammina e altri. Non descrivono un epatocita né un neurone, e inoltre limitano a tracce i sottoprodotti non misurati, il che può ridurre artificialmente una funzione (il cortisolo scende da 0,095 a 0,001 perché un sottoprodotto della steroidogenesi può uscire solo in tracce). Quando si sceglie una funzione cellulare con i flussi misurati attivi, la nota dell'obiettivo chiede di impostarli su «Nessuno». Crescita, ATP e glutatione si possono usare con essi.</div>
+<p><b>Obiettivi considerati e scartati</b>, perché l'FBA non dà per loro una risposta sensata in questi modelli:</p>
+<ul>
+  <li><b>Glutatione sintetasi</b> (<code>MAR04326</code>): 6,5 mmol/gDW/h di GSH che la γ-glutamil amminopeptidasi (<code>MAR04175</code>) scinde subito di nuovo, un ciclo futile che brucia solo ATP. Al suo posto si usa il rilascio netto di GSH (sopra).</li>
+  <li><b>Glutatione reduttasi</b> (rigenerazione del NADPH): illimitata, perché il modello può riossidare il GSH in un ciclo chiuso.</li>
+  <li><b>Formazione di goccioline lipidiche</b> (<code>MAR00031</code>): il suo prodotto non ha uscita nel modello, quindi l'ottimo è 0. La lipogenesi è rappresentata dal rilascio di palmitato.</li>
+  <li><b>Rilascio di lattato</b>: possibile, ma è un sottoprodotto, non qualcosa che si ritiene la cellula massimizzi.</li>
+</ul>
+<p>Ogni obiettivo si applica nel verso in cui la reazione è scritta nel modello. Per usarne uno tuo, cerca qualsiasi reazione nella ricerca, scegli Massimizza o Minimizza e premi <b>Salva</b>: l'obiettivo resta nell'elenco con il nome che scegli (per ID della reazione, quindi funziona anche nell'altro modello se la reazione vi esiste). <b>Elimina</b> lo rimuove. Gli obiettivi salvati restano nel browser; una sessione scaricata conserva l'obiettivo in uso.</p>
+
+<h2 id="it-modes">7. Stato stazionario e Dinamico a confronto</h2>
+<div class="tablebox"><table>
+  <tr><th></th><th>Stato stazionario</th><th>Dinamico</th></tr>
+  <tr><td>Domanda</td><td>«Con questo terreno, che cosa fa la cellula?»</td><td>«Che cosa succede nelle prossime ore mentre il terreno si esaurisce?»</td></tr>
+  <tr><td>Terreno</td><td>Costante: le concentrazioni non cambiano.</td><td>Finito: ogni assorbimento abbassa la concentrazione, ogni secrezione la alza.</td></tr>
+  <tr><td>Flussi</td><td>Una soluzione FBA.</td><td>L'FBA viene risolto di nuovo ogni volta che un nutriente scende abbastanza da cambiare ciò che la cellula può assorbire.</td></tr>
+  <tr><td>Biomassa</td><td>Non seguita.</td><td>Cresce esponenzialmente al tasso di crescita corrente.</td></tr>
+  <tr><td>Marcatura</td><td>Finale (stato stazionario isotopico): ogni pool ha raggiunto il suo arricchimento finale.</td><td>Riempie gradualmente i pool intracellulari, così si vede la marcatura arrivare prima alla glicolisi e poi ai prodotti lontani.</td></tr>
+  <tr><td>Tempo richiesto</td><td>Pochi secondi.</td><td>Circa mezzo minuto; il doppio con un knockout, perché si simula anche la cellula non perturbata.</td></tr>
+</table></div>
+<h3>Come funziona la modalità dinamica</h3>
+<ol>
+  <li>Il tempo va da 10 secondi alla durata scelta in 30 passi, spaziati logaritmicamente (prima passi brevi, quando la marcatura cambia più in fretta). Con eventi programmati, i passi brevi ricominciano dopo ogni evento.</li>
+  <li>A ogni passo l'assorbimento massimo di ogni nutriente viene ricalcolato dalla sua concentrazione attuale, e non può mai superare ciò che resta fisicamente nel terreno.</li>
+  <li>Se un limite che vincolava davvero la cellula si è spostato di più di circa l'8 %, l'FBA viene risolto di nuovo; altrimenti si mantengono i flussi precedenti.</li>
+  <li>Le concentrazioni vengono aggiornate: <code>ΔC = −assorbimento × biomassa × Δt</code>. L'ossigeno è tenuto costante, perché lo scambio gassoso lo reintegra.</li>
+  <li>La biomassa cresce: <code>X ← X · exp(tasso di crescita × Δt)</code>.</li>
+  <li>La marcatura avanza di un passo implicito in ogni pool di metabolita.</li>
+</ol>
+<p>Tre numeri la controllano: la durata, la biomassa iniziale (gDW per litro di terreno: più cellule esauriscono prima il terreno) e la dimensione del pool intracellulare (quanto di ogni metabolita contiene la cellula, il che fissa la rapidità con cui la marcatura lo riempie).</p>
+<h3>Eventi programmati (avanzato)</h3>
+<p>In modalità dinamica, la sezione «Eventi programmati» del pannello sinistro permette di cambiare il terreno durante la simulazione:</p>
+<ul>
+  <li><b>Aggiungere un metabolita</b> a un'ora data: sceglilo, imposta la concentrazione da aggiungere e, con ⚛, quali atomi sono marcati e in quale frazione delle molecole. Così si programma un impulso di marcatura.</li>
+  <li><b>Cambiare l'intero terreno</b> a un'ora data: il terreno viene sostituito da uno dei terreni predefiniti o salvati, non marcato, e ciò che le cellule avevano secreto viene lavato via. Dopo un inizio marcato, questo è un <em>chase</em>.</li>
+</ul>
+<p>Il terreno contiene allora una miscela di lotti dello stesso metabolita, per esempio glucosio non marcato che c'era già più glucosio marcato aggiunto dopo. Le cellule li assorbono in proporzione a quanto resta di ciascuno. L'FBA viene risolto di nuovo a ogni evento. Gli eventi fissati dopo la fine della simulazione vengono ignorati.</p>
+<div class="note">Un metabolita che le cellule secernono nel terreno e poi riassorbono (lattato, alanina…) conta come non marcato quando ritorna.</div>
+<div class="note">La modalità dinamica è un'approssimazione («FBA dinamico»). A tutti i pool intracellulari è data la stessa dimensione, il che non è vero nelle cellule reali: leggi i <em>tempi</em> di marcatura come indicativi, e l'<em>ordine</em> in cui le cose si marcano come la parte informativa.</div>
+
+<h2 id="it-medium">8. Il terreno</h2>
+<p>Un modello stechiometrico non ha concentrazioni, solo limiti all'assorbimento. L'applicazione converte ogni concentrazione in una velocità massima di assorbimento con una regola di saturazione:</p>
+<div class="formula">assorbimento massimo = V<sub>max</sub> · C / (K<sub>m</sub> + C)</div>
+<p>Così, raddoppiare una concentrazione bassa raddoppia all'incirca ciò che la cellula può assorbire, mentre raddoppiarne una già saturante cambia poco. Passa il cursore su una casella di concentrazione per vedere il limite risultante. La cellula non deve usare tutto il consentito: l'FBA prende ciò che serve all'obiettivo.</p>
+<p>Con i flussi di scambio misurati attivi (impostazione predefinita), un assorbimento misurato sostituisce questa regola: la cellula assorbe ciò che è stato misurato, purché il metabolita sia nel terreno. Questi componenti sono contrassegnati con ⊙ nell'elenco. La regola continua a limitare tutto il resto.</p>
+<ul>
+  <li><b>Terreni predefiniti</b>: Standard (ricco, tipo DMEM/F-12), Plasmax e HPLM (concentrazioni fisiologiche).</li>
+  <li><b>I tuoi</b>: modifica, aggiungi o rimuovi componenti, poi «salva…» per conservare il terreno con un nome in questo browser.</li>
+  <li><b>Componenti illimitati</b>: acqua, protoni, fosfato e i sali principali non sono mai limitanti.</li>
+  <li><b>Iniezioni</b>: puoi aggiungere un metabolita non extracellulare (per esempio citrato citosolico). Viene allora fornito direttamente dentro quel compartimento — un esperimento che solo un modello consente.</li>
+</ul>
+<p>Per Plasmax e HPLM sono esclusi i componenti che i modelli non contengono (selenito, manganese, vanadato, nitrato, p-amminobenzoato, acetoacetato di metile, rosso fenolo). Gli acidi grassi essenziali e le vitamine liposolubili, che nei terreni reali provengono dal siero, sono aggiunti ai valori del terreno standard.</p>
+
+<h2 id="it-tracing">9. Tracciamento isotopico</h2>
+<p>Premi <b>⚛</b> accanto a un componente del terreno per aprire l'editor della molecola, clicca sugli atomi da marcare (<sup>13</sup>C, <sup>15</sup>N, <sup>18</sup>O o <sup>34</sup>S) e scegli quale frazione delle molecole porta la marcatura.</p>
+<h3>Arricchimento posizionale</h3>
+<p>Per ogni atomo di ogni metabolita l'applicazione calcola il suo <b>arricchimento</b>: la frazione di molecole in cui quell'atomo è l'isotopo pesante. Un atomo eredita l'arricchimento dagli atomi da cui è stato formato, pesato per il flusso:</p>
+<div class="formula">arricchimento di un atomo = Σ (flusso di ogni reazione produttrice × arricchimento dell'atomo di origine) / Σ flusso</div>
+<p>Ciò si risolve esattamente per l'intera rete, cicli compresi (il ciclo di Krebs rimanda marcatura a se stesso). Seleziona un metabolita per vederne la struttura colorata atomo per atomo.</p>
+<h3>Isotopologhi (M+0, M+1, M+2 …)</h3>
+<p>Uno spettrometro di massa non vede le posizioni: conta quanti atomi pesanti porta ogni molecola. M+0 è la molecola non marcata, M+3 una molecola con tre atomi pesanti. Questa distribuzione non si può dedurre dal solo arricchimento posizionale. Il glucosio completamente marcato dà piruvato che è M+3 o M+0, mai un miscuglio casuale di posizioni marcate.</p>
+<p>Per questo l'applicazione traccia <b>molecole intere all'indietro</b>. Per costruire una molecola del metabolita selezionato sceglie una delle reazioni che lo producono (in proporzione al flusso), trova da quale molecola di substrato proviene ogni atomo e ripete per quei substrati fino ad arrivare al terreno, dove la marcatura è nota. Gli atomi venuti dalla stessa molecola di substrato restano insieme, ed è ciò che mantiene corretto lo schema. Farlo per 2.000 molecole dà la distribuzione mostrata nel pannello del metabolita.</p>
+<ul>
+  <li>Disponibile con un tracciante, in entrambe le modalità. Allo stato stazionario è la distribuzione finale. In modalità dinamica è la distribuzione <b>al tempo indicato dal cursore</b>, e «Mostra nel tempo» traccia ogni isotopologo lungo la simulazione.</li>
+  <li><b>In modalità dinamica il percorso va anche indietro nel tempo.</b> Una molecola trovata in un pool vi è entrata qualche tempo prima: quanto viene estratto a caso dalla dimensione del pool e dal suo ricambio. Flussi e composizione del terreno sono presi come erano in quel momento precedente, e una molecola più vecchia della simulazione non è marcata. È ciò che fa apparire un impulso aggiunto all'ora 4 prima nella glicolisi e solo dopo nei prodotti lontani.</li>
+  <li>Subito dopo l'inizio o un evento (i primi secondi), l'arricchimento atomo per atomo e le barre degli isotopologhi possono non coincidere: il primo è calcolato in passi temporali grossolani, le seconde con tempi di attesa esatti. Tornano a coincidere in pochi minuti.</li>
+  <li><b>Senza tracciante</b> il pannello mostra la distribuzione attesa dall'abbondanza isotopica naturale (<sup>13</sup>C 1,07 %, <sup>15</sup>N 0,36 %, <sup>18</sup>O 0,2 %, <sup>34</sup>S 4,25 %, <sup>2</sup>H 0,01 % …), calcolata esattamente dalla formula. È lo sfondo da cui parte qualsiasi misura.</li>
+  <li>Con un tracciante, l'abbondanza isotopica naturale <b>non</b> viene sommata: confronta con misure corrette per essa.</li>
+  <li>Trattandosi di un campione casuale di 2.000 molecole, ogni barra ha un'incertezza di circa ±1 punto percentuale.</li>
+  <li>Se parte degli atomi è passata per reazioni senza mappa atomica, il pannello lo indica e la distribuzione è approssimata.</li>
+  <li><sup>18</sup>O e <sup>34</sup>S aggiungono due unità di massa per atomo, <sup>13</sup>C e <sup>15</sup>N una.</li>
+</ul>
+<h3>Dove finisce la marcatura</h3>
+<p>Con un tracciante, il riepilogo mostra quale quota degli atomi marcati lascia la cellula in ogni prodotto (CO<sub>2</sub>, lattato, biomassa …).</p>
+
+<h2 id="it-ko">10. Knockout e knockdown</h2>
+<p>Aggiungi un gene o una reazione nella sezione «Knockout / knockdown» e imposta la sua attività residua: 0 % è un knockout, qualsiasi valore intermedio un knockdown.</p>
+<ul>
+  <li><b>I geni agiscono tramite le regole gene–proteina–reazione.</b> Se una reazione richiede <code>A and B</code> (un complesso), perdere l'uno o l'altro la blocca. Se richiede <code>A or B</code> (isoenzimi), perderne uno non cambia nulla. L'elenco mostra, per esempio, «2/7»: due delle sette reazioni che citano il gene dipendono davvero da esso. Un gene barrato non ha alcun effetto.</li>
+  <li><b>Il riferimento.</b> Ogni simulazione perturbata è confrontata con la stessa simulazione senza perturbazione, calcolata automaticamente.</li>
+  <li><b>Un knockdown</b> limita la reazione a quella frazione del suo flusso di riferimento. Una reazione che non aveva flusso nel riferimento non è vincolata da un knockdown parziale.</li>
+  <li><b>«Variato» significa</b> un flusso che differisce dal riferimento di più del 2 %.</li>
+  <li><b>I flussi misurati</b> restano in vigore nella simulazione perturbata, così il confronto è tra due cellule con lo stesso fenotipo misurato. Se il knockout li rende impossibili, vengono rilassati e il riepilogo lo segnala.</li>
+</ul>
+<div class="note">L'FBA assume che la cellula reindirizzi in modo perfetto e istantaneo. Un knockout innocuo nel modello significa «nella rete esiste una via alternativa», non «la cellula non se ne accorgerà». Al contrario, un knockout che ferma la crescita nel modello indica una reazione senza alternative.</div>
+
+<h2 id="it-compare">11. Confrontare due situazioni</h2>
+<p>La modalità di confronto mette affiancate due situazioni qualsiasi: due terreni o concentrazioni iniziali, un impulso o un cambio di terreno, un knockout, un tracciante diverso, o un modello modificato rispetto a quello pubblicato.</p>
+<ol>
+  <li>Prepara la prima situazione e simulala. In <b>Confronta</b>, premi <b>Salva l'attuale come scenario…</b> e dagli un nome (per esempio «Controllo»).</li>
+  <li>Cambia ciò che vuoi verificare e simula di nuovo.</li>
+  <li>Scegli lo scenario nell'elenco (il pulsante di opzione). Un distintivo blu sulla mappa indica con che cosa stai confrontando.</li>
+</ol>
+<p>Da quel momento lo scenario prende ovunque il posto del «riferimento»:</p>
+<ul>
+  <li><b>Mappa.</b> «Mostra: Solo flusso variato» colora le reazioni secondo la variazione di flusso (blu = meno, arancione = più). «Marcatura variata» colora i metaboliti secondo la variazione del loro arricchimento medio e nasconde il resto. Nelle viste globale e cellula ogni gruppo è colorato secondo la variazione della sua marcatura pesata per il flusso.</li>
+  <li><b>Pannello di riepilogo.</b> L'obiettivo con la sua variazione, le reazioni più variate, gli scambi che cambiano, le vie che cambiano di più (somma dei flussi assoluti) e i metaboliti la cui marcatura cambia di più. Ogni riga si legge «scenario → ora»; cliccala per andarci.</li>
+  <li><b>Pannello del metabolita.</b> Ricambio e arricchimento medio nelle due situazioni, e le due <b>distribuzioni degli isotopologhi come barre appaiate</b> (grigio: scenario, ambra: ora). Una situazione senza tracciante appare come 100 % M+0.</li>
+  <li><b>Pannello della reazione ed etichette.</b> Il flusso nello scenario accanto a quello attuale.</li>
+</ul>
+<p>Note:</p>
+<ul>
+  <li>Lo scenario conserva il suo risultato, quindi nulla viene ricalcolato passando da uno scenario all'altro. ↺ ricarica le impostazioni di uno scenario (terreno, traccianti, perturbazioni, eventi, modifiche del modello) e lo ricalcola.</li>
+  <li>Due simulazioni dinamiche si confrontano al punto temporale più vicino. Uno scenario stazionario si confronta con ogni punto temporale di una simulazione dinamica.</li>
+  <li>Se le due situazioni usano modifiche del modello diverse, reazioni e metaboliti sono abbinati per ID. Quelli presenti in un solo lato contano come flusso zero nell'altro.</li>
+  <li>Finché uno scenario è selezionato, sostituisce il riferimento automatico non perturbato di un knockout. Smetti di confrontare per riavere quel riferimento.</li>
+  <li>Gli scenari vivono in memoria. Per conservarli, scarica la sessione (<a href="#it-download">sezione 15</a>). Importarla ricalcola tutti gli scenari.</li>
+</ul>
+
+<h2 id="it-editing">12. Modificare il modello</h2>
+<p>Premi <b>✎ Modifica modello</b> nella barra superiore. La sezione «Modifiche del modello» elenca ogni cambiamento, e i pannelli di reazione e metabolita ottengono pulsanti di modifica. Puoi:</p>
+<ul>
+  <li><b>aggiungere una reazione</b>, con stechiometria, limiti, enzimi (regola GPR) e una mappa atomica;</li>
+  <li><b>aggiungere un metabolita</b>: un nuovo composto (dal suo SMILES), oppure un composto esistente in un altro compartimento;</li>
+  <li><b>cambiare una reazione pubblicata</b>: i suoi limiti (per esempio renderla irreversibile), la sua regola GPR (aggiungere o togliere enzimi) o il suo nome;</li>
+  <li><b>rimuovere</b> una reazione o un metabolita. Un metabolita può andarsene solo insieme alle reazioni che lo usano, e l'applicazione propone di rimuoverle;</li>
+  <li><b>copiare una reazione come nuova</b>: per esempio, mettere un enzima in un altro compartimento.</li>
+</ul>
+<p>Le modifiche sono operazioni applicate, in ordine, sopra il modello pubblicato. Il modello pubblicato in sé non cambia mai. Gli elementi rimossi restano al loro posto, contrassegnati, così i risultati prima e dopo una modifica si possono confrontare elemento per elemento. Le modifiche restano in questo browser per ciascun modello. ✕ ne annulla una, e «scarta tutto» torna al modello pubblicato. L'elenco delle modifiche e il distintivo della mappa segnalano le modifiche rifiutate (✕) e quelle con avvisi (⚠).</p>
+
+<h3>Che cosa rende valida una modifica</h3>
+<p>L'editor verifica tutte le regole seguenti mentre scrivi. Una modifica con un errore (✕) non può essere salvata, e una modifica memorizzata diventata non valida viene saltata. Gli avvisi (⚠) significano che la modifica è lecita ma probabilmente non farà ciò che ti aspetti. Le regole seguono i consueti controlli di qualità per i modelli su scala genomica (Thiele &amp; Palsson 2010; MEMOTE, Lieven et al. 2020).</p>
+<div class="tablebox"><table>
+  <tr><th>Controllo</th><th>Livello</th><th>Perché</th></tr>
+  <tr><td>ID univoco (lettere, cifre, <code>_ . -</code>)</td><td>errore</td><td>Sessioni, confronti ed esportazioni si riferiscono a reazioni e metaboliti tramite ID.</td></tr>
+  <tr><td>Ogni metabolita esiste (o viene creato) e compare una volta; i coefficienti sono numeri diversi da zero</td><td>errore</td><td>La matrice stechiometrica deve essere ben definita.</td></tr>
+  <tr><td>Substrati e prodotti, salvo che abbia un solo metabolita (scambio)</td><td>errore</td><td>Una reazione con un solo lato distrugge o crea massa. Uno scambio di un metabolita <em>extracellulare</em> è il modo lecito di farlo; un solo metabolita dentro la cellula è segnalato come pozzo.</td></tr>
+  <tr><td>Limite inferiore ≤ limite superiore, entrambi numeri; ±1000 significa illimitato</td><td>errore / avviso</td><td>I limiti definiscono verso e reversibilità: 0 … 1000 è irreversibile, −1000 … 1000 reversibile.</td></tr>
+  <tr><td>Bilancio degli elementi (tutti tranne H)</td><td>errore, salvo che tu lo accetti</td><td>Altrimenti si creerebbero o distruggerebbero atomi. La marcatura potrebbe allora comparire dal nulla e la crescita potrebbe risultare «gratuita». Le reazioni aggregate o di confine si possono accettare esplicitamente.</td></tr>
+  <tr><td>Bilancio di idrogeno e carica</td><td>avviso</td><td>Di solito manca un H⁺. I GEM bilanciano i protoni a pH 7,2.</td></tr>
+  <tr><td>Formula di ogni partecipante</td><td>avviso</td><td>Senza formule il bilancio non si può verificare.</td></tr>
+  <tr><td>Sintassi GPR: simboli di geni uniti da <code>and</code> (complesso) / <code>or</code> (isoenzimi), parentesi bilanciate</td><td>errore</td><td>La regola decide che cosa fa un knockout. I nuovi simboli di geni vengono aggiunti al modello e possono subire knockout. Nessuna regola significa nessun enzima, quindi nessun knockout raggiunge la reazione.</td></tr>
+  <tr><td>Non è un duplicato di una reazione esistente</td><td>avviso</td><td>Due reazioni identiche si dividono il flusso arbitrariamente.</td></tr>
+  <tr><td>Metaboliti in al massimo due compartimenti</td><td>avviso</td><td>Una reazione di solito avviene in un compartimento o sposta qualcosa attraverso una membrana.</td></tr>
+  <tr><td><b>Nessun vicolo cieco né metabolita isolato</b> creato dalla modifica</td><td>avviso</td><td>Allo stato stazionario ogni metabolita deve essere sia prodotto sia consumato. Un nuovo composto che nulla consuma blocca la reazione che lo produce, che porta quindi flusso zero. Un nuovo prodotto ha dunque bisogno di un'uscita: un trasporto verso il terreno più uno scambio, oppure una reazione che lo consumi. Rimuovere una reazione può lasciare isolati altri metaboliti; la conferma li elenca.</td></tr>
+  <tr><td>La reazione obiettivo (biomassa) e i suoi metaboliti non si possono rimuovere</td><td>errore</td><td>Scegli prima un altro obiettivo.</td></tr>
+  <tr><td>Mappa atomica: indici dentro le molecole, da substrato a prodotto, stesso elemento, nessun atomo di prodotto riempito due volte</td><td>errore</td><td>Una mappa errata sposta la marcatura in posti impossibili.</td></tr>
+  <tr><td>La mappa atomica copre tutti i carboni dei prodotti</td><td>avviso</td><td>I carboni non mappati ricevono la marcatura media degli atomi non mappati dei substrati e sono segnalati con posizione incerta.</td></tr>
+</table></div>
+
+<h3>Quali dati richiede una modifica?</h3>
+<ul>
+  <li><b>Per i flussi (FBA)</b>: solo la stechiometria e i limiti, più la regola GPR se i knockout devono raggiungere la reazione. Una formula per ogni metabolita permette di verificare il bilancio.</li>
+  <li><b>Per tracciare un metabolita intero</b>: nient'altro. Un metabolita senza struttura conta come un pseudo-atomo pesato per i suoi carboni. Il suo arricchimento medio è corretto, ma non ha posizioni né isotopologhi.</li>
+  <li><b>Per la marcatura posizionale e gli isotopologhi</b>: uno <b>SMILES</b> di ogni nuovo composto <em>e</em> una <b>mappa atomica</b> di ogni nuova reazione. Lo SMILES da solo non basta: dice che cos'è la molecola, non quale atomo del substrato diventa quale atomo del prodotto. Dallo SMILES l'applicazione (RDKit, caricato al primo uso) disegna la molecola, calcola formula e carica e trova i suoi atomi simmetrici come la pre-elaborazione. Scrivilo nello stato di protonazione del modello (pH 7,2, carbossilati come COO⁻); gli atomi pesanti devono coincidere con la formula.</li>
+</ul>
+<p>La mappa atomica può venire da tre fonti, in ordine di affidabilità decrescente:</p>
+<ol>
+  <li><b>Uno SMILES di reazione con mappa atomica</b> che incolli, con ogni copia stechiometrica scritta per esteso. Puoi crearne uno con RXNMapper, già installato per la pre-elaborazione: <code>tools/.venv/bin/python tools/map_reaction.py "substrates&gt;&gt;products"</code>. Funziona in locale. L'applicazione associa ogni molecola dello SMILES a un partecipante tramite lo scheletro, quindi cariche e ordini di legame possono differire.</li>
+  <li><b>Regole automatiche</b>: lo stesso composto su entrambi i lati passa intero (trasporto, trasportatori). Una reazione pubblicata fatta degli stessi composti, per esempio una che hai copiato in un altro compartimento, presta la sua mappa.</li>
+  <li><b>Massima sottostruttura comune automatica</b>, lo stesso metodo greedy del ripiego della pre-elaborazione. È veloce ma chimicamente ingenuo. Nell'esempio seguente accoppia cinque atomi di un piruvato con l'acetoino, mentre RXNMapper prende correttamente due carboni da ciascun piruvato. Verificalo, oppure incolla invece uno SMILES mappato.</li>
+</ol>
+<div class="note">Gli scambi che aggiungi sono esenti dalla regola «prodotti non misurati solo in tracce» dei flussi misurati (<a href="#it-measured">sezione 5</a>): li hai aggiunti per usarli. Se il fenotipo misurato deve includere il nuovo prodotto, aggiungilo a «Flussi di scambio misurati» con il suo tasso misurato.</div>
+<p>Le modifiche si salvano con la sessione o da sole (<code>model_edits.json</code>), e l'importazione le riapplica sul modello pubblicato. <code>model_edits_report.csv</code> elenca ogni modifica con i suoi controlli, per una sezione dei metodi.</p>
+
+<h2 id="it-cascade">13. L'ordine a cascata</h2>
+<p>Ogni metabolita riceve una <b>profondità</b>: il minimo numero di passi di reazione necessari per raggiungerlo dai metaboliti del terreno attuale. I componenti del terreno sono a 0; il glucosio dentro la cellula a 1; il glucosio 6-fosfato a 2; e così via. I versi delle reazioni seguono il modello, non i flussi simulati, quindi l'ordine non salta quando cambi una concentrazione — solo quando aggiungi o togli un componente del terreno.</p>
+<ul>
+  <li>I cofattori (ATP, NAD, acqua, CoA …) sono ignorati, altrimenti tutto sarebbe a un passo da tutto.</li>
+  <li>Il pannello del metabolita mostra la profondità e la sua posizione su una scala da 0 a 100.</li>
+  <li>Con un terreno ricco la maggior parte del metabolismo centrale è a soli due-quattro passi, perché gli amminoacidi vi entrano direttamente. Togli componenti per allungare la cascata.</li>
+  <li><b>La cima di ogni cascata è la stessa:</b> prima il terreno (metaboliti extracellulari), poi il «passo 0», le reazioni di trasporto che li portano nella cellula, e dal passo 1 in poi ciò che accade dentro.</li>
+  <li>Dentro la mappa di una via le righe contano i passi <em>all'interno di quella via</em>, a partire dai suoi metaboliti più vicini al terreno. È ciò che dà alla glicolisi la sua familiare scala dal glucosio al piruvato. I metaboliti del terreno che alimentano la via e i loro trasportatori sono disegnati sopra di essa, così nulla compare dal nulla.</li>
+  <li>Sulla mappa globale, la riga del terreno è la via «Exchange/demand reactions» e il passo 0 è «Transport reactions»; un doppio clic su una delle due ne elenca le reazioni.</li>
+  <li>I cicli non si possono disegnare senza che qualche freccia punti verso l'alto; è normale.</li>
+</ul>
+
+<h2 id="it-experiments">14. Esperimenti in silico</h2>
+<p>Ogni esempio dà i passi e ciò che abbiamo ottenuto con Human-GEM, il terreno standard, i flussi misurati NCI-60 e il pFBA attivo (tutto predefinito). I tuoi numeri dovrebbero coincidere da vicino. Con questi valori predefiniti la cellula cresce a 0,0341 h⁻¹, assorbe 0,742 mmol/gDW/h di glucosio e secerne 1,35 di lattato. I nomi dei pulsanti corrispondono all'interfaccia in italiano.</p>
+
+<div class="exp">
+<h3>A. Knockout di un enzima</h3>
+<ol>
+  <li>In «Knockout / knockdown», scrivi <code>ASNS</code> (asparagina sintetasi) e scegli il gene.</li>
+  <li>Imposta «Mostra» su «Solo flusso variato».</li>
+</ol>
+<p class="res"><b>Risultato.</b> La crescita cala solo di poco, da 0,0341 a 0,0333 h⁻¹ (−2 %): le cellule misurate assorbono già asparagina dal terreno, e ciò copre la maggior parte del fabbisogno. Imposta i flussi misurati su «Nessuno» e confronta.</p>
+<p class="res"><b>Confronta con:</b> <code>PDHB</code> (piruvato deidrogenasi): crescita invariata, ma circa 220 reazioni vengono reindirizzate. <code>FASN</code>, <code>HMGCR</code> o <code>CAD</code>: la crescita si ferma, non c'è alternativa. <code>GAPDH</code>: nessun effetto, perché il modello ha un isoenzima (GAPDHS).</p>
+</div>
+
+<div class="exp">
+<h3>B. Knockout di un trasportatore</h3>
+<ol>
+  <li>Fai il knockout del gene <code>SLC2A1</code> (GLUT1). L'elenco mostra 2/7: solo due delle sue sette reazioni dipendono unicamente da esso.</li>
+  <li>Ora toglilo e fai il knockout della reazione <code>MAR05029</code> (trasporto facilitato del glucosio, catalizzato da tutte le isoforme GLUT).</li>
+</ol>
+<p class="res"><b>Risultato.</b> In entrambi i casi la crescita non cambia e l'assorbimento di glucosio prosegue ai 0,742 mmol/gDW/h misurati: il modello ha ancora altre reazioni di trasporto del glucosio, come i simportatori accoppiati al sodio. Per privare davvero la cellula di glucosio, porta la sua concentrazione a 0.</p>
+<p class="res"><b>Lezione.</b> Un modello generico contiene tutti i trasportatori dell'organismo. Una linea cellulare reale ne esprime solo alcuni.</p>
+</div>
+
+<div class="exp">
+<h3>C. Tracciare il <sup>13</sup>C del glucosio e leggere gli isotopologhi</h3>
+<ol>
+  <li>Premi ⚛ accanto al glucosio, clicca «Tutti i C», applica.</li>
+  <li>Cerca <code>pyruvate</code>, poi <code>citrate</code>, e guarda «Isotopologhi» nel pannello destro. Usa le schede dei compartimenti per confrontare citosol e mitocondrio.</li>
+</ol>
+<p class="res"><b>Risultato.</b> Il lattato è 96 % M+3. Il piruvato mitocondriale è circa 52 % M+3 e 41 % M+0: unità intere di tre carboni marcate dal glucosio, diluite da piruvato non marcato prodotto da amminoacidi. Il citrato mitocondriale è circa 49 % M+2 e 38 % M+0; l'M+2 è la firma dell'acetil-CoA marcato che entra nel ciclo di Krebs. Il fumarato è circa 8 % M+2. Il riepilogo mostra che l'87 % del carbonio marcato esce come lattato.</p>
+<p class="res"><b>Variante.</b> Togli la marcatura del glucosio e marca invece la glutammina («Tutti i C»). Il glutammato è 100 % M+5 e il fumarato 86 % M+4 (ciclo di Krebs ossidativo). Il citrato mitocondriale è circa 51 % M+4 e 35 % M+6: l'M+6 viene dalla carbossilazione riduttiva del 2-ossoglutarato M+5 con CO<sub>2</sub> a sua volta marcata dall'ossidazione della glutammina.</p>
+</div>
+
+<div class="exp">
+<h3>D. Tracciare l'azoto</h3>
+<ol>
+  <li>Premi ⚛ accanto alla glutammina, clicca «Tutti gli N», applica.</li>
+  <li>Imposta «Mostra» su «Solo marcati» e passa alla vista cellula.</li>
+</ol>
+<p class="res"><b>Risultato.</b> La marcatura compare in glutammato, aspartato, alanina e nei nucleotidi, mostrando quali vie prendono il loro azoto dalla glutammina. Glutammato e aspartato citosolici sono circa 95 % M+1 e l'alanina 100 % M+1.</p>
+</div>
+
+<div class="exp">
+<h3>E. Guardare il terreno esaurirsi</h3>
+<ol>
+  <li>Passa a «Dinamico». Mantieni 24 h e 0,5 gDW/L.</li>
+  <li>Al termine, trascina il cursore temporale e guarda «Terreno nel tempo» nel riepilogo.</li>
+</ol>
+<p class="res"><b>Risultato.</b> La biomassa raddoppia (0,50 → 1,00 gDW/L). Al tasso di assorbimento misurato il glucosio si esaurisce tra le 9 e le 13 h, glutammina e colina verso le 18 h. Da lì in poi i flussi misurati non si possono più rispettare e vengono rilassati (la barra di stato lo segnala), e la crescita rallenta da 0,0341 a 0,018 h⁻¹ alle 24 h. L'FBA è stato risolto 8 volte.</p>
+<p class="res"><b>Variante.</b> Passa a Plasmax: con la sua glutammina fisiologica (0,65 mM) e la vitamina B12, la crescita si ferma verso le 9 h. Oppure porta la biomassa iniziale a 2 gDW/L per vedere l'esaurimento in poche ore.</p>
+</div>
+
+<div class="exp">
+<h3>F. Massimizzare un antiossidante: il glutatione</h3>
+<ol>
+  <li>In «Obiettivo cellulare», scegli «Massima sintesi di glutatione» (equivale a cercare <code>MAR09351</code>, «Exchange of GSH», e lasciare «Massimizza»).</li>
+  <li>Leggi il valore dell'obiettivo e l'elenco degli assorbimenti.</li>
+  <li>Porta la cistina, poi la cisteina, a 1 mM.</li>
+</ol>
+<p class="res"><b>Risultato.</b> La cellula può esportare al massimo 0,0201 mmol/gDW/h di glutatione: lo zolfo è limitante, perché cisteina, metionina e cistina sono assorbite al massimo. Con cistina 1 mM il massimo sale a 0,0226, e con anche cisteina 1 mM a 0,0250.</p>
+<p class="res"><b>Trappola.</b> Se massimizzi invece la reazione di <em>sintesi</em> (<code>MAR04326</code>), ottieni 6,5 mmol/gDW/h: il modello produce e degrada glutatione in un ciclo, bruciando ATP. Per chiedere «quanto può produrre la cellula», massimizza l'esportazione del prodotto, non una reazione interna.</p>
+<p class="res"><b>Nota.</b> La crescita non è più l'obiettivo, quindi la cellula non cresce in questa simulazione. Lo stesso approccio vale per altri prodotti, per esempio urato o taurina: cerca «Exchange of …».</p>
+</div>
+
+<div class="exp">
+<h3>G. Poco ossigeno</h3>
+<ol>
+  <li>Porta l'O<sub>2</sub> da 0,2 a 0,0003 mM.</li>
+</ol>
+<p class="res"><b>Risultato.</b> La crescita cala da 0,0341 a 0,0209 h⁻¹. L'assorbimento di glucosio sale a 0,95 mmol/gDW/h e la secrezione di lattato a 1,42, il massimo dei loro intervalli misurati: la cellula si appoggia sulla glicolisi per l'ATP. A 0,0001 mM la crescita scende a 0,0098 h⁻¹. Senza alcun ossigeno il modello non può crescere, perché alcuni componenti della biomassa richiedono O<sub>2</sub> per essere prodotti.</p>
+<p class="res"><b>Confronta.</b> Con i flussi misurati disattivati, lo stesso ossigeno basso fa secernere al modello succinato invece di lattato: entrambi smaltiscono l'eccesso di potere riducente, e l'FBA da solo non ha motivo di preferire quello usato dalle cellule reali.</p>
+</div>
+
+<div class="exp">
+<h3>H. Confrontare terreni</h3>
+<ol>
+  <li>Alterna il selettore del terreno tra Standard, Plasmax e HPLM.</li>
+</ol>
+<p class="res"><b>Risultato.</b> Crescita: 0,0341 h⁻¹ in Standard e Plasmax, 0,0152 h⁻¹ in HPLM. Con i flussi misurati attivi, entrambi i terreni danno gli stessi scambi misurati. HPLM è limitato dal pantotenato (1,05 µM, contro 4,2 µM in Plasmax), che serve alla cellula per il CoA: con il pantotenato di Plasmax, anche HPLM cresce a 0,0341. Questo limite dipende dalla cinetica di assorbimento assunta. Con i flussi misurati disattivati, la crescita è 0,0370, 0,0238 e 0,0152 h⁻¹.</p>
+</div>
+
+<div class="exp">
+<h3>I. Togliere la glutammina</h3>
+<ol>
+  <li>Porta la glutammina a 0.</li>
+</ol>
+<p class="res"><b>Risultato.</b> L'assorbimento misurato di glutammina appare barrato in «Flussi di scambio misurati»: non si applica più. La crescita cala da 0,0341 a 0,0295 h⁻¹, e serina e amminoacidi essenziali vengono assorbiti più in fretta. La rete può produrre tutto ciò di cui ha bisogno senza glutammina. Molte cellule in coltura non ci riescono — un promemoria che l'FBA mostra la capacità, non la regolazione.</p>
+</div>
+
+<div class="exp">
+<h3>J. Un impulso di marcatura durante la simulazione</h3>
+<ol>
+  <li>Passa a «Dinamico». In «Eventi programmati», cerca <code>glucose</code>: compare un evento alle 4 h che aggiunge 5,5 mM.</li>
+  <li>Premi ⚛ sull'evento, clicca «Tutti i C», applica. Premi «Simula».</li>
+  <li>Cerca <code>glucose-6-phosphate</code>, sposta il cursore temporale e premi «Mostra nel tempo».</li>
+</ol>
+<p class="res"><b>Risultato.</b> Fino all'ora 4 non c'è marcatura: il pannello mostra l'abbondanza naturale. All'ora 4 il glucosio del terreno salta da 3,9 a 9,4 mM, di cui 5,5 mM marcati. Il glucosio 6-fosfato diventa allora circa 60 % M+6 e 40 % M+0 — molecole interamente marcate o interamente non marcate, mai una miscela — e il piruvato circa 55 % M+3. Più avanti la marcatura si diluisce: circa 30 % M+2 nel citrato mitocondriale e 5 % M+2 nel fumarato due ore dopo l'impulso.</p>
+</div>
+
+<div class="exp">
+<h3>K. Impulso e chase</h3>
+<ol>
+  <li>Mantieni l'impulso dell'esempio J e premi «+ cambia l'intero terreno». Imposta quell'evento alle 12 h e lascia il terreno standard.</li>
+  <li>Simula e segui il glucosio 6-fosfato con «Mostra nel tempo».</li>
+</ol>
+<p class="res"><b>Risultato.</b> La marcatura sale dopo l'ora 4 e viene lavata via dopo l'ora 12: due ore dopo il chase, glucosio 6-fosfato, piruvato, citrato e fumarato tornano tutti a M+0. I pool più lenti conservano la marcatura più a lungo; confrontare la velocità con cui diversi metaboliti la perdono è lo scopo di un chase. La simulazione richiede circa un minuto.</p>
+</div>
+
+<div class="exp">
+<h3>L. Confrontare normossia e ipossia, isotopologo per isotopologo</h3>
+<ol>
+  <li>Marca il glucosio («Tutti i C»). In «Confronta», salva il risultato come <code>Control</code>.</li>
+  <li>Porta l'O<sub>2</sub> a 0,0003 mM e scegli «Control» nell'elenco degli scenari.</li>
+  <li>Leggi il riepilogo, imposta «Mostra» su «Marcatura variata», poi apri <code>citrate</code> e <code>fumarate</code> mitocondriali.</li>
+</ol>
+<p class="res"><b>Risultato.</b> La crescita passa da 0,0341 a 0,0209 h⁻¹ (−39 %), l'assorbimento di glucosio da 0,742 a 0,948 e quello di O<sub>2</sub> da 0,359 a 0,142 mmol/gDW/h. Le barre appaiate mostrano il ciclo di Krebs molto più marcato. Il citrato mitocondriale passa da 48 % M+2 / 5 % M+4 a 41 % M+2, 25 % M+4, 20 % M+5 e 13 % M+6. Il fumarato passa da 88 % a 42 % M+0, con la comparsa di M+2, M+3 e M+4. Il fumarato M+3 è la firma della carbossilazione del piruvato. Il citrato da M+4 a M+6 si forma quando l'ossalacetato marcato incontra acetil-CoA marcato.</p>
+</div>
+
+<div class="exp">
+<h3>M. Aggiungere una via eterologa: l'acetoino</h3>
+<ol>
+  <li>Premi ✎ Modifica modello → + Metabolita → nuovo composto <code>acetoin</code>, compartimento c, SMILES <code>CC(O)C(C)=O</code>, Leggi struttura (C4H8O2), Salva.</li>
+  <li>+ Reazione: substrati 2 <code>pyruvate</code> [c] e 1 <code>H+</code> [c]; prodotti 1 acetoino [c] e 2 <code>CO2</code> [c]; GPR <code>alsS and alsD</code> (acetolattato sintasi e decarbossilasi batteriche, aggregate). Per la mappa atomica, scegli «SMILES di reazione con mappa atomica» e incolla l'output di <code>tools/map_reaction.py</code> (mostrato nel test <code>tools/test_edits.mjs</code>).</li>
+  <li>I controlli del modello dicono ora che l'acetoino è un vicolo cieco. Aggiungi l'acetoino nel compartimento e (+ In un altro compartimento), un trasporto (acetoino [c] ⇌ acetoino [e], reversibile: la sua mappa atomica si trova automaticamente) e uno scambio (acetoino [e] da solo, 0 … 1000).</li>
+  <li>Marca il glucosio. Massimizza il nuovo scambio come obiettivo.</li>
+</ol>
+<p class="res"><b>Risultato.</b> Con la crescita come obiettivo la via non porta flusso: costa carbonio e non dà nulla alla cellula. Massimizzare l'esportazione di acetoino dà 0,98 mmol/gDW/h. L'acetoino è 58 % M+4, 37 % M+2 e 5 % M+0, esattamente ciò che danno due piruvati indipendenti al 76 % M+3 (0,76² = 0,58; 2 × 0,76 × 0,23 = 0,35). La mappa MCS automatica avrebbe mappato solo 3 dei 4 carboni dell'acetoino da un solo piruvato: usa uno SMILES mappato quando le posizioni contano.</p>
+</div>
+
+<div class="exp">
+<h3>N. Togliere un enzima dal modello</h3>
+<ol>
+  <li>Salva come scenario il risultato predefinito con un tracciante di glucosio.</li>
+  <li>In modalità di modifica, rimuovi le quattro reazioni della L-lattato deidrogenasi <code>MAR04280</code>, <code>MAR04281</code>, <code>MAR04388</code> e <code>MAR06018</code> (cercale in «Rimuovi una reazione o un metabolita…»). Confronta con lo scenario.</li>
+</ol>
+<p class="res"><b>Risultato.</b> La crescita non cambia, ma la secrezione di lattato scende da 1,35 a 0,94 mmol/gDW/h, il minimo dell'intervallo misurato: l'L-lattato è ancora prodotto da vie minori. La cellula brucia il resto del suo piruvato, quindi l'assorbimento di ossigeno sale da 0,36 a 0,82. Il citrato mitocondriale acquista M+4–M+6 e il fumarato scende da 88 % a 47 % M+0. Un knockout del solo <code>LDHA</code> lascerebbe queste reazioni agli isoenzimi delle loro regole GPR. Rimuovere le reazioni elimina il passo qualunque sia l'enzima che lo catalizza.</p>
+</div>
+
+<h3>Altre idee</h3>
+<ul>
+  <li><b>Titolare un knockdown</b>: aggiungi <code>FASN</code> (il suo knockout ferma la crescita) e sposta il cursore da 100 % a 0 % per vedere dove la crescita comincia a calare.</li>
+  <li><b>Misurato contro FBA libero</b>: ripeti un esperimento qualsiasi con «Flussi di scambio misurati» su «Nessuno» e confronta.</li>
+  <li><b>Trovare i nutrienti essenziali</b>: togli i componenti del terreno uno alla volta e guarda quali fermano la crescita.</li>
+  <li><b>Traccianti posizionali</b>: marca solo il carbonio 1 del glucosio e guarda quanto se ne perde come CO<sub>2</sub> nella via dei pentoso fosfati.</li>
+  <li><b>Fornire un intermedio</b>: inietta citrato citosolico o succinato mitocondriale e guarda che cosa ne fa la cellula.</li>
+  <li><b>Combinare</b>: un tracciante più un knockout mostra come la marcatura viene reindirizzata.</li>
+</ul>
+
+<h2 id="it-download">15. Scaricare i risultati</h2>
+<p>«Scarica» apre un elenco di tutto ciò che il risultato attuale può fornire. Spunta ciò che vuoi; ricevi un unico <code>.zip</code> con un <code>README.txt</code> che descrive ogni file. Le tabelle sono CSV (si aprono con qualsiasi foglio di calcolo), i grafici sono SVG (vettoriali, modificabili) e la mappa è un PNG di ciò che è sullo schermo.</p>
+<div class="tablebox"><table>
+  <tr><th>File</th><th>Contenuto</th><th>Disponibile</th></tr>
+  <tr><td><code>fluxes.csv</code></td><td>Ogni reazione: flusso, limiti, via, equazione, geni, numeri EC; flusso di riferimento e variazione quando c'è una perturbazione.</td><td>Sempre</td></tr>
+  <tr><td><code>exchange_fluxes.csv</code></td><td>Assorbimento e secrezione di ogni metabolita scambiato, con la sua concentrazione e i parametri cinetici.</td><td>Sempre</td></tr>
+  <tr><td><code>pathways.csv</code></td><td>Per via: reazioni, reazioni attive, flusso totale, arricchimento.</td><td>Sempre</td></tr>
+  <tr><td><code>metabolites.csv</code></td><td>Per metabolita: ricambio, profondità nella cascata, arricchimento medio.</td><td>Sempre</td></tr>
+  <tr><td><code>flux_changes_vs_reference.csv</code></td><td>Reazioni variate di più del 2 %.</td><td>Knockout / knockdown</td></tr>
+  <tr><td><code>atom_enrichment.csv</code></td><td>Arricchimento di ogni atomo marcato.</td><td>Tracciante</td></tr>
+  <tr><td><code>isotopologues.csv</code></td><td>M+0, M+1 … dei 150 metaboliti marcati più attivi (in modalità dinamica, al tempo selezionato).</td><td>Tracciante</td></tr>
+  <tr><td><code>isotopologues_over_time.csv</code> e grafico</td><td>Frazioni degli isotopologhi del metabolita selezionato in fino a 30 punti temporali.</td><td>Dinamico, tracciante, un metabolita selezionato</td></tr>
+  <tr><td><code>timecourse.csv</code>, <code>timecourse_enrichment.csv</code></td><td>Biomassa, crescita, concentrazioni del terreno, flussi di scambio e arricchimento a ogni punto temporale.</td><td>Dinamico</td></tr>
+  <tr><td><code>chart_*.svg</code></td><td>Assorbimento, secrezione, attività delle vie, reazioni più variate, destino della marcatura, isotopologhi, esaurimento del terreno, biomassa.</td><td>Come sopra</td></tr>
+  <tr><td><code>map.png</code></td><td>La mappa così come appare.</td><td>Viste a mappa</td></tr>
+  <tr><td><code>settings.json</code></td><td>Modello, terreno, obiettivo, traccianti e perturbazioni: ciò che serve per ripetere la simulazione.</td><td>Sempre</td></tr>
+  <tr><td><code>session.json</code></td><td>L'intera sessione, pronta da importare: modifiche del modello, terreno (con atomi marcati), flussi misurati, perturbazioni, eventi, obiettivo, parametri dinamici e scenari salvati.</td><td>Sempre, anche senza risultato</td></tr>
+  <tr><td><code>model_edits.json</code>, <code>model_edits_report.csv</code></td><td>Solo le modifiche del modello, e una tabella di ogni modifica con i suoi controlli.</td><td>Modifiche del modello</td></tr>
+  <tr><td><code>comparison_*.csv</code></td><td>Scambi, vie, arricchimento medio e distribuzioni degli isotopologhi nello scenario confrontato e ora.</td><td>Uno scenario confrontato</td></tr>
+</table></div>
+<h3>Sessioni: ripetere i calcoli altrove</h3>
+<p>«Importa» nella barra superiore legge un <code>session.json</code>, un <code>model_edits.json</code> o direttamente lo <code>.zip</code> di un download che ne contenga uno. Una sessione sostituisce le impostazioni e le modifiche del modello attuali, cambia modello se serve e ricalcola ogni scenario salvato, così vedi lo stesso confronto del suo autore. Le modifiche importate da sole possono sostituire quelle attuali o essere aggiunte dopo. Tutto è memorizzato per ID, quindi una sessione funziona anche dopo un aggiornamento del modello. Gli ID che non esistono più vengono saltati, e la barra di stato dice quanti. Un download con solo <code>session.json</code> (o solo le modifiche) viene scaricato come JSON semplice.</p>
+<p>In modalità dinamica le tabelle per reazione si riferiscono al punto temporale selezionato con il cursore.</p>
+
+<h2 id="it-limits">16. Limiti</h2>
+<ul>
+  <li><b>Niente cinetica né regolazione.</b> Le concentrazioni fissano solo i limiti di assorbimento. Livelli enzimatici, allosteria e segnalazione sono assenti.</li>
+  <li><b>Una cellula generica.</b> Human-GEM contiene ogni reazione nota in qualsiasi tessuto umano. Un tipo cellulare specifico ne esprime un sottoinsieme; l'applicazione non costruisce ancora modelli tessuto-specifici.</li>
+  <li><b>Ottimi alternativi.</b> Più schemi di flusso possono dare la stessa crescita. Il pFBA ne sceglie uno; piccole «variazioni» dopo un knockout possono essere un'alternativa ugualmente buona e non un effetto reale.</li>
+  <li><b>I flussi misurati sono un fenotipo medio.</b> Sono la mediana di 59 linee tumorali in RPMI-1640, convertita con una massa cellulare media. Non sono il fenotipo di nessuna linea in particolare, e vengono mantenuti quando cambi terreno.</li>
+  <li><b>Le cinetiche di assorbimento sono stime approssimative.</b> Fissano comunque l'assorbimento dei componenti del terreno non misurati, e con i flussi misurati disattivati fissano tutto.</li>
+  <li><b>Solo flussi netti.</b> Nella realtà le reazioni reversibili scambiano marcatura nei due versi; il modello vede solo il flusso netto, il che può sottostimare il rimescolamento della marcatura.</li>
+  <li><b>Le mappe atomiche sono calcolate</b>, non tutte curate. Le posizioni incerte sono segnalate.</li>
+  <li><b>Niente tracciamento dell'idrogeno</b> (<sup>2</sup>H) e nessuna correzione per l'abbondanza naturale.</li>
+  <li><b>La modalità dinamica</b> assume un'unica dimensione di pool per tutti i metaboliti intracellulari. I tempi di marcatura, e quindi le curve degli isotopologhi nel tempo, scalano con quel numero: il loro ordine e la loro forma sono informativi, il loro orologio no.</li>
+  <li><b>Le modifiche del modello sono verificate, non curate.</b> I controlli intercettano reazioni impossibili o sbilanciate e vicoli ciechi, non biologia sbagliata. Le mappe atomiche automatiche (massima sottostruttura comune) possono accoppiare atomi sbagliati; preferisci uno SMILES mappato.</li>
+  <li><b>Gli scenari restano in memoria</b> con i loro risultati. Scarica la sessione per conservarli dopo aver chiuso la pagina.</li>
+  <li><b>Mouse-GEM 1.8.0</b> ha un obiettivo (<code>MAR00021</code>) su una scala diversa dalla reazione di biomassa umana, quindi la sua crescita assoluta è molto bassa con il terreno predefinito. Puoi scegliere un altro obiettivo.</li>
+</ul>
+
+<h2 id="it-glossary">17. Glossario</h2>
+<div class="tablebox"><table>
+  <tr><td><b>Flusso</b></td><td>Velocità di una reazione, in mmol per grammo di peso secco all'ora.</td></tr>
+  <tr><td><b>Flusso di carbonio / azoto</b></td><td>Atomi di carbonio o azoto trasferibili all'ora che un gruppo di reazioni produce e un altro consuma, attraverso metaboliti condivisi; gli atomi dei trasportatori riciclati come il CoA non contano (<a href="#it-carbonflow">sezione 3</a>).</td></tr>
+  <tr><td><b>ΔG′<sub>m</sub></b></td><td>Energia di Gibbs trasformata di una reazione con tutti i reagenti a 1 mM, al pH del suo compartimento. Negativa: la reazione può procedere in verso diretto (<a href="#it-dg">sezione 3</a>).</td></tr>
+  <tr><td><b>GEM</b></td><td>Modello metabolico su scala genomica: tutte le reazioni metaboliche note di un organismo, collegate ai suoi geni.</td></tr>
+  <tr><td><b>FBA / pFBA</b></td><td>Analisi del bilancio dei flussi / la sua variante parsimoniosa (minimo flusso totale).</td></tr>
+  <tr><td><b>Obiettivo</b></td><td>La reazione il cui flusso viene massimizzato o minimizzato.</td></tr>
+  <tr><td><b>Reazione di biomassa</b></td><td>Una pseudo-reazione che consuma componenti cellulari nelle proporzioni necessarie a produrre nuova massa cellulare.</td></tr>
+  <tr><td><b>Reazione di scambio</b></td><td>L'entrata o l'uscita di un metabolita tra il terreno e l'esterno del modello.</td></tr>
+  <tr><td><b>Flusso di scambio misurato</b></td><td>Una velocità di assorbimento o secrezione misurata nelle cellule, usata per fissare la reazione di scambio corrispondente.</td></tr>
+  <tr><td><b>Mantenimento di ATP</b></td><td>ATP speso per il mantenimento (pompe ioniche, ricambio) indipendentemente dalla crescita.</td></tr>
+  <tr><td><b>Regola GPR</b></td><td>Regola gene–proteina–reazione: quali geni servono a una reazione.</td></tr>
+  <tr><td><b>Arricchimento</b></td><td>Frazione di una posizione atomica occupata dall'isotopo pesante.</td></tr>
+  <tr><td><b>Isotopologo</b></td><td>Molecole che differiscono solo per il numero di atomi pesanti (M+0, M+1 …).</td></tr>
+  <tr><td><b>Ricambio</b></td><td>Velocità totale con cui un metabolita viene prodotto.</td></tr>
+  <tr><td><b>gDW</b></td><td>Grammo di peso secco cellulare.</td></tr>
+  <tr><td><b>Scenario</b></td><td>Una situazione salvata (impostazioni, modifiche del modello e risultato) con cui si confronta quella attuale.</td></tr>
+  <tr><td><b>Mappa atomica</b></td><td>Quale atomo di ogni substrato diventa quale atomo di ogni prodotto in una reazione.</td></tr>
+  <tr><td><b>Vicolo cieco</b></td><td>Un metabolita che nessuna reazione può produrre, o nessuna può consumare. Le reazioni che lo toccano sono bloccate allo stato stazionario.</td></tr>
+  <tr><td><b>SMILES</b></td><td>Una notazione lineare della struttura di una molecola, per esempio <code>CC(O)C(C)=O</code> per l'acetoino.</td></tr>
+</table></div>
+
+<h2 id="it-refs">18. Bibliografia</h2>
+<ul>
+  <li>Orth JD, Thiele I, Palsson BØ. What is flux balance analysis? <i>Nat. Biotechnol.</i> 2010; 28:245–248. <a href="https://doi.org/10.1038/nbt.1614" target="_blank" rel="noopener">doi:10.1038/nbt.1614</a></li>
+  <li>Lewis NE et al. Omic data from evolved <i>E. coli</i> are consistent with computed optimal growth from genome-scale models. <i>Mol. Syst. Biol.</i> 2010; 6:390 (parsimonious FBA). <a href="https://doi.org/10.1038/msb.2010.47" target="_blank" rel="noopener">doi:10.1038/msb.2010.47</a></li>
+  <li>Mahadevan R, Edwards JS, Doyle FJ. Dynamic flux balance analysis of diauxic growth in <i>Escherichia coli</i>. <i>Biophys. J.</i> 2002; 83:1331–1340. <a href="https://doi.org/10.1016/S0006-3495(02)73903-9" target="_blank" rel="noopener">doi:10.1016/S0006-3495(02)73903-9</a></li>
+  <li>Robinson JL et al. An atlas of human metabolism. <i>Sci. Signal.</i> 2020; 13:eaaz1482 (Human-GEM). <a href="https://doi.org/10.1126/scisignal.aaz1482" target="_blank" rel="noopener">doi:10.1126/scisignal.aaz1482</a></li>
+  <li>Wang H et al. Genome-scale metabolic network reconstruction of model animals as a platform for translational research. <i>PNAS</i> 2021; 118:e2102344118 (Mouse-GEM). <a href="https://doi.org/10.1073/pnas.2102344118" target="_blank" rel="noopener">doi:10.1073/pnas.2102344118</a></li>
+  <li>Schwaller P et al. Extraction of organic chemistry grammar from unsupervised learning of chemical reactions. <i>Sci. Adv.</i> 2021; 7:eabe4166 (RXNMapper). <a href="https://doi.org/10.1126/sciadv.abe4166" target="_blank" rel="noopener">doi:10.1126/sciadv.abe4166</a></li>
+  <li>Vande Voorde J et al. Improving the metabolic fidelity of cancer models with a physiological cell culture medium. <i>Sci. Adv.</i> 2019; 5:eaau7314 (Plasmax). <a href="https://doi.org/10.1126/sciadv.aau7314" target="_blank" rel="noopener">doi:10.1126/sciadv.aau7314</a></li>
+  <li>Cantor JR et al. Physiologic medium rewires cellular metabolism and reveals uric acid as an endogenous inhibitor of UMP synthase. <i>Cell</i> 2017; 169:258–272 (HPLM). <a href="https://doi.org/10.1016/j.cell.2017.03.023" target="_blank" rel="noopener">doi:10.1016/j.cell.2017.03.023</a></li>
+  <li>Jain M et al. Metabolite profiling identifies a key role for glycine in rapid cancer cell proliferation. <i>Science</i> 2012; 336:1040–1044 (NCI-60 exchange fluxes). <a href="https://doi.org/10.1126/science.1218595" target="_blank" rel="noopener">doi:10.1126/science.1218595</a></li>
+  <li>Aurich MK, Fleming RMT, Thiele I. A systems approach reveals distinct metabolic strategies among the NCI-60 cancer cell lines. <i>PLoS Comput. Biol.</i> 2017; 13:e1005698 (per-line values, S1 Table Q). <a href="https://doi.org/10.1371/journal.pcbi.1005698" target="_blank" rel="noopener">doi:10.1371/journal.pcbi.1005698</a></li>
+  <li>Zielinski DC et al. Systems biology analysis of drivers underlying hallmarks of cancer cell metabolism. <i>Sci. Rep.</i> 2017; 7:41241 (cell mass, ATP maintenance). <a href="https://doi.org/10.1038/srep41241" target="_blank" rel="noopener">doi:10.1038/srep41241</a></li>
+  <li>Kilburn DG, Lilly MD, Webb FC. The energetics of mammalian cell growth. <i>J. Cell Sci.</i> 1969; 4:645–654 (ATP maintenance). <a href="https://doi.org/10.1242/jcs.4.3.645" target="_blank" rel="noopener">doi:10.1242/jcs.4.3.645</a></li>
+  <li>Dolfi SC et al. The metabolic demands of cancer cells are coupled to their size and protein synthesis rates. <i>Cancer Metab.</i> 2013; 1:20 (NCI-60 culture conditions). <a href="https://doi.org/10.1186/2049-3002-1-20" target="_blank" rel="noopener">doi:10.1186/2049-3002-1-20</a></li>
+  <li>Thiele I, Palsson BØ. A protocol for generating a high-quality genome-scale metabolic reconstruction. <i>Nat. Protoc.</i> 2010; 5:93–121 (quality checks for model edits). <a href="https://doi.org/10.1038/nprot.2009.203" target="_blank" rel="noopener">doi:10.1038/nprot.2009.203</a></li>
+  <li>Lieven C et al. MEMOTE for standardized genome-scale metabolic model testing. <i>Nat. Biotechnol.</i> 2020; 38:272–276. <a href="https://doi.org/10.1038/s41587-020-0446-y" target="_blank" rel="noopener">doi:10.1038/s41587-020-0446-y</a></li>
+  <li>RDKit: open-source cheminformatics, MinimalLib 2026.03.6 (SMILES, depiction, maximum common substructure in the model editor). <a href="https://doi.org/10.5281/zenodo.591637" target="_blank" rel="noopener">doi:10.5281/zenodo.591637</a></li>
+  <li>Noor E, Haraldsdóttir HS, Milo R, Fleming RMT. Consistent estimation of Gibbs energy using component contributions. <i>PLoS Comput. Biol.</i> 2013; 9:e1003098. <a href="https://doi.org/10.1371/journal.pcbi.1003098" target="_blank" rel="noopener">doi:10.1371/journal.pcbi.1003098</a></li>
+  <li>Beber ME et al. eQuilibrator 3.0: a database solution for thermodynamic constant estimation. <i>Nucleic Acids Res.</i> 2022; 50:D603–D609. <a href="https://doi.org/10.1093/nar/gkab1106" target="_blank" rel="noopener">doi:10.1093/nar/gkab1106</a></li>
+  <li>eQuilibrator compound database (compounds.sqlite), used offline by tools/build_thermo.py. <a href="https://doi.org/10.5281/zenodo.4128543" target="_blank" rel="noopener">doi:10.5281/zenodo.4128543</a></li>
+  <li>Haraldsdóttir HS, Thiele I, Fleming RMT. Quantitative assignment of reaction directionality in a multicompartmental human metabolic reconstruction. <i>Biophys. J.</i> 2012; 102:1703–1711. <a href="https://doi.org/10.1016/j.bpj.2012.02.032" target="_blank" rel="noopener">doi:10.1016/j.bpj.2012.02.032</a></li>
+  <li>Casey JR, Grinstein S, Orlowski J. Sensors and regulators of intracellular pH. <i>Nat. Rev. Mol. Cell Biol.</i> 2010; 11:50–61 (compartment pH). <a href="https://doi.org/10.1038/nrm2820" target="_blank" rel="noopener">doi:10.1038/nrm2820</a></li>
+  <li>Porcelli AM et al. pH difference across the outer mitochondrial membrane measured with a green fluorescent protein mutant. <i>Biochem. Biophys. Res. Commun.</i> 2005; 326:799–804 (intermembrane space pH). <a href="https://doi.org/10.1016/j.bbrc.2004.11.105" target="_blank" rel="noopener">doi:10.1016/j.bbrc.2004.11.105</a></li>
+  <li>Zorova LD et al. Mitochondrial membrane potential. <i>Anal. Biochem.</i> 2018; 552:50–59. <a href="https://doi.org/10.1016/j.ab.2017.07.009" target="_blank" rel="noopener">doi:10.1016/j.ab.2017.07.009</a></li>
+  <li>Yang M, Brackenbury WJ. Membrane potential and cancer progression. <i>Front. Physiol.</i> 2013; 4:185 (plasma membrane potential). <a href="https://doi.org/10.3389/fphys.2013.00185" target="_blank" rel="noopener">doi:10.3389/fphys.2013.00185</a></li>
+  <li>Urban PF, Klingenberg M. On the redox potentials of ubiquinone and cytochrome <i>b</i> in the respiratory chain. <i>Eur. J. Biochem.</i> 1969; 9:519–525. <a href="https://doi.org/10.1111/j.1432-1033.1969.tb00640.x" target="_blank" rel="noopener">doi:10.1111/j.1432-1033.1969.tb00640.x</a></li>
+  <li>Loveridge KM et al. A divergent mitochondrial cytochrome <i>c</i> in malaria parasites with an anomalously low redox potential. <i>J. Mol. Biol.</i> 2026; 438:169996 (+250 mV for canonical mitochondrial cytochrome <i>c</i>). <a href="https://doi.org/10.1016/j.jmb.2026.169996" target="_blank" rel="noopener">doi:10.1016/j.jmb.2026.169996</a></li>
+  <li>Traut TW. Physiological concentrations of purines and pyrimidines. <i>Mol. Cell. Biochem.</i> 1994; 140:1–22. <a href="https://doi.org/10.1007/BF00928361" target="_blank" rel="noopener">doi:10.1007/BF00928361</a></li>
+  <li>Schuetz R, Kuepfer L, Sauer U. Systematic evaluation of objective functions for predicting intracellular fluxes in <i>Escherichia coli</i>. <i>Mol. Syst. Biol.</i> 2007; 3:119. <a href="https://doi.org/10.1038/msb4100162" target="_blank" rel="noopener">doi:10.1038/msb4100162</a></li>
+  <li>Lu SC. Glutathione synthesis. <i>Biochim. Biophys. Acta</i> 2013; 1830:3143–3153. <a href="https://doi.org/10.1016/j.bbagen.2012.09.008" target="_blank" rel="noopener">doi:10.1016/j.bbagen.2012.09.008</a></li>
+  <li>Gille C et al. HepatoNet1: a comprehensive metabolic reconstruction of the human hepatocyte for the analysis of liver physiology. <i>Mol. Syst. Biol.</i> 2010; 6:411. <a href="https://doi.org/10.1038/msb.2010.62" target="_blank" rel="noopener">doi:10.1038/msb.2010.62</a></li>
+  <li>Richelle A et al. Model-based assessment of mammalian cell metabolic functionalities using omics data. <i>Cell Rep. Methods</i> 2021; 1:100040. <a href="https://doi.org/10.1016/j.crmeth.2021.100040" target="_blank" rel="noopener">doi:10.1016/j.crmeth.2021.100040</a></li>
+  <li>Huangfu Q, Hall JAJ. Parallelizing the dual revised simplex method. <i>Math. Program. Comput.</i> 2018; 10:119–142 (HiGHS). <a href="https://doi.org/10.1007/s12532-017-0130-5" target="_blank" rel="noopener">doi:10.1007/s12532-017-0130-5</a></li>
+</ul>
+</article>

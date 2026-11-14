@@ -1,0 +1,668 @@
+<article data-lang="fr" hidden>
+<h1>Documentation de MetfluxLive</h1>
+<p class="lead">Ce que l'application calcule, d'où viennent ses données, comment lire les résultats, et une série d'expériences in silico à essayer.</p>
+
+<h2 id="fr-what">1. Qu'est-ce que MetfluxLive</h2>
+<p>MetfluxLive est un outil de navigateur pour explorer un modèle métabolique de cellule entière. Vous choisissez un milieu de culture, l'application prédit la vitesse de chaque réaction de la cellule (les <em>flux</em>) et les dessine sous forme de carte animée. Vous pouvez en plus marquer les atomes d'un nutriment et voir où ils aboutissent, éteindre des enzymes et suivre la consommation du milieu au cours du temps.</p>
+<p>Tout s'exécute dans le navigateur : aucun serveur ne fait de calculs et rien de ce que vous saisissez ne quitte votre ordinateur. Les milieux enregistrés et les préférences sont conservés dans le stockage local du navigateur.</p>
+<div class="note">Les nombres sont des <b>prédictions du modèle</b>, pas des mesures. Ils montrent ce que le réseau <em>peut</em> faire sous les hypothèses expliquées plus bas. Servez-vous-en pour formuler des hypothèses et concevoir des expériences, pas pour les remplacer.</div>
+
+<h2 id="fr-start">2. Prise en main</h2>
+<ol>
+  <li>Ouvrez l'application. Elle charge Human-GEM, le milieu standard et lance une première simulation.</li>
+  <li>Au centre se trouve la cellule : chaque bulle est une voie dans un compartiment ; les lignes lumineuses en mouvement sont du carbone qui circule entre elles ; le sélecteur <b>Lignes</b>, sous la carte, les fait passer à l'azote, à tous les transporteurs redox ensemble, au NADH, au NADPH, à l'ubiquinol, à l'ATP ou à l'énergie libre (<a href="#fr-carbonflow">comment elles sont calculées</a>). Un double-clic sur une bulle ouvre la carte de sa voie.</li>
+  <li>Le panneau de gauche est l'expérience : milieu, knockouts et objectif. Changez une concentration et les flux sont recalculés d'eux-mêmes tant qu'<b>Auto</b>, à côté de <b>Simuler</b>, est activé (<a href="#fr-run">voir plus bas</a>).</li>
+  <li>Le panneau de droite explique ce qui est sélectionné : le résumé, un métabolite, une réaction, une voie ou un gène.</li>
+  <li>Utilisez la recherche (<kbd>Ctrl</kbd>+<kbd>K</kbd>) pour aller à n'importe quel métabolite, réaction, enzyme ou voie.</li>
+</ol>
+
+<h2 id="fr-ui">3. L'interface</h2>
+<h3 id="fr-run">Simuler et Auto</h3>
+<p>Au centre de la barre supérieure se trouvent le mode (<b>État stationnaire</b> / <b>Dynamique</b>, <a href="#fr-modes">section 7</a>), le <b>?</b> avec un résumé des méthodes, et <b>Simuler</b> avec son interrupteur <b>Auto</b>.</p>
+<ul>
+  <li><b>Simuler</b> résout le modèle à cet instant avec tout ce qui se trouve dans le panneau de gauche (milieu, traceurs, flux mesurés, knockouts, objectif et, en Dynamique, la durée et les événements) et redessine la carte avec le nouveau résultat. Rien d'autre ne calcule de flux : la carte et les panneaux n'affichent que le dernier résultat.</li>
+  <li><b>Auto</b> appuie sur Simuler à votre place peu après chaque modification. Il est mémorisé séparément pour chaque mode : <b>activé</b> par défaut en État stationnaire, où un calcul prend une ou deux secondes, et <b>désactivé</b> par défaut en Dynamique, où il prend une demi-minute ou plus et où l'on veut en général régler plusieurs choses (événements, traceurs) avant de commencer. Activez-le aussi en Dynamique si vous préférez ; une nouvelle modification arrête le calcul en cours et en relance un autre.</li>
+  <li>Avec Auto désactivé, une modification laisse l'ancien résultat à l'écran, un point ambre sur Simuler et le message « Paramètres modifiés » dans la barre d'état jusqu'à ce que vous appuyiez. Changer de mode fonctionne de même : le calcul n'est relancé que si Auto est activé pour le nouveau mode.</li>
+</ul>
+<h3>Mode clair et sombre</h3>
+<p>Le bouton lune/soleil à droite de la barre supérieure passe du thème sombre (par défaut) à un thème clair aux surfaces pastel douces. Les couleurs des données (marquage, variation, énergie libre) sont les mêmes dans les deux ; seuls changent le fond, les panneaux et les éléments neutres. Le navigateur mémorise le choix, qui s'applique aussi à cette page.</p>
+<h3>Trois façons d'organiser la carte</h3>
+<div class="tablebox"><table>
+  <tr><th>Grouper</th><th>Ce que l'on voit</th><th>Utile pour</th></tr>
+  <tr><td><b>Cellule</b></td><td>Réactions groupées par compartiment et par voie, disposées comme une cellule : cytosol, mitochondrie, réticulum, Golgi, lysosome, peroxysome, noyau et le milieu extérieur. Les réactions qui traversent une membrane sont posées dessus.</td><td>Voir où les choses se passent et ce qui est transporté.</td></tr>
+  <tr><td><b>Voies</b></td><td>Une bulle par voie, placées de façon que les voies qui partagent des métabolites soient proches.</td><td>Une vue d'ensemble des voies actives.</td></tr>
+  <tr><td><b>Cascade</b> (par défaut)</td><td>Voies en rangées, ordonnées selon le nombre d'étapes de réaction qui les séparent du milieu : nutriments en haut, produits lointains en bas. Dans une voie, la même idée donne une chaîne de haut en bas comme dans les manuels.</td><td>Lire le métabolisme comme un flux des nutriments vers les produits.</td></tr>
+</table></div>
+<h3>Lire la carte</h3>
+<ul>
+  <li><b>L'épaisseur des lignes et la vitesse des particules</b> montrent le flux sur une échelle logarithmique, pour que les petits flux restent visibles.</li>
+  <li><b>Dans la carte d'une voie</b>, les cercles sont des métabolites et les losanges des réactions. La couleur de l'anneau d'un métabolite est son compartiment. Les cofacteurs comme l'ATP ou l'eau sont masqués pour que la carte reste lisible.</li>
+  <li><b>Avec un traceur</b>, la couleur passe du gris (non marqué) à l'ambre puis au magenta (entièrement marqué).</li>
+  <li><b>Avec un knockout</b>, choisir « Flux modifié seulement » colore selon la hausse (orange) ou la baisse (bleu) par rapport à la cellule non perturbée ; un anneau rouge signale les réactions perturbées.</li>
+</ul>
+<h3 id="fr-carbonflow">Ce que portent les lignes entre groupes</h3>
+<p>Dans les vues Cellule, Voies et Cascade, une ligne relie deux groupes (bulles) quand l'un d'eux <b>fabrique quelque chose que l'autre utilise</b>. Le sélecteur <b>Lignes</b>, en bas à gauche de la carte, choisit ce qu'est ce quelque chose :</p>
+<div class="tablebox"><table>
+  <tr><th>Lignes</th><th>Ce qu'est une ligne</th><th>Unité</th></tr>
+  <tr><td><b>Carbone</b> (par défaut)</td><td>Atomes de carbone qu'un groupe passe à un autre, sans compter les atomes des transporteurs (CoA, nucléotides, thiamine, lipoamide…).</td><td>mmol C/gDW/h</td></tr>
+  <tr><td><b>Azote</b></td><td>La même chose pour les atomes d'azote. Ici l'ammonium compte comme porteur d'azote.</td><td>mmol N/gDW/h</td></tr>
+  <tr><td><b>Tous les transporteurs redox</b></td><td>La somme des lignes de tous les transporteurs redox : NADH, NADPH, ubiquinol, FADH<sub>2</sub>, vitamine K réduite et (comptés pour moitié, car ils portent un électron) les cytochromes c et b5 et les ferrédoxines. La carte globale du pouvoir réducteur.</td><td>mmol paires d'e<sup>−</sup>/gDW/h</td></tr>
+  <tr><td><b>NADH</b>, <b>NADPH</b>, <b>Ubiquinol</b></td><td>Cofacteur réduit fabriqué par un groupe et oxydé par un autre : d'où vient le pouvoir réducteur et où il va.</td><td>mmol/gDW/h</td></tr>
+  <tr><td><b>ATP</b></td><td>ATP, GTP, UTP et CTP fabriqués par un groupe et dépensés par un autre.</td><td>mmol/gDW/h</td></tr>
+  <tr><td><b>Énergie libre (ΔG′<sub>m</sub>)</b></td><td>Pas de lignes : chaque groupe a la taille de l'énergie libre que dissipent ses réactions, et la couleur indique si elles vont en descente ou en montée (voir plus bas).</td><td>J/gDW/h</td></tr>
+</table></div>
+<p>Le <b>?</b> à côté du sélecteur ouvre cette section. Le navigateur mémorise le choix.</p>
+
+<h4>Comment une ligne est calculée</h4>
+<p>Les lignes sont construites à partir de la solution de flux, un pool de métabolite à la fois :</p>
+<ol>
+  <li>Pour un pool (par exemple le pyruvate dans le cytosol), chaque réaction active qui le touche soit le produit (flux × coefficient &gt; 0), soit le consomme. Les productions sont sommées par groupe (P<sub>A</sub>), de même que les consommations (C<sub>B</sub>).</li>
+  <li>On suppose le pool bien mélangé : une molécule fabriquée par le groupe A a la même probabilité d'être utilisée par n'importe quel consommateur. Le groupe A envoie donc à B la part
+    <div class="formula">F(A→B) = w × P<sub>A</sub> × C<sub>B</sub> / max(P, C)</div>
+    où P et C sont la production et la consommation totales du pool (égales à l'état stationnaire) et w est ce que porte une molécule : ses atomes de carbone ou d'azote transférables, ou 1 pour un cofacteur.</li>
+  <li>Les parts de tous les pools sont additionnées pour chaque paire de groupes. Le flux interne à un groupe n'est pas dessiné.</li>
+</ol>
+<p>Le nombre d'atomes est donc un <b>poids</b>, pas une normalisation : une mol/h de glucose (6 C) pèse deux fois plus qu'une mol/h de pyruvate (3 C). La <b>direction</b> vient de la solution de flux elle-même, c'est-à-dire du groupe qui produit le pool et de celui qui le consomme. L'hypothèse de bon mélange est celle qu'utilise le traceur. Une ligne ne sait pas quel atome va où ; elle se contente de répartir chaque pool entre ses consommateurs.</p>
+
+<h4>Atomes transférables : exclure les transporteurs</h4>
+<p>De nombreux intermédiaires sont liés à un transporteur recyclé qui ne passe jamais d'une voie à l'autre : le CoA de l'acétyl-CoA et du malonyl-CoA, l'UDP de l'UDP-glucose, le thiamine diphosphate des adduits de la pyruvate déshydrogénase, la lipoamide des 2-oxoacide déshydrogénases, l'ARNt des acides aminés chargés, la carnitine, le tétrahydrofolate, le glutathion. Compter leurs atomes ferait par exemple peser le malonyl-CoA 24 C alors que seuls 3 appartiennent au malonate.</p>
+<p>Pour les exclure, l'application lance le traceur sur la solution de flux actuelle avec un marquage spécial : chaque atome d'un transporteur est « marqué » (1), chaque atome des nutriments ne l'est pas (0). Le marquage final de chaque atome est la part de cette position qui provient d'un transporteur. Les atomes transférables d'un métabolite sont alors ses atomes de l'élément multipliés par (1 − cette part). Dans la simulation par défaut, cela donne 1,9 carbone transférable pour l'acétyl-CoA mitochondrial, 2,9 pour le malonyl-CoA, 6 pour l'UDP-glucose et 2 pour l'adduit hydroxyéthyl-thiamine diphosphate. Comme le traceur suit les cartes atomiques, une molécule fabriquée en partie à partir d'un transporteur compte en partie : l'IMP a 9,6 carbones transférables sur 10, car une partie provient de nucléotides adényliques recyclés.</p>
+<p>Les transporteurs sont les cofacteurs organiques masqués sur les cartes (nucléotides, NAD(P), FAD, CoA, ubiquinone, cytochrome c, thiorédoxine) plus le thiamine diphosphate, la lipoamide et la lipoyl-protéine, l'ACP, les ARNt, la carnitine, le tétrahydrofolate et le glutathion. Les cycles fermés qui ne reçoivent aucun atome de l'extérieur (deux réactions de voies différentes qui transforment la même molécule dans un sens puis dans l'autre) comptent aussi comme transporteurs, car leurs atomes ne font que tourner. Les porteurs inorganiques de l'élément restent inclus : CO<sub>2</sub> et bicarbonate pour le carbone, ammonium pour l'azote, de sorte que décarboxylations et désaminations apparaissent bien comme des lignes.</p>
+<p>Dans la simulation par défaut de Human-GEM (vue Voies), les lignes de carbone les plus épaisses sont le glucose du milieu vers la glycolyse (4,4 mmol C/gDW/h) et le lactate de la glycolyse vers le milieu (4,0), suivies des acides aminés qui vont vers les protéines via les ARNt chargés et de la glutamine qui alimente le cycle de Krebs sous forme de 2-oxoglutarate. Les lignes d'azote les plus épaisses sont la glutamine du milieu (0,34 mmol N/gDW/h), les acides aminés vers les protéines et l'ammonium libéré par la glutaminase dans le milieu.</p>
+
+<h4>Cofacteurs redox et ATP</h4>
+<p>Pour le NADH, le NADPH, l'ubiquinol et l'ATP, les pools suivis sont le cofacteur réduit (ou les triphosphates) et w = 1. Une ligne de A vers B indique que A réduit (ou phosphoryle) le cofacteur et que B l'oxyde (ou l'hydrolyse). Dans la simulation par défaut :</p>
+<ul>
+  <li>le NADH va de la glycolyse à la phosphorylation oxydative (0,37 mmol/gDW/h) ;</li>
+  <li>le NADPH va de l'enzyme malique (« Pyruvate metabolism ») et de la voie des pentoses phosphates à la synthèse des acides gras et du cholestérol ;</li>
+  <li>l'ubiquinol va de la succinate déshydrogénase (cycle de Krebs) au complexe III ;</li>
+  <li>l'ATP va de la glycolyse (0,91) et de la phosphorylation oxydative (0,56) vers la maintenance et la biomasse (« Artificial reactions »).</li>
+</ul>
+<p>Les quatre triphosphates sont pris ensemble car la nucléoside diphosphate kinase convertit l'ATP en GTP, UTP et CTP. Une ligne des groupes producteurs d'ATP vers « Nucleotide metabolism », puis de là vers la synthèse protéique, montre ce relais.</p>
+<p><b>Tous les transporteurs redox.</b> Cette option additionne les équivalents réducteurs de tous les transporteurs, en paires d'électrons (un NADH, NADPH, ubiquinol ou FADH<sub>2</sub> = une paire = un hydrure ; un cytochrome ou une ferrédoxine réduits = une demi-paire). Chaque transporteur reste apparié du producteur au consommateur séparément, si bien que le NADH fabriqué dans une voie n'est jamais apparié au NADPH utilisé dans une autre : dans la cellule ce sont des pools distincts, qui ne s'échangent que par des enzymes spécifiques (transhydrogénase, enzyme malique), lesquelles apparaissent comme des réactions à part entière. L'info-bulle d'une ligne indique le transporteur qui contribue le plus. Dans la simulation par défaut, le total est de 1,27 mmol de paires/gDW/h : NADH 0,94, ubiquinol 0,17, NADPH 0,15. Les lignes les plus épaisses sont glycolyse → phosphorylation oxydative (0,37, NADH), synthèse de la sérine → glycolyse (0,21, le NADH de la phosphoglycérate déshydrogénase utilisé par la lactate déshydrogénase) et cycle de Krebs → phosphorylation oxydative (0,19, surtout de l'ubiquinol). Le glutathion est exclu : le GSH est aussi fabriqué et consommé en tant que molécule (synthèse, conjugaison, biomasse), ce qui serait compté comme trafic redox.</p>
+
+<h4 id="fr-dg">Énergie libre (ΔG′<sub>m</sub>)</h4>
+<p>Avec <b>Énergie libre</b> sélectionnée il n'y a pas de lignes, car l'énergie libre ne passe pas d'une voie à l'autre comme un atome. À la place, chaque réaction j a une énergie de Gibbs transformée estimée ΔG′<sub>m</sub>, et le produit v<sub>j</sub> × ΔG′<sub>m,j</sub> (mmol/gDW/h × kJ/mol = J/gDW/h) est l'énergie libre que la réaction dissipe en se déroulant (s'il est négatif) ou qu'elle devrait recevoir (s'il est positif).</p>
+<ul>
+  <li><b>Vues globales</b> : la taille d'une bulle est l'énergie libre dissipée par ses réactions ; sa couleur la compare à l'énergie que demanderaient ses étapes en montée, du rouge (tout en descente) à l'ardoise puis au violet (surtout en montée). Gris : actif, mais aucune réaction n'a d'estimation.</li>
+  <li><b>Carte d'une voie</b> : chaque réaction est colorée selon le ΔG′<sub>m</sub> dans le sens où elle va, du rouge (−40 kJ/mol ou moins, loin de l'équilibre) à l'ardoise (près de l'équilibre) puis au violet (en montée). La fiche de la réaction donne la valeur, son incertitude et l'énergie dissipée. L'info-bulle d'un groupe donne l'énergie dissipée, la part en montée et la fraction de son flux qui a une estimation.</li>
+</ul>
+<p><b>D'où viennent les valeurs.</b> Le ΔG′<sub>m</sub> est estimé une seule fois, hors ligne, avec eQuilibrator 3 et la méthode de contribution des composants (Noor et al. 2013 ; Beber et al. 2022), par <code>tools/build_thermo.py</code>. Les métabolites sont appariés par leurs identifiants MetaNetX, ChEBI, HMDB, BiGG ou KEGG, sinon par l'InChIKey de la structure du modèle. Conditions : 37 °C, force ionique 0,25 M, pMg 3, et le pH de chaque compartiment (cytosol, noyau et RE 7,2 ; matrice 8,0 ; espace intermembranaire 6,9 ; peroxysome 7,0 ; Golgi 6,4 ; lysosome 4,7 ; milieu 7,4 ; Casey et al. 2010, Porcelli et al. 2005). Chaque réactif est à 1 mM (l'eau à 1). Les réactions qui traversent une membrane utilisent la méthode multicompartiment de Haraldsdóttir et al. (2012), avec un potentiel de matrice de −160 mV par rapport au cytosol (Zorova et al. 2018) et un potentiel de membrane plasmique de −60 mV (Yang &amp; Brackenbury 2013 rapportent de −10 à −90 mV). Deux couples redox prennent des potentiels moyens mesurés au lieu de l'estimation : le cytochrome c, +0,25 V (Loveridge et al. 2026), placé dans l'espace intermembranaire où il se trouve réellement ; et l'ubiquinone membranaire, +0,065 V à pH 7 (Urban &amp; Klingenberg 1969), car l'estimation pour cette longue quinone isoprénoïde est très éloignée (elle donnait +74 kJ/mol à la succinate déshydrogénase).</p>
+<p><b>Couverture.</b> Dans Human-GEM, 2 295 métabolites sur 4 102 sont trouvés et 6 476 réactions sur 12 748 ont une estimation. Les autres impliquent des protéines, des groupes R, des lipides décrits comme des classes ou des composés absents d'eQuilibrator. Dans la simulation par défaut, les réactions avec estimation portent 94 % du flux actif.</p>
+<p><b>Ce que montre la simulation par défaut.</b> La cellule dissipe environ 330 J/gDW/h par les réactions qui ont une estimation. L'essentiel se trouve dans la glycolyse (126) et les transporteurs (112), puis la phosphorylation oxydative (42). L'hexokinase (−20,8 kJ/mol), la pyruvate kinase (−24,5), l'ATP synthase (−13,6) et la cytochrome oxydase (−35,4) vont en descente. Certaines étapes que les cellules effectuent dans ce sens apparaissent en montée à 1 mM : la glycéraldéhyde-3-phosphate déshydrogénase (+18,8), le complexe I (+16,2) et le complexe III (+9,7). Dans les cellules, un 1,3-bisphosphoglycérate bas et des rapports NADH/NAD<sup>+</sup> ou QH<sub>2</sub>/Q différents de 1 les font fonctionner près de l'équilibre. Quelques étapes en montée signalent plutôt un problème du modèle : le transporteur mitochondrial du diphosphate (+61,8 kJ/mol) fait entrer le PPi<sup>4−</sup> dans la matrice chargée négativement en uniport, ce que le potentiel de membrane interdit ; dans la cellule ce serait un échangeur.</p>
+<div class="note"><b>Limites du ΔG′<sub>m</sub>.</b> (1) Le standard de 1 mM est une convention, pas une mesure : une réaction dont |ΔG′<sub>m</sub>| est inférieur à environ 10 kJ/mol peut aller dans les deux sens aux concentrations réelles, et « en montée » signifie « nécessite des concentrations loin de 1 mM », pas « impossible ». (2) Les estimations ont des incertitudes, affichées sur la fiche de la réaction ; au-delà de 20 kJ/mol le signe n'est pas fiable. (3) Les flux ne sont pas contraints par la thermodynamique : la FBA peut choisir un sens que le ΔG′<sub>m</sub> défavorise, et cette vue se contente de le montrer. (4) Le pH des compartiments et les potentiels de membrane sont des valeurs typiques, identiques pour toute lignée ; les potentiels du RE, du Golgi, du lysosome et du peroxysome sont fixés à 0. (5) Les réactions ajoutées dans l'éditeur de modèle n'ont pas d'estimation. (6) L'enthalpie (ΔH) n'est pas affichée : ses estimations sont bien plus rares que celles de ΔG et, pour le sens d'une réaction, c'est le ΔG qui compte.</div>
+
+<h4>Affichage</h4>
+<ul>
+  <li><b>Vue Cellule</b> : le pool de chaque compartiment est séparé, et les transporteurs sont des groupes à part posés sur les membranes, si bien qu'une ligne va de la glycolyse cytosolique au transporteur mitochondrial du pyruvate puis au cycle de Krebs. <b>Voies et Cascade</b> : les pools de tous les compartiments sont fusionnés et les réactions de transport ignorées, si bien que le même carbone va directement de la glycolyse au cycle de Krebs.</li>
+  <li>Seules les 220 plus grandes lignes sont conservées (320 dans la vue Cellule). L'épaisseur et la vitesse des particules sont logarithmiques, relatives à la plus grande ligne : les lignes en dessous d'environ 1/350 de celle-ci sont masquées, et les particules ne bougent que sur les lignes au-dessus d'environ 1/90. Sélectionner une bulle garde ses propres lignes vives et atténue les autres.</li>
+  <li><b>Couleur</b> : flux simple en cyan. Avec un traceur du même élément (un traceur <sup>13</sup>C et les lignes Carbone, un traceur <sup>15</sup>N et les lignes Azote), la couleur est la fraction marquée de ce que porte la ligne, pondérée par la production. En « Flux modifié seulement », la couleur est la variation moyenne des deux groupes reliés.</li>
+  <li>Dans la carte d'une voie, les lignes sont toujours des flux de réaction ; le sélecteur n'y compte que pour l'énergie libre, qui colore chaque réaction.</li>
+  <li><b>Télécharger</b> › <i>pathway_flows.csv</i> liste les lignes de chaque grandeur entre voies, et <i>fluxes.csv</i> gagne des colonnes de ΔG′<sub>m</sub>.</li>
+</ul>
+<div class="note"><b>Limites.</b> (1) La part de transporteur repose sur les cartes atomiques ; là où une réaction n'en a pas, les atomes restants sont mélangés (comme dans le traceur), si bien que la part d'une molécule fabriquée par une telle réaction est approximative. (2) Les groupes sont les voies (sous-systèmes) attribuées par le modèle : une réaction classée dans une voie inattendue y emporte ses lignes. Ouvrez une bulle pour voir quelles réactions portent ses lignes. (3) La pFBA choisit une route parmi plusieurs également courtes. L'application départage volontairement l'un de ces ex æquo : les copies d'une réaction qui utilisent un désoxynucléotide au lieu du ribonucléotide (hexokinase avec dATP, pyruvate kinase avec dADP) coûtent 0,1 % de plus, car les cellules maintiennent les désoxynucléotides autour de 1 % des niveaux de ribonucléotides ou moins (Traut 1994). Sans cela, un cycle dATP/dADP pouvait remplacer l'ATP/ADP dans la glycolyse et faire passer ses lignes par « Purine metabolism ». D'autres ex æquo subsistent : dans le modèle, la pyruvate kinase produit aussi du GTP à partir de GDP (même enzyme), et la pFBA l'utilise car cela économise l'étape de la nucléoside diphosphate kinase.</div>
+<h3>Autres commandes</h3>
+<ul>
+  <li><b>Afficher</b> : tout, seulement ce qui porte du marquage, seulement le flux modifié (après un knockout, ou par rapport à un scénario comparé), ou seulement le marquage modifié par rapport à un scénario comparé.</li>
+  <li><b>Panneaux</b> : faites glisser la bordure entre un panneau latéral et la carte pour en changer la largeur ; un double-clic sur la bordure la rétablit. Les sections du panneau de gauche se replient en cliquant sur leur titre.</li>
+  <li><b>Langue</b> : anglais, espagnol, portugais, italien, français, allemand ou grec (en haut à droite). Les noms des métabolites, réactions et voies viennent du modèle et restent en anglais. Quand la fenêtre est étroite ou les libellés longs, la barre supérieure se compacte d'elle-même : Modifier, Importer et Télécharger deviennent des icônes (leur info-bulle garde le nom complet), puis le nom de l'application est masqué.</li>
+  <li><b>Télécharger</b> : exporte tableaux, graphiques, la carte et la session (voir <a href="#fr-download">section 15</a>). <b>Importer</b> recharge une session ou un fichier de modifications du modèle.</li>
+  <li><b>Comparer</b> (panneau de gauche) : scénarios enregistrés avec lesquels comparer (<a href="#fr-compare">section 11</a>). <b>✎ Modifier le modèle</b> (barre supérieure) : ajouter ou retirer des réactions, des enzymes et des métabolites (<a href="#fr-editing">section 12</a>).</li>
+</ul>
+
+<h2 id="fr-data">4. Sources des données</h2>
+<div class="tablebox"><table>
+  <tr><th>Quoi</th><th>Source</th><th>Sert à</th></tr>
+  <tr><td>Human-GEM 2.1.1</td><td><a href="https://github.com/SysBioChalmers/Human-GEM" target="_blank" rel="noopener">SysBioChalmers/Human-GEM</a> ; Robinson et al., <i>Sci. Signal.</i> 2020</td><td>Le réseau humain : 12 748 réactions, 8 374 métabolites (un par compartiment), 2 870 gènes, 146 voies, plus les règles gène–réaction et les structures des métabolites.</td></tr>
+  <tr><td>Mouse-GEM 1.8.0</td><td><a href="https://github.com/SysBioChalmers/Mouse-GEM" target="_blank" rel="noopener">SysBioChalmers/Mouse-GEM</a> ; Wang et al., <i>PNAS</i> 2021</td><td>Le réseau de la souris. Il partage ses identifiants avec Human-GEM, les structures sont donc réutilisées.</td></tr>
+  <tr><td>Cartes atome à atome</td><td>Calculées pour cette application avec <a href="https://github.com/rxn4chemistry/rxnmapper" target="_blank" rel="noopener">RXNMapper</a> (Schwaller et al., <i>Sci. Adv.</i> 2021) et RDKit, plus des corrections faites à la main pour le métabolisme central</td><td>Suivre chaque atome à travers chaque réaction.</td></tr>
+  <tr><td>Plasmax et HPLM</td><td>Tableau S1 de <a href="https://pubmed.ncbi.nlm.nih.gov/30613774/" target="_blank" rel="noopener">Vande Voorde et al., <i>Sci. Adv.</i> 2019</a> ; HPLM provient à l'origine de Cantor et al., <i>Cell</i> 2017</td><td>Milieux physiologiques.</td></tr>
+  <tr><td>Milieu standard</td><td>Suit approximativement le DMEM / Ham's F-12</td><td>Milieu par défaut.</td></tr>
+  <tr><td>Flux d'échange mesurés</td><td>Jain et al., <i>Science</i> 2012 (lignées NCI-60), valeurs par lignée du tableau S1 Q d'Aurich et al., <i>PLoS Comput. Biol.</i> 2017</td><td>L'absorption et la sécrétion par défaut du glucose, du lactate, de la glutamine et de 15 autres métabolites (<a href="#fr-measured">section 5</a>).</td></tr>
+  <tr><td>Maintenance de l'ATP</td><td>Kilburn, Lilly &amp; Webb, <i>J. Cell Sci.</i> 1969, valeur telle qu'utilisée par Zielinski et al., <i>Sci. Rep.</i> 2017</td><td>L'ATP que la cellule dépense, qu'elle croisse ou non.</td></tr>
+  <tr><td>Cinétique d'absorption (V<sub>max</sub>, K<sub>m</sub>)</td><td>Ordres de grandeur pour des cellules de mammifère en culture, fixés à la main</td><td>Absorption maximale des composants du milieu dont l'échange n'a pas été mesuré (vitamines, cystine, histidine…), et de tous quand les flux mesurés sont désactivés. <b>Ce ne sont pas des valeurs mesurées.</b></td></tr>
+  <tr><td>Solveur linéaire</td><td><a href="https://highs.dev" target="_blank" rel="noopener">HiGHS</a>, compilé en WebAssembly</td><td>Résoudre le problème de bilan des flux.</td></tr>
+</table></div>
+<p>Les modèles sont convertis une fois, hors ligne, dans les fichiers JSON de <code>data/</code> ; l'application n'a besoin que de ces fichiers.</p>
+<h3>Quelle est la qualité des cartes atomiques ?</h3>
+<p>Sur les 11 094 réactions de Human-GEM qui ne sont pas de simples échanges, 10 554 ont une carte atomique :</p>
+<div class="tablebox"><table>
+  <tr><th>Méthode</th><th>Réactions</th><th>Fiabilité</th></tr>
+  <tr><td>Identité (la même molécule des deux côtés : transport)</td><td class="num">4 172</td><td>Exacte.</td></tr>
+  <tr><td>RXNMapper</td><td class="num">5 196</td><td>Généralement juste ; le panneau de la réaction affiche un score de confiance.</td></tr>
+  <tr><td>Plus grande sous-structure commune</td><td class="num">1 138</td><td>Moindre : utilisée pour les réactions génériques à « groupes R » et les très grandes molécules.</td></tr>
+  <tr><td>Partielle</td><td class="num">48</td><td>Seuls certains atomes sont cartographiés.</td></tr>
+</table></div>
+<p>La transcétolase, la transaldolase, la 6-phosphogluconate déshydrogénase et l'aconitase ont été vérifiées et corrigées à la main. Deux erreurs systématiques du cartographe automatique sont corrigées dans toutes les réactions concernées :</p>
+<ul>
+  <li><b>Transaminases</b> (34 réactions) : RXNMapper tend à donner le squelette carboné d'un cétoacide à l'autre acide aminé, par exemple les carbones du pyruvate au 2-oxoglutaramate produit à partir de la glutamine. Le squelette de chaque paire acide aminé ↔ cétoacide est désormais conservé par sous-structure commune.</li>
+  <li><b>La partie CoA</b> (environ 200 transferts d'acyle) : dans chaque transfert d'acyle le CoA passe intact, si bien que les atomes du CoA d'un produit sont pris au CoA d'un substrat. Là où c'est impossible (pseudo-métabolites comme « acyl-CoA pool »), les atomes de CoA non cartographiés sont comptés comme non marqués au lieu de recevoir le marquage de la chaîne acyle.</li>
+</ul>
+<p>Avant ces corrections, le glucose marqué produisait du succinate et du fumarate M+1 parasites, et le CoA lui-même apparaissait marqué à 40 %. Là où il n'y a pas de carte, le marquage est réparti également entre les produits et le métabolite est dessiné avec un contour pointillé.</p>
+
+<h2 id="fr-measured">5. Valeurs mesurées et leurs sources</h2>
+<p>Livrée à elle-même, la FBA choisit la façon la moins coûteuse de croître. Pour une cellule cancéreuse en culture, cela signifie absorber une fraction du glucose consommé par les cellules réelles et ne sécréter aucun lactate, si bien que le marquage d'un traceur de glucose atteint à peine le cycle de Krebs. Par défaut, l'application fixe donc les principaux échanges à des valeurs mesurées dans des lignées tumorales humaines. Choisissez « Aucun » dans « Flux d'échange mesurés » pour les désactiver.</p>
+<h3>Flux d'échange NCI-60</h3>
+<p>Jain et al. ont mesuré la consommation et la libération de plus de 100 métabolites par les 60 lignées du panel NCI-60 (<i>Science</i> 2012). Les valeurs par lignée utilisées ici sont celles publiées dans le tableau S1 Q d'Aurich et al. (<i>PLoS Comput. Biol.</i> 2017), qui les ont appliquées comme bornes de ±20 % autour de chaque mesure. L'application prend la médiane sur les 59 lignées avec données et conserve les 18 échanges dont le sens est le même dans tout le panel. L'aspartate, la proline, la glycine, l'ornithine et le glycérol sont absorbés par certaines lignées et libérés par d'autres ; ils sont donc exclus.</p>
+<div class="tablebox"><table>
+  <tr><th>Métabolite</th><th>Sens</th><th>Médiane (fmol/cellule/h)</th><th>Écart interquartile</th><th>Utilisé (mmol/gDW/h)</th></tr>
+  <tr><td>glucose</td><td>absorption</td><td class="num">278</td><td class="num">171–399</td><td class="num">0,928</td></tr>
+  <tr><td>L-lactate</td><td>sécrétion</td><td class="num">353</td><td class="num">241–568</td><td class="num">1,180</td></tr>
+  <tr><td>glutamine</td><td>absorption</td><td class="num">71</td><td class="num">38–99</td><td class="num">0,237</td></tr>
+  <tr><td>sérine</td><td>absorption</td><td class="num">8,90</td><td class="num">6,48–14</td><td class="num">0,0297</td></tr>
+  <tr><td>alanine</td><td>sécrétion</td><td class="num">13</td><td class="num">4,39–23</td><td class="num">0,0428</td></tr>
+  <tr><td>glutamate</td><td>sécrétion</td><td class="num">8,12</td><td class="num">3,38–15</td><td class="num">0,0271</td></tr>
+  <tr><td>leucine</td><td>absorption</td><td class="num">5,66</td><td class="num">3,91–8,59</td><td class="num">0,0189</td></tr>
+  <tr><td>lysine</td><td>absorption</td><td class="num">5,41</td><td class="num">4,27–8,50</td><td class="num">0,0180</td></tr>
+  <tr><td>isoleucine</td><td>absorption</td><td class="num">4,74</td><td class="num">3,05–6,57</td><td class="num">0,0158</td></tr>
+  <tr><td>valine</td><td>absorption</td><td class="num">4,04</td><td class="num">3,09–6,21</td><td class="num">0,0135</td></tr>
+  <tr><td>thréonine</td><td>absorption</td><td class="num">3,78</td><td class="num">2,69–6,04</td><td class="num">0,0126</td></tr>
+  <tr><td>arginine</td><td>absorption</td><td class="num">3,68</td><td class="num">2,09–5,83</td><td class="num">0,0123</td></tr>
+  <tr><td>tyrosine</td><td>absorption</td><td class="num">2,57</td><td class="num">2,04–4,20</td><td class="num">0,0086</td></tr>
+  <tr><td>phénylalanine</td><td>absorption</td><td class="num">1,90</td><td class="num">1,54–3,18</td><td class="num">0,0063</td></tr>
+  <tr><td>méthionine</td><td>absorption</td><td class="num">1,70</td><td class="num">1,30–2,53</td><td class="num">0,0057</td></tr>
+  <tr><td>asparagine</td><td>absorption</td><td class="num">1,67</td><td class="num">0,88–2,13</td><td class="num">0,0056</td></tr>
+  <tr><td>tryptophane</td><td>absorption</td><td class="num">0,45</td><td class="num">0,36–0,89</td><td class="num">0,0015</td></tr>
+  <tr><td>choline</td><td>absorption</td><td class="num">0,66</td><td class="num">0,40–1,02</td><td class="num">0,0022</td></tr>
+</table></div>
+<ul>
+  <li><b>Conversion des unités.</b> Les vitesses par cellule sont converties avec une masse sèche de 0,3 ng par cellule, la moyenne approximative NCI-60 utilisée par Zielinski et al. (<i>Sci. Rep.</i> 2017) : mmol/gDW/h = fmol/cellule/h ÷ 300. C'est une moyenne : pour une lignée donnée, les flux absolus peuvent s'écarter de la différence entre sa masse et celle-ci.</li>
+  <li><b>Marge.</b> Chaque flux peut varier de ±20 % autour de la valeur, comme chez Aurich et al. Vous pouvez changer la marge, modifier, ajouter ou retirer des lignes.</li>
+  <li><b>Conditions de culture.</b> Les lignées NCI-60 sont cultivées en RPMI-1640 avec 5 % de sérum de veau fœtal et 2 mM de glutamine (comme le décrivent Dolfi et al., <i>Cancer Metab.</i> 2013, pour les mêmes lignées). Si vous utilisez un autre milieu, la cellule garde le phénotype qu'elle avait en RPMI.</li>
+  <li><b>Produits non mesurés.</b> Avec un jeu mesuré actif, les métabolites organiques non mesurés ne peuvent être sécrétés qu'à l'état de traces (0,001 mmol/gDW/h). Dans les données NCI-60, les échanges mesurés de glucose, de lactate et d'acides aminés représentent plus de 99 % du flux d'échange observé (Zielinski et al. 2017). Sans cette limite, la FBA élimine le carbone en excès sous la forme la moins coûteuse, comme le sorbitol. Le CO<sub>2</sub>, l'ammoniac, l'urée, l'eau et les ions inorganiques ne sont pas limités.</li>
+  <li><b>Quand ils ne peuvent pas être respectés.</b> Si un flux mesuré devient impossible (vous retirez le glucose du milieu, un nutriment s'épuise en mode dynamique, un knockout bloque la production de lactate…), les flux mesurés sont relâchés : les absorptions ne gardent que leur maximum et les sécrétions deviennent libres. La barre d'état et le résumé l'indiquent.</li>
+  <li><b>Mouse-GEM</b> utilise les mêmes valeurs. Elles ont été mesurées dans des cellules humaines.</li>
+</ul>
+<h3>Maintenance de l'ATP</h3>
+<p>Les cellules dépensent de l'ATP qu'elles croissent ou non : pompes ioniques, renouvellement des protéines, etc. Human-GEM laisse cela à zéro. Avec le jeu NCI-60 actif, la réaction d'hydrolyse de l'ATP cytosolique (<code>MAR03964</code>) doit porter au moins 1,07 mmol/gDW/h, la valeur que Zielinski et al. ont tirée des mesures de Kilburn, Lilly &amp; Webb (<i>J. Cell Sci.</i> 1969) sur des cellules LS de souris. Cela impose la respiration et le renouvellement du cycle de Krebs qu'ont les cellules réelles. Sans cela, un traceur de glucose marque le fumarate à 0 % au lieu d'environ 9 % M+2.</p>
+<h3>Ce qui reste supposé</h3>
+<ul>
+  <li>La cinétique d'absorption (V<sub>max</sub>, K<sub>m</sub>) des composants du milieu non mesurés, et de tous quand le jeu mesuré est désactivé.</li>
+  <li>La composition du milieu « Standard », qui n'est qu'une approximation du DMEM/F-12.</li>
+  <li>En mode dynamique, la taille des pools intracellulaires.</li>
+</ul>
+
+<h2 id="fr-fba">6. L'analyse de bilan des flux, en termes simples</h2>
+<p>Une cellule effectue des milliers de réactions à la fois. On connaît rarement la vitesse de chacune, mais on sait deux choses solides : la <b>recette</b> de chaque réaction (ce qu'elle consomme et ce qu'elle produit), et le fait qu'une cellule ne peut ni créer ni détruire de la matière.</p>
+<p>L'analyse de bilan des flux (FBA) part de là. Imaginez la cellule comme le réseau d'eau d'une ville :</p>
+<ul>
+  <li><b>Les tuyaux sont les réactions</b> ; le débit d'un tuyau est le flux, en millimoles par gramme de poids sec cellulaire et par heure (mmol/gDW/h).</li>
+  <li><b>Les jonctions sont les métabolites.</b> À chaque jonction, ce qui entre doit égaler ce qui sort : rien ne s'accumule et rien n'apparaît de nulle part. C'est l'hypothèse d'<em>état stationnaire</em>.</li>
+  <li><b>Certains tuyaux sont à sens unique</b>, et chacun a une capacité maximale. Les tuyaux qui apportent les nutriments du milieu sont limités par ce que le milieu offre.</li>
+</ul>
+<p>Ces règles laissent de nombreux schémas de flux possibles. Pour en choisir un, la FBA suppose que la cellule <em>cherche à atteindre quelque chose</em> — par défaut, croître aussi vite que possible — et trouve le schéma qui y parvient le mieux. « Croître » est lui-même une réaction, la <b>réaction de biomasse</b>, qui consomme acides aminés, nucléotides, lipides et énergie dans les proportions dont une nouvelle cellule a besoin.</p>
+<div class="formula">maximiser  v<sub>biomasse</sub><br>sous  S · v = 0   (chaque métabolite est équilibré)<br>           inf<sub>j</sub> ≤ v<sub>j</sub> ≤ sup<sub>j</sub>   (sens et capacité de chaque réaction)</div>
+<p>C'est un programme linéaire, qu'un ordinateur résout exactement en quelques secondes, même pour 12 748 réactions.</p>
+<h3>Ce que la FBA peut et ne peut pas vous dire</h3>
+<ul>
+  <li>Elle n'a <b>pas besoin de cinétique enzymatique</b>, c'est pourquoi elle fonctionne pour une cellule entière. Pour la même raison, elle ne sait rien des quantités d'enzymes, de la régulation ni des concentrations de métabolites dans la cellule.</li>
+  <li>Le meilleur taux de croissance est unique, mais <b>les flux qui l'atteignent ne le sont souvent pas</b> : il peut y avoir plusieurs routes également bonnes. L'application applique donc par défaut la <b>FBA parcimonieuse</b> (pFBA) : parmi toutes les meilleures solutions, elle prend celle au flux total le plus faible, en partant de l'idée que les cellules évitent de fabriquer des enzymes inutiles. Cela supprime aussi les boucles internes absurdes.</li>
+  <li>L'objectif est une hypothèse. La croissance est raisonnable pour des cellules qui prolifèrent en culture ; elle décrit mal un neurone ou un hépatocyte au repos. Vous pouvez choisir un autre objectif prédéfini ou n'importe quelle réaction (voir plus bas).</li>
+  <li>Ce qui entre dans la cellule et en sort est la partie du métabolisme la plus facile à mesurer. Fixer ces échanges à des mesures (<a href="#fr-measured">section 5</a>) retire à la FBA une grande partie de sa liberté et rend les flux internes bien plus réalistes.</li>
+</ul>
+
+<h3 id="fr-objectives">Choisir l'objectif</h3>
+<p>La FBA a besoin d'un objectif : ce que la cellule est censée produire en aussi grande quantité que possible. La croissance est l'hypothèse habituelle pour les cellules qui prolifèrent, mais la plupart des cellules d'un organisme ne croissent pas : elles produisent de l'ATP, exportent un produit ou éliminent des déchets. La section <b>Objectif cellulaire</b> propose donc, outre la croissance, un ensemble de <b>fonctions cellulaires</b> du type des « tâches métaboliques » utilisées dans les modèles de foie et de cellules humaines (Gille et al. 2010 ; Richelle et al. 2021), les objectifs que vous avez enregistrés et une recherche pour utiliser n'importe quelle réaction. Chaque objectif prédéfini a été vérifié dans Human-GEM et Mouse-GEM : il donne un optimum fini et non trivial.</p>
+<p>La plupart des fonctions s'écrivent comme la <b>libération d'un produit</b> (sa réaction d'échange, maximisée). Quand l'objectif est la libération d'un métabolite, l'application ferme l'absorption de ce même métabolite : sinon un milieu qui le contient (glucose, urée, créatine ou GSH dans Plasmax…) ne ferait que traverser la cellule, et l'objectif mesurerait le milieu au lieu de la cellule. Son taux mesuré éventuel est aussi mis de côté. La valeur est alors la synthèse nette.</p>
+<div class="tablebox"><table>
+  <tr><th>Objectif</th><th>Réaction (maximisée)</th><th>Cellule et fonction</th><th class="num">Valeur*</th><th>Ce qui la limite*</th></tr>
+  <tr><td colspan="5"><b>Croissance, énergie et stress</b></td></tr>
+  <tr><td>Croissance (biomasse générique) — par défaut</td><td>biomasse (<code>MAR13082</code> ; Mouse-GEM <code>MAR00021</code>)</td><td>Cellules en prolifération</td><td class="num">0,037 h⁻¹</td><td>O<sub>2</sub>, acides aminés</td></tr>
+  <tr><td>Production maximale d'ATP</td><td><code>MAR03964</code>, hydrolyse de l'ATP cytosolique</td><td>Stress énergétique, cellules qui ne se divisent pas ; un objectif alternatif classique (Schuetz et al. 2007)</td><td class="num">13,2</td><td>O<sub>2</sub> (baissez-le pour modéliser l'hypoxie)</td></tr>
+  <tr><td>Synthèse maximale de glutathion</td><td><code>MAR09351</code>, libération de GSH</td><td>Stress oxydatif (Lu 2013)</td><td class="num">0,020</td><td>cystéine, cystine, méthionine</td></tr>
+  <tr><td colspan="5"><b>Foie et métabolisme lipidique</b></td></tr>
+  <tr><td>Sortie d'urée</td><td><code>MAR09438</code></td><td>Hépatocyte : élimination de l'ammonium</td><td class="num">0,30</td><td>apport d'azote (glutamine)</td></tr>
+  <tr><td>Sortie de glucose</td><td><code>MAR09034</code></td><td>Foie, rein : néoglucogenèse à jeun</td><td class="num">0,27</td><td>carbone des acides aminés</td></tr>
+  <tr><td>Sortie de corps cétoniques</td><td><code>MAR09134</code>, β-hydroxybutyrate</td><td>Foie : cétogenèse à jeun</td><td class="num">0,99</td><td>glucose et O<sub>2</sub></td></tr>
+  <tr><td>Sortie d'acides biliaires</td><td><code>MAR09281</code>, glycocholate</td><td>Hépatocyte</td><td class="num">0,098</td><td>carbone, O<sub>2</sub></td></tr>
+  <tr><td>Sortie de cholestérol</td><td><code>MAR09285</code></td><td>Foie : synthèse du cholestérol pour les lipoprotéines</td><td class="num">0,096</td><td>carbone</td></tr>
+  <tr><td>Lipogenèse de novo</td><td><code>MAR00611</code>, libération de palmitate</td><td>Hépatocyte, adipocyte</td><td class="num">0,21</td><td>glucose</td></tr>
+  <tr><td colspan="5"><b>Neurones et cellules endocrines</b></td></tr>
+  <tr><td>Libération de glutamate</td><td><code>MAR09071</code></td><td>Neurone glutamatergique</td><td class="num">0,55</td><td>apport d'azote</td></tr>
+  <tr><td>Libération de GABA</td><td><code>MAR09091</code></td><td>Neurone GABAergique</td><td class="num">0,55</td><td>apport d'azote</td></tr>
+  <tr><td>Libération de dopamine</td><td><code>MAR09092</code></td><td>Neurone dopaminergique</td><td class="num">0,019</td><td>tyrosine, phénylalanine</td></tr>
+  <tr><td>Sortie de cortisol</td><td><code>MAR09293</code></td><td>Corticosurrénale</td><td class="num">0,095</td><td>carbone, O<sub>2</sub></td></tr>
+  <tr><td colspan="5"><b>Autres types cellulaires</b></td></tr>
+  <tr><td>Sortie de monoxyde d'azote</td><td><code>MAR09381</code></td><td>Endothélium, macrophage activé</td><td class="num">0,55</td><td>apport d'azote (arginine)</td></tr>
+  <tr><td>Synthèse de l'hème</td><td><code>MAR09107</code></td><td>Précurseur érythroïde</td><td class="num">0,11</td><td>carbone, O<sub>2</sub></td></tr>
+  <tr><td>Sortie de créatine</td><td><code>MAR09290</code></td><td>Rein, foie</td><td class="num">0,20</td><td>apport d'azote</td></tr>
+</table></div>
+<p>* Human-GEM, milieu standard, flux d'échange mesurés sur « Aucun », en mmol/gDW/h sauf indication contraire (Mouse-GEM donne les mêmes valeurs à 5 % près). Avec la croissance comme objectif, toutes les autres fonctions sont proches de 0. Dans le milieu standard, beaucoup de fonctions sont limitées par la glutamine et les acides aminés qu'il apporte ; dans un milieu plus riche ou physiologique, elles changent.</p>
+<h4 id="fr-objlist">Ce que représente chaque objectif</h4>
+<p>Les mêmes explications apparaissent sous le sélecteur quand on choisit un objectif.</p>
+<dl class="objs">
+  <dt class="grp">Croissance, énergie et stress</dt>
+  <dt>Croissance (biomasse générique)</dt><dd>Maximise la réaction de biomasse du modèle : la cellule croît autant que le permettent le milieu et les taux mesurés. L'objectif habituel des cellules en prolifération.</dd>
+  <dt>Production maximale d'ATP (stress énergétique)</dt><dd>Maximise l'hydrolyse de l'ATP cytosolique (MAR03964, la réaction de maintenance) au lieu de la croissance : le maximum d'ATP que la cellule peut tirer de ce qu'elle absorbe. Un objectif alternatif classique, pour les cellules qui ne se divisent pas et le stress énergétique ; avec moins d'O₂ dans le milieu, il montre comment l'approvisionnement en ATP change en hypoxie. La croissance est nulle.</dd>
+  <dt>Synthèse maximale de glutathion (stress oxydatif)</dt><dd>Maximise la sortie nette de glutathion (son export, MAR09351), que la cellule ne peut soutenir qu'en fabriquant du GSH à partir de glutamate, cystéine et glycine ; les cellules augmentent la synthèse de GSH en stress oxydatif. La glutathion synthétase elle-même n'est pas utilisée : le modèle fabrique alors du GSH et le recoupe aussitôt, un cycle futile. Dans le milieu standard, la valeur (~0,02 mmol/gDW/h) est fixée par l'apport de cystéine, cystine et méthionine, comme dans les cellules réelles. La croissance est nulle.</dd>
+  <dt class="grp">Foie et métabolisme lipidique</dt>
+  <dt>Sortie d'urée (hépatocyte, élimination de l'ammonium)</dt><dd>Maximise la libération d'urée (MAR09438) : le cycle de l'urée éliminant l'azote des acides aminés et de l'ammonium, la principale fonction azotée de l'hépatocyte.</dd>
+  <dt>Sortie de glucose (néoglucogenèse)</dt><dd>Maximise la libération nette de glucose (MAR09034) avec son absorption fermée : néoglucogenèse à partir d'acides aminés, de lactate ou de glycérol, comme le foie et le rein à jeun. Que le milieu contienne du glucose ou non, il ne peut pas simplement traverser la cellule.</dd>
+  <dt>Sortie de corps cétoniques (β-hydroxybutyrate)</dt><dd>Maximise la libération de (R)-3-hydroxybutanoate (MAR09134), le principal corps cétonique fabriqué par le foie à partir d'acides gras et d'acides aminés cétogènes à jeun.</dd>
+  <dt>Sortie d'acides biliaires (glycocholate)</dt><dd>Maximise la libération de glycocholate (MAR09281) : synthèse d'acides biliaires à partir du cholestérol et conjugaison avec la glycine, une fonction de l'hépatocyte.</dd>
+  <dt>Sortie de cholestérol (synthèse)</dt><dd>Maximise la libération de cholestérol (MAR09285) : la capacité de synthèse de novo du cholestérol, que le foie exporte dans les lipoprotéines.</dd>
+  <dt>Lipogenèse de novo (palmitate)</dt><dd>Maximise la libération de palmitate (MAR00611) : la capacité de synthèse de novo d'acides gras à partir du glucose et des acides aminés, comme dans les hépatocytes et les adipocytes.</dd>
+  <dt class="grp">Neurones et cellules endocrines</dt>
+  <dt>Libération de glutamate (neurone glutamatergique)</dt><dd>Maximise la libération de glutamate (MAR09071), le transmetteur des neurones glutamatergiques.</dd>
+  <dt>Libération de GABA (neurone GABAergique)</dt><dd>Maximise la libération de 4-aminobutyrate (GABA, MAR09091), le transmetteur des neurones GABAergiques, fabriqué à partir du glutamate.</dd>
+  <dt>Libération de dopamine (neurone dopaminergique)</dt><dd>Maximise la libération de dopamine (MAR09092), fabriquée à partir de la tyrosine ; l'apport d'acides aminés aromatiques fixe la valeur.</dd>
+  <dt>Sortie de cortisol (corticosurrénale)</dt><dd>Maximise la libération de cortisol (MAR09293) : stéroïdogenèse à partir du cholestérol dans la corticosurrénale.</dd>
+  <dt class="grp">Autres types cellulaires</dt>
+  <dt>Sortie de monoxyde d'azote (endothélium, macrophage)</dt><dd>Maximise la libération de monoxyde d'azote (MAR09381) par la NO synthase à partir de l'arginine, comme dans les cellules endothéliales et les macrophages activés.</dd>
+  <dt>Synthèse de l'hème (précurseur érythroïde)</dt><dd>Maximise la libération d'hème (MAR09107) : la voie de synthèse de l'hème (glycine + succinyl-CoA, fer), la principale tâche métabolique des précurseurs érythroïdes.</dd>
+  <dt>Sortie de créatine</dt><dd>Maximise la libération de créatine (MAR09290), fabriquée à partir d'arginine, de glycine et de méthionine dans le rein et le foie.</dd>
+</dl>
+<div class="note"><b>Flux mesurés et fonctions cellulaires.</b> Les taux mesurés chargés par défaut (NCI-60) appartiennent à des cellules tumorales en prolifération et y fixent les échanges de glucose, de lactate, de glutamine et d'autres. Ils ne décrivent ni un hépatocyte ni un neurone, et limitent en outre les sous-produits non mesurés à l'état de traces, ce qui peut plafonner artificiellement une fonction (le cortisol tombe de 0,095 à 0,001 parce qu'un sous-produit de la stéroïdogenèse ne peut sortir qu'en traces). Quand une fonction cellulaire est choisie avec les flux mesurés actifs, la note de l'objectif demande de les régler sur « Aucun ». La croissance, l'ATP et le glutathion peuvent être utilisés avec eux.</div>
+<p><b>Objectifs envisagés puis écartés</b>, car la FBA ne donne pas de réponse sensée pour eux dans ces modèles :</p>
+<ul>
+  <li><b>Glutathion synthétase</b> (<code>MAR04326</code>) : 6,5 mmol/gDW/h de GSH que la γ-glutamyl aminopeptidase (<code>MAR04175</code>) recoupe aussitôt, un cycle futile qui ne fait que brûler de l'ATP. On utilise à la place la libération nette de GSH (ci-dessus).</li>
+  <li><b>Glutathion réductase</b> (régénération du NADPH) : non bornée, car le modèle peut réoxyder le GSH dans une boucle fermée.</li>
+  <li><b>Formation de gouttelettes lipidiques</b> (<code>MAR00031</code>) : son produit n'a pas d'issue dans le modèle, l'optimum est donc 0. La lipogenèse est représentée par la libération de palmitate.</li>
+  <li><b>Libération de lactate</b> : possible, mais c'est un sous-produit, pas quelque chose que la cellule est censée maximiser.</li>
+</ul>
+<p>Chaque objectif s'applique dans le sens où la réaction est écrite dans le modèle. Pour utiliser le vôtre, cherchez n'importe quelle réaction, choisissez Maximiser ou Minimiser et appuyez sur <b>Enregistrer</b> : l'objectif reste dans la liste sous le nom de votre choix (par ID de réaction, il fonctionne donc aussi dans l'autre modèle si la réaction y existe). <b>Supprimer</b> le retire. Les objectifs enregistrés sont conservés dans le navigateur ; une session téléchargée conserve l'objectif en cours.</p>
+
+<h2 id="fr-modes">7. État stationnaire ou Dynamique</h2>
+<div class="tablebox"><table>
+  <tr><th></th><th>État stationnaire</th><th>Dynamique</th></tr>
+  <tr><td>Question</td><td>« Avec ce milieu, que fait la cellule ? »</td><td>« Que se passe-t-il dans les heures qui viennent à mesure que le milieu s'épuise ? »</td></tr>
+  <tr><td>Milieu</td><td>Constant : les concentrations ne changent pas.</td><td>Fini : chaque absorption baisse la concentration, chaque sécrétion l'augmente.</td></tr>
+  <tr><td>Flux</td><td>Une solution FBA.</td><td>La FBA est résolue de nouveau chaque fois qu'un nutriment baisse assez pour changer ce que la cellule peut absorber.</td></tr>
+  <tr><td>Biomasse</td><td>Non suivie.</td><td>Croît exponentiellement au taux de croissance du moment.</td></tr>
+  <tr><td>Marquage</td><td>Final (état stationnaire isotopique) : chaque pool a atteint son enrichissement final.</td><td>Remplit progressivement les pools intracellulaires : on voit le marquage arriver d'abord dans la glycolyse, puis dans les produits lointains.</td></tr>
+  <tr><td>Durée du calcul</td><td>Quelques secondes.</td><td>Environ une demi-minute ; le double avec un knockout, car la cellule non perturbée est aussi simulée.</td></tr>
+</table></div>
+<h3>Comment fonctionne le mode dynamique</h3>
+<ol>
+  <li>Le temps va de 10 secondes à la durée choisie en 30 pas, espacés logarithmiquement (des pas courts d'abord, quand le marquage change le plus vite). Avec des événements programmés, les pas courts recommencent après chaque événement.</li>
+  <li>À chaque pas, l'absorption maximale de chaque nutriment est recalculée à partir de sa concentration actuelle, et ne peut jamais dépasser ce qui reste physiquement dans le milieu.</li>
+  <li>Si une limite qui contraignait réellement la cellule a bougé de plus d'environ 8 %, la FBA est résolue de nouveau ; sinon les flux précédents sont conservés.</li>
+  <li>Les concentrations sont mises à jour : <code>ΔC = −absorption × biomasse × Δt</code>. L'oxygène est maintenu constant, car les échanges gazeux le renouvellent.</li>
+  <li>La biomasse croît : <code>X ← X · exp(taux de croissance × Δt)</code>.</li>
+  <li>Le marquage avance d'un pas implicite dans chaque pool de métabolite.</li>
+</ol>
+<p>Trois nombres le contrôlent : la durée, la biomasse initiale (gDW par litre de milieu : plus de cellules épuisent le milieu plus tôt) et la taille du pool intracellulaire (la quantité de chaque métabolite que contient la cellule, qui fixe la vitesse à laquelle le marquage le remplit).</p>
+<h3>Événements programmés (avancé)</h3>
+<p>En mode dynamique, la section « Événements programmés » du panneau de gauche permet de changer le milieu pendant la simulation :</p>
+<ul>
+  <li><b>Ajouter un métabolite</b> à une heure donnée : choisissez-le, fixez la concentration à ajouter et, avec ⚛, quels atomes sont marqués et dans quelle fraction des molécules. C'est ainsi qu'on programme un pulse de marquage.</li>
+  <li><b>Changer tout le milieu</b> à une heure donnée : le milieu est remplacé par l'un des milieux prédéfinis ou enregistrés, non marqué, et tout ce que les cellules avaient sécrété est éliminé. Après un départ marqué, c'est une <em>chasse</em>.</li>
+</ul>
+<p>Le milieu contient alors un mélange de lots du même métabolite, par exemple du glucose non marqué déjà présent plus du glucose marqué ajouté ensuite. Les cellules les absorbent en proportion de ce qui reste de chacun. La FBA est résolue de nouveau à chaque événement. Les événements placés après la fin de la simulation sont ignorés.</p>
+<div class="note">Un métabolite que les cellules sécrètent dans le milieu puis réabsorbent (lactate, alanine…) est compté comme non marqué à son retour.</div>
+<div class="note">Le mode dynamique est une approximation (« FBA dynamique »). Tous les pools intracellulaires reçoivent la même taille, ce qui est faux dans les cellules réelles : lisez les <em>temps</em> de marquage comme indicatifs, et l'<em>ordre</em> dans lequel les choses se marquent comme la partie informative.</div>
+
+<h2 id="fr-medium">8. Le milieu</h2>
+<p>Un modèle stœchiométrique n'a pas de concentrations, seulement des limites d'absorption. L'application convertit chaque concentration en vitesse d'absorption maximale par une règle de saturation :</p>
+<div class="formula">absorption maximale = V<sub>max</sub> · C / (K<sub>m</sub> + C)</div>
+<p>Ainsi, doubler une concentration faible double à peu près ce que la cellule peut prendre, alors que doubler une concentration déjà saturante change peu. Survolez une case de concentration pour voir la limite obtenue. La cellule n'est pas obligée d'utiliser tout ce qui lui est permis : la FBA prend ce qui sert l'objectif.</p>
+<p>Avec les flux d'échange mesurés actifs (par défaut), une absorption mesurée remplace cette règle : la cellule absorbe ce qui a été mesuré, pourvu que le métabolite soit dans le milieu. Ces composants portent la marque ⊙ dans la liste. La règle continue de limiter tout le reste.</p>
+<ul>
+  <li><b>Milieux prédéfinis</b> : Standard (riche, type DMEM/F-12), Plasmax et HPLM (concentrations physiologiques).</li>
+  <li><b>Les vôtres</b> : modifiez, ajoutez ou retirez des composants, puis « enregistrer… » pour garder le milieu sous un nom dans ce navigateur.</li>
+  <li><b>Composants illimités</b> : l'eau, les protons, le phosphate et les sels majeurs ne sont jamais limitants.</li>
+  <li><b>Injections</b> : vous pouvez ajouter un métabolite non extracellulaire (par exemple du citrate cytosolique). Il est alors fourni directement dans ce compartiment — une expérience que seul un modèle permet.</li>
+</ul>
+<p>Pour Plasmax et HPLM, les composants absents des modèles (sélénite, manganèse, vanadate, nitrate, p-aminobenzoate, acétoacétate de méthyle, rouge de phénol) sont exclus. Les acides gras essentiels et les vitamines liposolubles, qui dans les milieux réels viennent du sérum, sont ajoutés aux valeurs du milieu standard.</p>
+
+<h2 id="fr-tracing">9. Traçage isotopique</h2>
+<p>Appuyez sur <b>⚛</b> à côté d'un composant du milieu pour ouvrir l'éditeur de molécule, cliquez sur les atomes à marquer (<sup>13</sup>C, <sup>15</sup>N, <sup>18</sup>O ou <sup>34</sup>S) et choisissez quelle fraction des molécules porte le marquage.</p>
+<h3>Enrichissement positionnel</h3>
+<p>Pour chaque atome de chaque métabolite, l'application calcule son <b>enrichissement</b> : la fraction des molécules dans lesquelles cet atome est l'isotope lourd. Un atome hérite de l'enrichissement des atomes dont il provient, pondéré par le flux :</p>
+<div class="formula">enrichissement d'un atome = Σ (flux de chaque réaction productrice × enrichissement de l'atome source) / Σ flux</div>
+<p>Cela est résolu exactement pour tout le réseau, cycles compris (le cycle de Krebs se renvoie du marquage à lui-même). Sélectionnez un métabolite pour voir sa structure colorée atome par atome.</p>
+<h3>Isotopologues (M+0, M+1, M+2 …)</h3>
+<p>Un spectromètre de masse ne voit pas les positions : il compte combien d'atomes lourds porte chaque molécule. M+0 est la molécule non marquée, M+3 une molécule à trois atomes lourds. Cette distribution ne peut pas être déduite de l'enrichissement positionnel seul. Un glucose entièrement marqué donne du pyruvate M+3 ou M+0, jamais un mélange aléatoire de positions marquées.</p>
+<p>L'application trace donc <b>des molécules entières à rebours</b>. Pour construire une molécule du métabolite sélectionné, elle choisit l'une des réactions qui le fabriquent (en proportion du flux), retrouve de quelle molécule de substrat provient chaque atome et recommence pour ces substrats jusqu'à atteindre le milieu, où le marquage est connu. Les atomes issus de la même molécule de substrat restent ensemble, ce qui garde le motif juste. Faire cela pour 2 000 molécules donne la distribution affichée dans le panneau du métabolite.</p>
+<ul>
+  <li>Disponible avec un traceur, dans les deux modes. À l'état stationnaire, c'est la distribution finale. En mode dynamique, c'est la distribution <b>au temps indiqué par le curseur</b>, et « Afficher dans le temps » trace chaque isotopologue au cours du calcul.</li>
+  <li><b>En mode dynamique, le parcours remonte aussi le temps.</b> Une molécule trouvée dans un pool y est entrée il y a un certain temps : sa durée est tirée au hasard d'après la taille du pool et son renouvellement. Les flux et la composition du milieu sont pris tels qu'ils étaient à ce moment antérieur, et une molécule plus ancienne que la simulation est non marquée. C'est ce qui fait apparaître un pulse ajouté à l'heure 4 d'abord dans la glycolyse, puis seulement plus tard dans les produits lointains.</li>
+  <li>Juste après le début ou un événement (les premières secondes), l'enrichissement atome par atome et les barres d'isotopologues peuvent diverger : le premier est calculé par pas de temps grossiers, les secondes avec des temps d'attente exacts. Ils concordent de nouveau en quelques minutes.</li>
+  <li><b>Sans traceur</b>, le panneau montre la distribution attendue d'après l'abondance isotopique naturelle (<sup>13</sup>C 1,07 %, <sup>15</sup>N 0,36 %, <sup>18</sup>O 0,2 %, <sup>34</sup>S 4,25 %, <sup>2</sup>H 0,01 % …), calculée exactement à partir de la formule. C'est le fond dont part toute mesure.</li>
+  <li>Avec un traceur, l'abondance isotopique naturelle n'est <b>pas</b> ajoutée par-dessus : comparez avec des mesures corrigées pour celle-ci.</li>
+  <li>S'agissant d'un échantillon aléatoire de 2 000 molécules, chaque barre a une incertitude d'environ ±1 point de pourcentage.</li>
+  <li>Si une partie des atomes est passée par des réactions sans carte atomique, le panneau l'indique et la distribution est approximative.</li>
+  <li><sup>18</sup>O et <sup>34</sup>S ajoutent deux unités de masse par atome, <sup>13</sup>C et <sup>15</sup>N une.</li>
+</ul>
+<h3>Où aboutit le marquage</h3>
+<p>Avec un traceur, le résumé montre quelle part des atomes marqués quitte la cellule dans chaque produit (CO<sub>2</sub>, lactate, biomasse …).</p>
+
+<h2 id="fr-ko">10. Knockout et knockdown</h2>
+<p>Ajoutez un gène ou une réaction dans la section « Knockout / knockdown » et fixez son activité résiduelle : 0 % est un knockout, toute valeur intermédiaire un knockdown.</p>
+<ul>
+  <li><b>Les gènes agissent via les règles gène–protéine–réaction.</b> Si une réaction nécessite <code>A and B</code> (un complexe), la perte de l'un ou l'autre l'arrête. Si elle nécessite <code>A or B</code> (isoenzymes), en perdre un ne change rien. La liste montre par exemple « 2/7 » : deux des sept réactions qui mentionnent le gène en dépendent vraiment. Un gène barré n'a aucun effet.</li>
+  <li><b>La référence.</b> Chaque simulation perturbée est comparée à la même simulation sans la perturbation, calculée automatiquement.</li>
+  <li><b>Un knockdown</b> limite la réaction à cette fraction de son flux de référence. Une réaction qui n'avait pas de flux dans la référence n'est pas contrainte par un knockdown partiel.</li>
+  <li><b>« Modifié » signifie</b> un flux qui diffère de la référence de plus de 2 %.</li>
+  <li><b>Les flux mesurés</b> restent en vigueur dans la simulation perturbée, afin que la comparaison porte sur deux cellules au même phénotype mesuré. Si le knockout les rend impossibles, ils sont relâchés et le résumé l'indique.</li>
+</ul>
+<div class="note">La FBA suppose que la cellule se réorganise parfaitement et instantanément. Un knockout sans effet dans le modèle signifie « une voie alternative existe dans le réseau », pas « la cellule ne s'en apercevra pas ». À l'inverse, un knockout qui arrête la croissance dans le modèle désigne une réaction sans contournement.</div>
+
+<h2 id="fr-compare">11. Comparer deux situations</h2>
+<p>Le mode comparaison met côte à côte deux situations quelconques : deux milieux ou concentrations initiales, un pulse ou un changement de milieu, un knockout, un autre traceur, ou un modèle modifié face au modèle publié.</p>
+<ol>
+  <li>Préparez la première situation et simulez-la. Dans <b>Comparer</b>, appuyez sur <b>Enregistrer l'actuel comme scénario…</b> et donnez-lui un nom (par exemple « Contrôle »).</li>
+  <li>Changez ce que vous voulez tester et simulez de nouveau.</li>
+  <li>Choisissez le scénario dans la liste (le bouton radio). Un badge bleu sur la carte indique avec quoi vous comparez.</li>
+</ol>
+<p>Dès lors, le scénario remplace partout la « référence » :</p>
+<ul>
+  <li><b>Carte.</b> « Afficher : Flux modifié seulement » colore les réactions selon la variation de flux (bleu = moins, orange = plus). « Marquage modifié » colore les métabolites selon la variation de leur enrichissement moyen et masque le reste. Dans les vues globale et cellule, chaque groupe est coloré selon la variation de son marquage pondéré par le flux.</li>
+  <li><b>Panneau de résumé.</b> L'objectif et sa variation, les réactions les plus modifiées, les échanges qui changent, les voies qui changent le plus (somme des flux absolus) et les métabolites dont le marquage change le plus. Chaque ligne se lit « scénario → maintenant » ; cliquez dessus pour y aller.</li>
+  <li><b>Panneau du métabolite.</b> Renouvellement et enrichissement moyen dans les deux situations, et les deux <b>distributions d'isotopologues en barres appariées</b> (gris : scénario, ambre : maintenant). Une situation sans traceur apparaît comme 100 % M+0.</li>
+  <li><b>Panneau de la réaction et info-bulles.</b> Le flux dans le scénario à côté du flux actuel.</li>
+</ul>
+<p>Remarques :</p>
+<ul>
+  <li>Le scénario garde son résultat, rien n'est donc recalculé quand vous passez d'un scénario à l'autre. ↺ recharge les paramètres d'un scénario (milieu, traceurs, perturbations, événements, modifications du modèle) et le recalcule.</li>
+  <li>Deux calculs dynamiques sont comparés au point temporel le plus proche. Un scénario stationnaire est comparé à chaque point temporel d'un calcul dynamique.</li>
+  <li>Si les deux situations utilisent des modifications du modèle différentes, réactions et métabolites sont appariés par ID. Ceux qui n'existent que d'un côté comptent comme un flux nul de l'autre.</li>
+  <li>Tant qu'un scénario est sélectionné, il remplace la référence automatique non perturbée d'un knockout. Arrêtez la comparaison pour retrouver cette référence.</li>
+  <li>Les scénarios vivent en mémoire. Pour les garder, téléchargez la session (<a href="#fr-download">section 15</a>). L'importer recalcule tous les scénarios.</li>
+</ul>
+
+<h2 id="fr-editing">12. Modifier le modèle</h2>
+<p>Appuyez sur <b>✎ Modifier le modèle</b> dans la barre supérieure. La section « Modifications du modèle » liste chaque changement, et les panneaux de réaction et de métabolite reçoivent des boutons de modification. Vous pouvez :</p>
+<ul>
+  <li><b>ajouter une réaction</b>, avec stœchiométrie, bornes, enzymes (règle GPR) et carte atomique ;</li>
+  <li><b>ajouter un métabolite</b> : un nouveau composé (à partir de son SMILES), ou un composé existant dans un autre compartiment ;</li>
+  <li><b>changer une réaction publiée</b> : ses bornes (par exemple la rendre irréversible), sa règle GPR (ajouter ou retirer des enzymes) ou son nom ;</li>
+  <li><b>retirer</b> une réaction ou un métabolite. Un métabolite ne peut partir qu'avec les réactions qui l'utilisent, et l'application propose de les retirer ;</li>
+  <li><b>copier une réaction comme nouvelle</b> : par exemple, placer une enzyme dans un autre compartiment.</li>
+</ul>
+<p>Les modifications sont des opérations appliquées, dans l'ordre, par-dessus le modèle publié. Le modèle publié lui-même n'est jamais modifié. Les éléments retirés restent en place, signalés, si bien que les résultats avant et après une modification peuvent être comparés élément par élément. Les modifications sont conservées dans ce navigateur pour chaque modèle. ✕ en annule une, et « tout annuler » revient au modèle publié. La liste des modifications et le badge de la carte signalent les modifications rejetées (✕) et celles qui ont des avertissements (⚠).</p>
+
+<h3>Ce qui rend une modification valide</h3>
+<p>L'éditeur vérifie chaque règle ci-dessous pendant la saisie. Une modification avec une erreur (✕) ne peut pas être enregistrée, et une modification stockée devenue invalide est ignorée. Les avertissements (⚠) signifient que la modification est légale mais ne fera probablement pas ce que vous attendez. Les règles suivent les contrôles de qualité habituels des modèles à l'échelle du génome (Thiele &amp; Palsson 2010 ; MEMOTE, Lieven et al. 2020).</p>
+<div class="tablebox"><table>
+  <tr><th>Contrôle</th><th>Niveau</th><th>Pourquoi</th></tr>
+  <tr><td>ID unique (lettres, chiffres, <code>_ . -</code>)</td><td>erreur</td><td>Sessions, comparaisons et exports désignent réactions et métabolites par leur ID.</td></tr>
+  <tr><td>Chaque métabolite existe (ou est créé) et apparaît une fois ; les coefficients sont des nombres non nuls</td><td>erreur</td><td>La matrice stœchiométrique doit être bien définie.</td></tr>
+  <tr><td>Substrats et produits, sauf s'il n'y a qu'un métabolite (échange)</td><td>erreur</td><td>Une réaction à un seul côté détruit ou crée de la matière. Un échange d'un métabolite <em>extracellulaire</em> est la façon légale de le faire ; un seul métabolite à l'intérieur de la cellule est signalé comme puits.</td></tr>
+  <tr><td>Borne inférieure ≤ borne supérieure, deux nombres ; ±1000 signifie non borné</td><td>erreur / avertissement</td><td>Les bornes définissent le sens et la réversibilité : 0 … 1000 est irréversible, −1000 … 1000 réversible.</td></tr>
+  <tr><td>Bilan des éléments (tous sauf H)</td><td>erreur, sauf si vous l'acceptez</td><td>Sinon des atomes seraient créés ou détruits. Du marquage pourrait alors surgir de nulle part et la croissance devenir « gratuite ». Les réactions globales ou de frontière peuvent être acceptées explicitement.</td></tr>
+  <tr><td>Bilan de l'hydrogène et des charges</td><td>avertissement</td><td>Il manque en général un H⁺. Les GEM équilibrent les protons à pH 7,2.</td></tr>
+  <tr><td>Formule de chaque participant</td><td>avertissement</td><td>Sans formules, le bilan ne peut pas être vérifié.</td></tr>
+  <tr><td>Syntaxe GPR : symboles de gènes reliés par <code>and</code> (complexe) / <code>or</code> (isoenzymes), parenthèses équilibrées</td><td>erreur</td><td>La règle décide de l'effet d'un knockout. Les nouveaux symboles de gènes sont ajoutés au modèle et peuvent subir un knockout. Sans règle il n'y a pas d'enzyme, donc aucun knockout n'atteint la réaction.</td></tr>
+  <tr><td>Pas de doublon d'une réaction existante</td><td>avertissement</td><td>Deux réactions identiques se partagent le flux arbitrairement.</td></tr>
+  <tr><td>Métabolites dans au plus deux compartiments</td><td>avertissement</td><td>Une réaction a normalement lieu dans un compartiment ou fait traverser une membrane.</td></tr>
+  <tr><td><b>Ni impasse ni métabolite isolé</b> créés par la modification</td><td>avertissement</td><td>À l'état stationnaire, chaque métabolite doit être à la fois produit et consommé. Un nouveau composé que rien ne consomme bloque la réaction qui le fabrique, dont le flux est alors nul. Un nouveau produit a donc besoin d'une sortie : un transport vers le milieu plus un échange, ou une réaction qui le consomme. Retirer une réaction peut laisser d'autres métabolites isolés ; la confirmation les liste.</td></tr>
+  <tr><td>La réaction objectif (biomasse) et ses métabolites ne peuvent pas être retirés</td><td>erreur</td><td>Choisissez d'abord un autre objectif.</td></tr>
+  <tr><td>Carte atomique : indices dans les molécules, du substrat vers le produit, même élément, aucun atome de produit rempli deux fois</td><td>erreur</td><td>Une carte fausse envoie le marquage à des endroits impossibles.</td></tr>
+  <tr><td>La carte atomique couvre tous les carbones des produits</td><td>avertissement</td><td>Les carbones non cartographiés reçoivent le marquage moyen des atomes non cartographiés des substrats et sont signalés à position incertaine.</td></tr>
+</table></div>
+
+<h3>De quelles données une modification a-t-elle besoin ?</h3>
+<ul>
+  <li><b>Pour les flux (FBA)</b> : seulement la stœchiométrie et les bornes, plus la règle GPR si les knockouts doivent atteindre la réaction. Une formule pour chaque métabolite permet de vérifier le bilan.</li>
+  <li><b>Pour tracer un métabolite en entier</b> : rien de plus. Un métabolite sans structure compte comme un pseudo-atome pondéré par ses carbones. Son enrichissement moyen est juste, mais il n'a ni positions ni isotopologues.</li>
+  <li><b>Pour le marquage positionnel et les isotopologues</b> : un <b>SMILES</b> de chaque nouveau composé <em>et</em> une <b>carte atomique</b> de chaque nouvelle réaction. Le SMILES seul ne suffit pas : il dit ce qu'est la molécule, pas quel atome du substrat devient quel atome du produit. À partir du SMILES, l'application (RDKit, chargé à la première utilisation) dessine la molécule, calcule formule et charge et trouve ses atomes symétriques comme le prétraitement. Écrivez-le dans l'état de protonation du modèle (pH 7,2, carboxylates en COO⁻) ; les atomes lourds doivent correspondre à la formule.</li>
+</ul>
+<p>La carte atomique peut venir de trois sources, par fiabilité décroissante :</p>
+<ol>
+  <li><b>Un SMILES de réaction avec carte atomique</b> que vous collez, chaque copie stœchiométrique écrite en entier. Vous pouvez en créer un avec RXNMapper, déjà installé pour le prétraitement : <code>tools/.venv/bin/python tools/map_reaction.py "substrates&gt;&gt;products"</code>. Il s'exécute localement. L'application associe chaque molécule du SMILES à un participant par son squelette, si bien que charges et ordres de liaison peuvent différer.</li>
+  <li><b>Règles automatiques</b> : le même composé des deux côtés passe en entier (transport, transporteurs). Une réaction publiée faite des mêmes composés, par exemple une que vous avez copiée dans un autre compartiment, prête sa carte.</li>
+  <li><b>Plus grande sous-structure commune automatique</b>, la même méthode gloutonne que le repli du prétraitement. Elle est rapide mais chimiquement naïve. Dans l'exemple ci-dessous, elle apparie cinq atomes d'un pyruvate à l'acétoïne, alors que RXNMapper prend correctement deux carbones de chaque pyruvate. Vérifiez-la, ou collez plutôt un SMILES cartographié.</li>
+</ol>
+<div class="note">Les échanges que vous ajoutez échappent à la règle « produits non mesurés seulement en traces » des flux mesurés (<a href="#fr-measured">section 5</a>) : vous les avez ajoutés pour qu'ils servent. Si le phénotype mesuré doit inclure le nouveau produit, ajoutez-le aux « Flux d'échange mesurés » avec son taux mesuré.</div>
+<p>Les modifications sont enregistrées avec la session ou seules (<code>model_edits.json</code>), et l'importation les rejoue sur le modèle publié. <code>model_edits_report.csv</code> liste chaque modification avec ses contrôles, pour une section de méthodes.</p>
+
+<h2 id="fr-cascade">13. L'ordre en cascade</h2>
+<p>Chaque métabolite reçoit une <b>profondeur</b> : le plus petit nombre d'étapes de réaction nécessaires pour l'atteindre à partir des métabolites du milieu actuel. Les composants du milieu sont à 0 ; le glucose dans la cellule à 1 ; le glucose 6-phosphate à 2 ; et ainsi de suite. Le sens des réactions suit le modèle, pas les flux simulés, si bien que l'ordre ne saute pas quand vous changez une concentration — seulement quand vous ajoutez ou retirez un composant du milieu.</p>
+<ul>
+  <li>Les cofacteurs (ATP, NAD, eau, CoA …) sont ignorés, sinon tout serait à une étape de tout.</li>
+  <li>Le panneau du métabolite affiche la profondeur et sa position sur une échelle de 0 à 100.</li>
+  <li>Avec un milieu riche, l'essentiel du métabolisme central n'est qu'à deux à quatre étapes, car les acides aminés y entrent directement. Retirez des composants pour étirer la cascade.</li>
+  <li><b>Le haut de chaque cascade est le même :</b> d'abord le milieu (métabolites extracellulaires), puis « l'étape 0 », les réactions de transport qui les font entrer dans la cellule, et à partir de l'étape 1 ce qui se passe à l'intérieur.</li>
+  <li>Dans la carte d'une voie, les rangées comptent les étapes <em>dans cette voie</em>, à partir de ses métabolites les plus proches du milieu. C'est ce qui donne à la glycolyse son échelle familière du glucose au pyruvate. Les métabolites du milieu qui alimentent la voie et leurs transporteurs sont dessinés au-dessus, pour que rien n'apparaisse de nulle part.</li>
+  <li>Sur la carte globale, la rangée du milieu est la voie « Exchange/demand reactions » et l'étape 0 est « Transport reactions » ; un double-clic sur l'une ou l'autre liste ses réactions.</li>
+  <li>Les cycles ne peuvent pas être dessinés sans que certaines flèches pointent vers le haut ; c'est normal.</li>
+</ul>
+
+<h2 id="fr-experiments">14. Expériences in silico</h2>
+<p>Chaque exemple donne les étapes et ce que nous avons obtenu avec Human-GEM, le milieu standard, les flux mesurés NCI-60 et la pFBA activée (tout par défaut). Vos nombres devraient être très proches. Avec ces réglages par défaut, la cellule croît à 0,0341 h⁻¹, absorbe 0,742 mmol/gDW/h de glucose et sécrète 1,35 de lactate. Les noms des boutons correspondent à l'interface en français.</p>
+
+<div class="exp">
+<h3>A. Knockout d'une enzyme</h3>
+<ol>
+  <li>Dans « Knockout / knockdown », tapez <code>ASNS</code> (asparagine synthétase) et choisissez le gène.</li>
+  <li>Réglez « Afficher » sur « Flux modifié seulement ».</li>
+</ol>
+<p class="res"><b>Résultat.</b> La croissance ne baisse que légèrement, de 0,0341 à 0,0333 h⁻¹ (−2 %) : les cellules mesurées absorbent déjà de l'asparagine du milieu, ce qui couvre l'essentiel du besoin. Réglez les flux mesurés sur « Aucun » et comparez.</p>
+<p class="res"><b>Comparez avec :</b> <code>PDHB</code> (pyruvate déshydrogénase) : croissance inchangée, mais environ 220 réactions sont réorientées. <code>FASN</code>, <code>HMGCR</code> ou <code>CAD</code> : la croissance s'arrête, il n'y a pas de contournement. <code>GAPDH</code> : aucun effet, car le modèle a une isoenzyme (GAPDHS).</p>
+</div>
+
+<div class="exp">
+<h3>B. Knockout d'un transporteur</h3>
+<ol>
+  <li>Faites le knockout du gène <code>SLC2A1</code> (GLUT1). La liste affiche 2/7 : seules deux de ses sept réactions dépendent de lui seul.</li>
+  <li>Retirez-le maintenant et faites le knockout de la réaction <code>MAR05029</code> (transport facilité du glucose, catalysé par toutes les isoformes GLUT).</li>
+</ol>
+<p class="res"><b>Résultat.</b> Dans les deux cas la croissance ne change pas et l'absorption de glucose se poursuit aux 0,742 mmol/gDW/h mesurés : le modèle a encore d'autres réactions de transport du glucose, comme les symporteurs couplés au sodium. Pour vraiment priver la cellule de glucose, mettez sa concentration à 0.</p>
+<p class="res"><b>Leçon.</b> Un modèle générique contient tous les transporteurs de l'organisme. Une lignée cellulaire réelle n'en exprime que quelques-uns.</p>
+</div>
+
+<div class="exp">
+<h3>C. Tracer le <sup>13</sup>C du glucose et lire les isotopologues</h3>
+<ol>
+  <li>Appuyez sur ⚛ à côté du glucose, cliquez sur « Tous les C », appliquez.</li>
+  <li>Cherchez <code>pyruvate</code>, puis <code>citrate</code>, et regardez « Isotopologues » dans le panneau de droite. Utilisez les onglets de compartiment pour comparer cytosol et mitochondrie.</li>
+</ol>
+<p class="res"><b>Résultat.</b> Le lactate est M+3 à 96 %. Le pyruvate mitochondrial est environ 52 % M+3 et 41 % M+0 : des unités entières à trois carbones marquées venant du glucose, diluées par du pyruvate non marqué fabriqué à partir d'acides aminés. Le citrate mitochondrial est environ 49 % M+2 et 38 % M+0 ; le M+2 est la signature de l'acétyl-CoA marqué qui entre dans le cycle de Krebs. Le fumarate est environ 8 % M+2. Le résumé montre que 87 % du carbone marqué sort sous forme de lactate.</p>
+<p class="res"><b>Variante.</b> Retirez le marquage du glucose et marquez plutôt la glutamine (« Tous les C »). Le glutamate est M+5 à 100 % et le fumarate M+4 à 86 % (cycle de Krebs oxydatif). Le citrate mitochondrial est environ 51 % M+4 et 35 % M+6 : le M+6 vient de la carboxylation réductrice du 2-oxoglutarate M+5 avec du CO<sub>2</sub> lui-même marqué par l'oxydation de la glutamine.</p>
+</div>
+
+<div class="exp">
+<h3>D. Tracer l'azote</h3>
+<ol>
+  <li>Appuyez sur ⚛ à côté de la glutamine, cliquez sur « Tous les N », appliquez.</li>
+  <li>Réglez « Afficher » sur « Marqués seulement » et passez à la vue cellule.</li>
+</ol>
+<p class="res"><b>Résultat.</b> Le marquage apparaît dans le glutamate, l'aspartate, l'alanine et les nucléotides, ce qui montre quelles voies tirent leur azote de la glutamine. Le glutamate et l'aspartate cytosoliques sont environ 95 % M+1 et l'alanine 100 % M+1.</p>
+</div>
+
+<div class="exp">
+<h3>E. Regarder le milieu s'épuiser</h3>
+<ol>
+  <li>Passez en « Dynamique ». Gardez 24 h et 0,5 gDW/L.</li>
+  <li>À la fin, faites glisser le curseur temporel et regardez « Milieu au cours du temps » dans le résumé.</li>
+</ol>
+<p class="res"><b>Résultat.</b> La biomasse double (0,50 → 1,00 gDW/L). Au taux d'absorption mesuré, le glucose s'épuise entre 9 et 13 h, la glutamine et la choline vers 18 h. Dès lors les flux mesurés ne peuvent plus être respectés et sont relâchés (la barre d'état l'indique), et la croissance ralentit de 0,0341 à 0,018 h⁻¹ à 24 h. La FBA a été résolue 8 fois.</p>
+<p class="res"><b>Variante.</b> Passez à Plasmax : avec sa glutamine physiologique (0,65 mM) et la vitamine B12, la croissance s'arrête vers 9 h. Ou portez la biomasse initiale à 2 gDW/L pour voir l'épuisement en quelques heures.</p>
+</div>
+
+<div class="exp">
+<h3>F. Maximiser un antioxydant : le glutathion</h3>
+<ol>
+  <li>Dans « Objectif cellulaire », choisissez « Synthèse maximale de glutathion » (cela revient à chercher <code>MAR09351</code>, « Exchange of GSH », et garder « Maximiser »).</li>
+  <li>Lisez la valeur de l'objectif et la liste des absorptions.</li>
+  <li>Montez la cystine, puis la cystéine, à 1 mM.</li>
+</ol>
+<p class="res"><b>Résultat.</b> La cellule peut exporter au plus 0,0201 mmol/gDW/h de glutathion : le soufre est limitant, car cystéine, méthionine et cystine sont absorbées à leur maximum. Avec 1 mM de cystine, le maximum monte à 0,0226, et avec aussi 1 mM de cystéine à 0,0250.</p>
+<p class="res"><b>Piège.</b> Si vous maximisez plutôt la réaction de <em>synthèse</em> (<code>MAR04326</code>), vous obtenez 6,5 mmol/gDW/h : le modèle fabrique et dégrade du glutathion en boucle, en brûlant de l'ATP. Pour demander « combien la cellule peut-elle produire », maximisez l'export du produit, pas une réaction interne.</p>
+<p class="res"><b>Remarque.</b> La croissance n'est plus l'objectif, la cellule ne croît donc pas dans cette simulation. La même approche vaut pour d'autres produits, par exemple l'urate ou la taurine : cherchez « Exchange of … ».</p>
+</div>
+
+<div class="exp">
+<h3>G. Peu d'oxygène</h3>
+<ol>
+  <li>Passez l'O<sub>2</sub> de 0,2 à 0,0003 mM.</li>
+</ol>
+<p class="res"><b>Résultat.</b> La croissance baisse de 0,0341 à 0,0209 h⁻¹. L'absorption de glucose monte à 0,95 mmol/gDW/h et la sécrétion de lactate à 1,42, le haut de leurs plages mesurées : la cellule s'appuie sur la glycolyse pour son ATP. À 0,0001 mM la croissance tombe à 0,0098 h⁻¹. Sans aucun oxygène le modèle ne peut pas croître, car certains composants de la biomasse ont besoin d'O<sub>2</sub> pour être fabriqués.</p>
+<p class="res"><b>Comparez.</b> Avec les flux mesurés désactivés, le même manque d'oxygène fait excréter au modèle du succinate plutôt que du lactate : tous deux éliminent l'excès de pouvoir réducteur, et la FBA seule n'a aucune raison de préférer celui qu'utilisent les cellules réelles.</p>
+</div>
+
+<div class="exp">
+<h3>H. Comparer des milieux</h3>
+<ol>
+  <li>Basculez le sélecteur de milieu entre Standard, Plasmax et HPLM.</li>
+</ol>
+<p class="res"><b>Résultat.</b> Croissance : 0,0341 h⁻¹ en Standard et Plasmax, 0,0152 h⁻¹ en HPLM. Avec les flux mesurés actifs, les deux milieux donnent les mêmes échanges mesurés. HPLM est limité par le pantothénate (1,05 µM, contre 4,2 µM dans Plasmax), dont la cellule a besoin pour le CoA : avec le pantothénate de Plasmax, HPLM croît aussi à 0,0341. Cette limite dépend de la cinétique d'absorption supposée. Avec les flux mesurés désactivés, la croissance est de 0,0370, 0,0238 et 0,0152 h⁻¹.</p>
+</div>
+
+<div class="exp">
+<h3>I. Retirer la glutamine</h3>
+<ol>
+  <li>Mettez la glutamine à 0.</li>
+</ol>
+<p class="res"><b>Résultat.</b> L'absorption mesurée de glutamine apparaît barrée dans « Flux d'échange mesurés » : elle ne s'applique plus. La croissance baisse de 0,0341 à 0,0295 h⁻¹, et la sérine et les acides aminés essentiels sont absorbés plus vite. Le réseau peut fabriquer tout ce dont il a besoin sans glutamine. Beaucoup de cellules en culture en sont incapables — un rappel que la FBA montre la capacité, pas la régulation.</p>
+</div>
+
+<div class="exp">
+<h3>J. Un pulse de marquage pendant le calcul</h3>
+<ol>
+  <li>Passez en « Dynamique ». Dans « Événements programmés », cherchez <code>glucose</code> : un événement apparaît à 4 h, qui ajoute 5,5 mM.</li>
+  <li>Appuyez sur ⚛ sur l'événement, cliquez sur « Tous les C », appliquez. Appuyez sur « Simuler ».</li>
+  <li>Cherchez <code>glucose-6-phosphate</code>, déplacez le curseur temporel et appuyez sur « Afficher dans le temps ».</li>
+</ol>
+<p class="res"><b>Résultat.</b> Jusqu'à l'heure 4 il n'y a pas de marquage : le panneau montre l'abondance naturelle. À l'heure 4, le glucose du milieu passe de 3,9 à 9,4 mM, dont 5,5 mM marqués. Le glucose 6-phosphate devient alors environ 60 % M+6 et 40 % M+0 — des molécules entièrement marquées ou entièrement non marquées, jamais un mélange — et le pyruvate environ 55 % M+3. Plus loin le marquage se dilue : environ 30 % M+2 dans le citrate mitochondrial et 5 % M+2 dans le fumarate deux heures après le pulse.</p>
+</div>
+
+<div class="exp">
+<h3>K. Pulse et chasse</h3>
+<ol>
+  <li>Gardez le pulse de l'exemple J et appuyez sur « + changer tout le milieu ». Placez cet événement à 12 h et laissez le milieu standard.</li>
+  <li>Simulez et suivez le glucose 6-phosphate avec « Afficher dans le temps ».</li>
+</ol>
+<p class="res"><b>Résultat.</b> Le marquage monte après l'heure 4 et est éliminé après l'heure 12 : deux heures après la chasse, glucose 6-phosphate, pyruvate, citrate et fumarate sont tous revenus à M+0. Les pools plus lents gardent leur marquage plus longtemps ; comparer la vitesse à laquelle différents métabolites le perdent est le but d'une chasse. Le calcul prend environ une minute.</p>
+</div>
+
+<div class="exp">
+<h3>L. Comparer normoxie et hypoxie, isotopologue par isotopologue</h3>
+<ol>
+  <li>Marquez le glucose (« Tous les C »). Dans « Comparer », enregistrez le résultat sous <code>Control</code>.</li>
+  <li>Mettez l'O<sub>2</sub> à 0,0003 mM et choisissez « Control » dans la liste des scénarios.</li>
+  <li>Lisez le résumé, réglez « Afficher » sur « Marquage modifié », puis ouvrez le <code>citrate</code> et le <code>fumarate</code> mitochondriaux.</li>
+</ol>
+<p class="res"><b>Résultat.</b> La croissance passe de 0,0341 à 0,0209 h⁻¹ (−39 %), l'absorption de glucose de 0,742 à 0,948 et celle d'O<sub>2</sub> de 0,359 à 0,142 mmol/gDW/h. Les barres appariées montrent un cycle de Krebs bien plus marqué. Le citrate mitochondrial passe de 48 % M+2 / 5 % M+4 à 41 % M+2, 25 % M+4, 20 % M+5 et 13 % M+6. Le fumarate passe de 88 % à 42 % M+0, avec l'apparition de M+2, M+3 et M+4. Le fumarate M+3 est la signature de la carboxylation du pyruvate. Le citrate M+4 à M+6 se forme quand de l'oxaloacétate marqué rencontre de l'acétyl-CoA marqué.</p>
+</div>
+
+<div class="exp">
+<h3>M. Ajouter une voie hétérologue : l'acétoïne</h3>
+<ol>
+  <li>Appuyez sur ✎ Modifier le modèle → + Métabolite → nouveau composé <code>acetoin</code>, compartiment c, SMILES <code>CC(O)C(C)=O</code>, Lire la structure (C4H8O2), Enregistrer.</li>
+  <li>+ Réaction : substrats 2 <code>pyruvate</code> [c] et 1 <code>H+</code> [c] ; produits 1 acétoïne [c] et 2 <code>CO2</code> [c] ; GPR <code>alsS and alsD</code> (acétolactate synthase et décarboxylase bactériennes, regroupées). Pour la carte atomique, choisissez « SMILES de réaction avec carte atomique » et collez la sortie de <code>tools/map_reaction.py</code> (montrée dans le test <code>tools/test_edits.mjs</code>).</li>
+  <li>Les vérifications du modèle indiquent maintenant que l'acétoïne est une impasse. Ajoutez l'acétoïne dans le compartiment e (+ Dans un autre compartiment), un transport (acétoïne [c] ⇌ acétoïne [e], réversible : sa carte atomique est trouvée automatiquement) et un échange (acétoïne [e] seule, 0 … 1000).</li>
+  <li>Marquez le glucose. Maximisez le nouvel échange comme objectif.</li>
+</ol>
+<p class="res"><b>Résultat.</b> Avec la croissance comme objectif, la voie ne porte aucun flux : elle coûte du carbone et n'apporte rien à la cellule. Maximiser l'export d'acétoïne donne 0,98 mmol/gDW/h. L'acétoïne est 58 % M+4, 37 % M+2 et 5 % M+0, exactement ce que donnent deux pyruvates indépendants marqués à 76 % M+3 (0,76² = 0,58 ; 2 × 0,76 × 0,23 = 0,35). La carte MCS automatique n'aurait cartographié que 3 des 4 carbones de l'acétoïne à partir d'un seul pyruvate : utilisez un SMILES cartographié quand les positions comptent.</p>
+</div>
+
+<div class="exp">
+<h3>N. Retirer une enzyme du modèle</h3>
+<ol>
+  <li>Enregistrez comme scénario le résultat par défaut avec un traceur de glucose.</li>
+  <li>En mode édition, retirez les quatre réactions de la L-lactate déshydrogénase <code>MAR04280</code>, <code>MAR04281</code>, <code>MAR04388</code> et <code>MAR06018</code> (cherchez-les dans « Retirer une réaction ou un métabolite… »). Comparez avec le scénario.</li>
+</ol>
+<p class="res"><b>Résultat.</b> La croissance ne change pas, mais la sécrétion de lactate baisse de 1,35 à 0,94 mmol/gDW/h, le bas de la plage mesurée : le L-lactate est encore fabriqué par des voies mineures. La cellule brûle le reste de son pyruvate, si bien que l'absorption d'oxygène monte de 0,36 à 0,82. Le citrate mitochondrial gagne du M+4 à M+6 et le fumarate passe de 88 % à 47 % M+0. Un knockout de <code>LDHA</code> seul laisserait ces réactions aux isoenzymes de leurs règles GPR. Retirer les réactions supprime l'étape, quelle que soit l'enzyme qui la catalyse.</p>
+</div>
+
+<h3>D'autres idées</h3>
+<ul>
+  <li><b>Titrer un knockdown</b> : ajoutez <code>FASN</code> (son knockout arrête la croissance) et déplacez le curseur de 100 % à 0 % pour voir où la croissance commence à baisser.</li>
+  <li><b>Mesuré contre FBA libre</b> : refaites une expérience avec « Flux d'échange mesurés » sur « Aucun » et comparez.</li>
+  <li><b>Trouver les nutriments essentiels</b> : retirez les composants du milieu un par un et voyez lesquels arrêtent la croissance.</li>
+  <li><b>Traceurs positionnels</b> : marquez seulement le carbone 1 du glucose et voyez quelle part est perdue sous forme de CO<sub>2</sub> dans la voie des pentoses phosphates.</li>
+  <li><b>Fournir un intermédiaire</b> : injectez du citrate cytosolique ou du succinate mitochondrial et voyez ce que la cellule en fait.</li>
+  <li><b>Combiner</b> : un traceur plus un knockout montre comment le marquage est réorienté.</li>
+</ul>
+
+<h2 id="fr-download">15. Télécharger les résultats</h2>
+<p>« Télécharger » ouvre la liste de tout ce que le résultat actuel peut fournir. Cochez ce que vous voulez ; vous obtenez un seul <code>.zip</code> avec un <code>README.txt</code> qui décrit chaque fichier. Les tableaux sont en CSV (ils s'ouvrent dans n'importe quel tableur), les graphiques en SVG (vectoriels, modifiables) et la carte est un PNG de ce qui est à l'écran.</p>
+<div class="tablebox"><table>
+  <tr><th>Fichier</th><th>Contenu</th><th>Disponible</th></tr>
+  <tr><td><code>fluxes.csv</code></td><td>Chaque réaction : flux, bornes, voie, équation, gènes, numéros EC ; flux de référence et variation en cas de perturbation.</td><td>Toujours</td></tr>
+  <tr><td><code>exchange_fluxes.csv</code></td><td>Absorption et sécrétion de chaque métabolite échangé, avec sa concentration et ses paramètres cinétiques.</td><td>Toujours</td></tr>
+  <tr><td><code>pathways.csv</code></td><td>Par voie : réactions, réactions actives, flux total, enrichissement.</td><td>Toujours</td></tr>
+  <tr><td><code>metabolites.csv</code></td><td>Par métabolite : renouvellement, profondeur dans la cascade, enrichissement moyen.</td><td>Toujours</td></tr>
+  <tr><td><code>flux_changes_vs_reference.csv</code></td><td>Réactions qui ont varié de plus de 2 %.</td><td>Knockout / knockdown</td></tr>
+  <tr><td><code>atom_enrichment.csv</code></td><td>Enrichissement de chaque atome marqué.</td><td>Traceur</td></tr>
+  <tr><td><code>isotopologues.csv</code></td><td>M+0, M+1 … des 150 métabolites marqués les plus actifs (en mode dynamique, au temps sélectionné).</td><td>Traceur</td></tr>
+  <tr><td><code>isotopologues_over_time.csv</code> et graphique</td><td>Fractions d'isotopologues du métabolite sélectionné en jusqu'à 30 points temporels.</td><td>Dynamique, traceur, un métabolite sélectionné</td></tr>
+  <tr><td><code>timecourse.csv</code>, <code>timecourse_enrichment.csv</code></td><td>Biomasse, croissance, concentrations du milieu, flux d'échange et enrichissement à chaque point temporel.</td><td>Dynamique</td></tr>
+  <tr><td><code>chart_*.svg</code></td><td>Absorption, sécrétion, activité des voies, réactions les plus modifiées, devenir du marquage, isotopologues, épuisement du milieu, biomasse.</td><td>Comme ci-dessus</td></tr>
+  <tr><td><code>map.png</code></td><td>La carte telle qu'affichée.</td><td>Vues en carte</td></tr>
+  <tr><td><code>settings.json</code></td><td>Modèle, milieu, objectif, traceurs et perturbations : ce qu'il faut pour refaire le calcul.</td><td>Toujours</td></tr>
+  <tr><td><code>session.json</code></td><td>La session complète, prête à importer : modifications du modèle, milieu (avec atomes marqués), flux mesurés, perturbations, événements, objectif, paramètres dynamiques et scénarios enregistrés.</td><td>Toujours, même sans résultat</td></tr>
+  <tr><td><code>model_edits.json</code>, <code>model_edits_report.csv</code></td><td>Seulement les modifications du modèle, et un tableau de chaque modification avec ses contrôles.</td><td>Modifications du modèle</td></tr>
+  <tr><td><code>comparison_*.csv</code></td><td>Échanges, voies, enrichissement moyen et distributions d'isotopologues dans le scénario comparé et maintenant.</td><td>Un scénario comparé</td></tr>
+</table></div>
+<h3>Sessions : refaire les calculs ailleurs</h3>
+<p>« Importer », dans la barre supérieure, lit un <code>session.json</code>, un <code>model_edits.json</code> ou directement le <code>.zip</code> d'un téléchargement qui en contient un. Une session remplace les paramètres et les modifications du modèle actuels, change de modèle si nécessaire et recalcule chaque scénario enregistré, si bien que vous voyez la même comparaison que son auteur. Des modifications importées seules peuvent remplacer les actuelles ou être ajoutées après elles. Tout est stocké par ID, si bien qu'une session fonctionne aussi après une mise à jour du modèle. Les ID qui n'existent plus sont ignorés, et la barre d'état indique combien. Un téléchargement ne contenant que <code>session.json</code> (ou que les modifications) est fourni en JSON simple.</p>
+<p>En mode dynamique, les tableaux par réaction se rapportent au point temporel sélectionné avec le curseur.</p>
+
+<h2 id="fr-limits">16. Limites</h2>
+<ul>
+  <li><b>Ni cinétique ni régulation.</b> Les concentrations ne fixent que des limites d'absorption. Les niveaux d'enzymes, l'allostérie et la signalisation sont absents.</li>
+  <li><b>Une cellule générique.</b> Human-GEM contient toutes les réactions connues dans n'importe quel tissu humain. Un type cellulaire donné en exprime un sous-ensemble ; l'application ne construit pas encore de modèles spécifiques d'un tissu.</li>
+  <li><b>Optima alternatifs.</b> Plusieurs schémas de flux peuvent donner la même croissance. La pFBA en choisit un ; de petites « variations » après un knockout peuvent être une alternative tout aussi bonne plutôt qu'un effet réel.</li>
+  <li><b>Les flux mesurés sont un phénotype moyen.</b> Ce sont la médiane de 59 lignées tumorales en RPMI-1640, convertie avec une masse cellulaire moyenne. Ce n'est le phénotype d'aucune lignée particulière, et ils sont conservés quand vous changez de milieu.</li>
+  <li><b>Les cinétiques d'absorption sont des estimations grossières.</b> Elles fixent toujours l'absorption des composants non mesurés du milieu, et quand les flux mesurés sont désactivés, elles fixent tout.</li>
+  <li><b>Flux nets seulement.</b> En réalité, les réactions réversibles échangent du marquage dans les deux sens ; le modèle ne voit que le flux net, ce qui peut sous-estimer le brassage du marquage.</li>
+  <li><b>Les cartes atomiques sont calculées</b>, pas toutes curées. Les positions incertaines sont signalées.</li>
+  <li><b>Pas de traçage de l'hydrogène</b> (<sup>2</sup>H) ni de correction de l'abondance naturelle.</li>
+  <li><b>Le mode dynamique</b> suppose une seule taille de pool pour tous les métabolites intracellulaires. Les temps de marquage, et donc les courbes d'isotopologues dans le temps, varient avec ce nombre : leur ordre et leur forme sont informatifs, leur horloge ne l'est pas.</li>
+  <li><b>Les modifications du modèle sont vérifiées, pas curées.</b> Les contrôles détectent les réactions impossibles ou déséquilibrées et les impasses, pas une biologie erronée. Les cartes atomiques automatiques (plus grande sous-structure commune) peuvent apparier de mauvais atomes ; préférez un SMILES cartographié.</li>
+  <li><b>Les scénarios sont gardés en mémoire</b> avec leurs résultats. Téléchargez la session pour les conserver après avoir fermé la page.</li>
+  <li><b>Mouse-GEM 1.8.0</b> est livré avec un objectif (<code>MAR00021</code>) à une échelle différente de la réaction de biomasse humaine, si bien que sa croissance absolue est très faible avec le milieu par défaut. Vous pouvez choisir un autre objectif.</li>
+</ul>
+
+<h2 id="fr-glossary">17. Glossaire</h2>
+<div class="tablebox"><table>
+  <tr><td><b>Flux</b></td><td>Vitesse d'une réaction, en mmol par gramme de poids sec et par heure.</td></tr>
+  <tr><td><b>Flux de carbone / d'azote</b></td><td>Atomes de carbone ou d'azote transférables par heure qu'un groupe de réactions produit et qu'un autre consomme, via des métabolites partagés ; les atomes des transporteurs recyclés comme le CoA ne comptent pas (<a href="#fr-carbonflow">section 3</a>).</td></tr>
+  <tr><td><b>ΔG′<sub>m</sub></b></td><td>Énergie de Gibbs transformée d'une réaction avec chaque réactif à 1 mM, au pH de son compartiment. Négative : la réaction peut aller dans le sens direct (<a href="#fr-dg">section 3</a>).</td></tr>
+  <tr><td><b>GEM</b></td><td>Modèle métabolique à l'échelle du génome : toutes les réactions métaboliques connues d'un organisme, reliées à ses gènes.</td></tr>
+  <tr><td><b>FBA / pFBA</b></td><td>Analyse de bilan des flux / sa variante parcimonieuse (flux total minimal).</td></tr>
+  <tr><td><b>Objectif</b></td><td>La réaction dont le flux est maximisé ou minimisé.</td></tr>
+  <tr><td><b>Réaction de biomasse</b></td><td>Une pseudo-réaction qui consomme les composants cellulaires dans les proportions nécessaires pour fabriquer de la nouvelle masse cellulaire.</td></tr>
+  <tr><td><b>Réaction d'échange</b></td><td>L'entrée ou la sortie d'un métabolite entre le milieu et l'extérieur du modèle.</td></tr>
+  <tr><td><b>Flux d'échange mesuré</b></td><td>Une vitesse d'absorption ou de sécrétion mesurée sur des cellules, utilisée pour fixer la réaction d'échange correspondante.</td></tr>
+  <tr><td><b>Maintenance de l'ATP</b></td><td>ATP dépensé pour l'entretien (pompes ioniques, renouvellement), indépendamment de la croissance.</td></tr>
+  <tr><td><b>Règle GPR</b></td><td>Règle gène–protéine–réaction : de quels gènes une réaction a besoin.</td></tr>
+  <tr><td><b>Enrichissement</b></td><td>Fraction d'une position atomique occupée par l'isotope lourd.</td></tr>
+  <tr><td><b>Isotopologue</b></td><td>Molécules qui ne diffèrent que par leur nombre d'atomes lourds (M+0, M+1 …).</td></tr>
+  <tr><td><b>Renouvellement</b></td><td>Vitesse totale à laquelle un métabolite est produit.</td></tr>
+  <tr><td><b>gDW</b></td><td>Gramme de poids sec cellulaire.</td></tr>
+  <tr><td><b>Scénario</b></td><td>Une situation enregistrée (paramètres, modifications du modèle et résultat) avec laquelle on compare la situation actuelle.</td></tr>
+  <tr><td><b>Carte atomique</b></td><td>Quel atome de chaque substrat devient quel atome de chaque produit dans une réaction.</td></tr>
+  <tr><td><b>Impasse</b></td><td>Un métabolite qu'aucune réaction ne peut produire, ou qu'aucune ne peut consommer. Les réactions qui le touchent sont bloquées à l'état stationnaire.</td></tr>
+  <tr><td><b>SMILES</b></td><td>Une notation linéaire de la structure d'une molécule, par exemple <code>CC(O)C(C)=O</code> pour l'acétoïne.</td></tr>
+</table></div>
+
+<h2 id="fr-refs">18. Références</h2>
+<ul>
+  <li>Orth JD, Thiele I, Palsson BØ. What is flux balance analysis? <i>Nat. Biotechnol.</i> 2010; 28:245–248. <a href="https://doi.org/10.1038/nbt.1614" target="_blank" rel="noopener">doi:10.1038/nbt.1614</a></li>
+  <li>Lewis NE et al. Omic data from evolved <i>E. coli</i> are consistent with computed optimal growth from genome-scale models. <i>Mol. Syst. Biol.</i> 2010; 6:390 (parsimonious FBA). <a href="https://doi.org/10.1038/msb.2010.47" target="_blank" rel="noopener">doi:10.1038/msb.2010.47</a></li>
+  <li>Mahadevan R, Edwards JS, Doyle FJ. Dynamic flux balance analysis of diauxic growth in <i>Escherichia coli</i>. <i>Biophys. J.</i> 2002; 83:1331–1340. <a href="https://doi.org/10.1016/S0006-3495(02)73903-9" target="_blank" rel="noopener">doi:10.1016/S0006-3495(02)73903-9</a></li>
+  <li>Robinson JL et al. An atlas of human metabolism. <i>Sci. Signal.</i> 2020; 13:eaaz1482 (Human-GEM). <a href="https://doi.org/10.1126/scisignal.aaz1482" target="_blank" rel="noopener">doi:10.1126/scisignal.aaz1482</a></li>
+  <li>Wang H et al. Genome-scale metabolic network reconstruction of model animals as a platform for translational research. <i>PNAS</i> 2021; 118:e2102344118 (Mouse-GEM). <a href="https://doi.org/10.1073/pnas.2102344118" target="_blank" rel="noopener">doi:10.1073/pnas.2102344118</a></li>
+  <li>Schwaller P et al. Extraction of organic chemistry grammar from unsupervised learning of chemical reactions. <i>Sci. Adv.</i> 2021; 7:eabe4166 (RXNMapper). <a href="https://doi.org/10.1126/sciadv.abe4166" target="_blank" rel="noopener">doi:10.1126/sciadv.abe4166</a></li>
+  <li>Vande Voorde J et al. Improving the metabolic fidelity of cancer models with a physiological cell culture medium. <i>Sci. Adv.</i> 2019; 5:eaau7314 (Plasmax). <a href="https://doi.org/10.1126/sciadv.aau7314" target="_blank" rel="noopener">doi:10.1126/sciadv.aau7314</a></li>
+  <li>Cantor JR et al. Physiologic medium rewires cellular metabolism and reveals uric acid as an endogenous inhibitor of UMP synthase. <i>Cell</i> 2017; 169:258–272 (HPLM). <a href="https://doi.org/10.1016/j.cell.2017.03.023" target="_blank" rel="noopener">doi:10.1016/j.cell.2017.03.023</a></li>
+  <li>Jain M et al. Metabolite profiling identifies a key role for glycine in rapid cancer cell proliferation. <i>Science</i> 2012; 336:1040–1044 (NCI-60 exchange fluxes). <a href="https://doi.org/10.1126/science.1218595" target="_blank" rel="noopener">doi:10.1126/science.1218595</a></li>
+  <li>Aurich MK, Fleming RMT, Thiele I. A systems approach reveals distinct metabolic strategies among the NCI-60 cancer cell lines. <i>PLoS Comput. Biol.</i> 2017; 13:e1005698 (per-line values, S1 Table Q). <a href="https://doi.org/10.1371/journal.pcbi.1005698" target="_blank" rel="noopener">doi:10.1371/journal.pcbi.1005698</a></li>
+  <li>Zielinski DC et al. Systems biology analysis of drivers underlying hallmarks of cancer cell metabolism. <i>Sci. Rep.</i> 2017; 7:41241 (cell mass, ATP maintenance). <a href="https://doi.org/10.1038/srep41241" target="_blank" rel="noopener">doi:10.1038/srep41241</a></li>
+  <li>Kilburn DG, Lilly MD, Webb FC. The energetics of mammalian cell growth. <i>J. Cell Sci.</i> 1969; 4:645–654 (ATP maintenance). <a href="https://doi.org/10.1242/jcs.4.3.645" target="_blank" rel="noopener">doi:10.1242/jcs.4.3.645</a></li>
+  <li>Dolfi SC et al. The metabolic demands of cancer cells are coupled to their size and protein synthesis rates. <i>Cancer Metab.</i> 2013; 1:20 (NCI-60 culture conditions). <a href="https://doi.org/10.1186/2049-3002-1-20" target="_blank" rel="noopener">doi:10.1186/2049-3002-1-20</a></li>
+  <li>Thiele I, Palsson BØ. A protocol for generating a high-quality genome-scale metabolic reconstruction. <i>Nat. Protoc.</i> 2010; 5:93–121 (quality checks for model edits). <a href="https://doi.org/10.1038/nprot.2009.203" target="_blank" rel="noopener">doi:10.1038/nprot.2009.203</a></li>
+  <li>Lieven C et al. MEMOTE for standardized genome-scale metabolic model testing. <i>Nat. Biotechnol.</i> 2020; 38:272–276. <a href="https://doi.org/10.1038/s41587-020-0446-y" target="_blank" rel="noopener">doi:10.1038/s41587-020-0446-y</a></li>
+  <li>RDKit: open-source cheminformatics, MinimalLib 2026.03.6 (SMILES, depiction, maximum common substructure in the model editor). <a href="https://doi.org/10.5281/zenodo.591637" target="_blank" rel="noopener">doi:10.5281/zenodo.591637</a></li>
+  <li>Noor E, Haraldsdóttir HS, Milo R, Fleming RMT. Consistent estimation of Gibbs energy using component contributions. <i>PLoS Comput. Biol.</i> 2013; 9:e1003098. <a href="https://doi.org/10.1371/journal.pcbi.1003098" target="_blank" rel="noopener">doi:10.1371/journal.pcbi.1003098</a></li>
+  <li>Beber ME et al. eQuilibrator 3.0: a database solution for thermodynamic constant estimation. <i>Nucleic Acids Res.</i> 2022; 50:D603–D609. <a href="https://doi.org/10.1093/nar/gkab1106" target="_blank" rel="noopener">doi:10.1093/nar/gkab1106</a></li>
+  <li>eQuilibrator compound database (compounds.sqlite), used offline by tools/build_thermo.py. <a href="https://doi.org/10.5281/zenodo.4128543" target="_blank" rel="noopener">doi:10.5281/zenodo.4128543</a></li>
+  <li>Haraldsdóttir HS, Thiele I, Fleming RMT. Quantitative assignment of reaction directionality in a multicompartmental human metabolic reconstruction. <i>Biophys. J.</i> 2012; 102:1703–1711. <a href="https://doi.org/10.1016/j.bpj.2012.02.032" target="_blank" rel="noopener">doi:10.1016/j.bpj.2012.02.032</a></li>
+  <li>Casey JR, Grinstein S, Orlowski J. Sensors and regulators of intracellular pH. <i>Nat. Rev. Mol. Cell Biol.</i> 2010; 11:50–61 (compartment pH). <a href="https://doi.org/10.1038/nrm2820" target="_blank" rel="noopener">doi:10.1038/nrm2820</a></li>
+  <li>Porcelli AM et al. pH difference across the outer mitochondrial membrane measured with a green fluorescent protein mutant. <i>Biochem. Biophys. Res. Commun.</i> 2005; 326:799–804 (intermembrane space pH). <a href="https://doi.org/10.1016/j.bbrc.2004.11.105" target="_blank" rel="noopener">doi:10.1016/j.bbrc.2004.11.105</a></li>
+  <li>Zorova LD et al. Mitochondrial membrane potential. <i>Anal. Biochem.</i> 2018; 552:50–59. <a href="https://doi.org/10.1016/j.ab.2017.07.009" target="_blank" rel="noopener">doi:10.1016/j.ab.2017.07.009</a></li>
+  <li>Yang M, Brackenbury WJ. Membrane potential and cancer progression. <i>Front. Physiol.</i> 2013; 4:185 (plasma membrane potential). <a href="https://doi.org/10.3389/fphys.2013.00185" target="_blank" rel="noopener">doi:10.3389/fphys.2013.00185</a></li>
+  <li>Urban PF, Klingenberg M. On the redox potentials of ubiquinone and cytochrome <i>b</i> in the respiratory chain. <i>Eur. J. Biochem.</i> 1969; 9:519–525. <a href="https://doi.org/10.1111/j.1432-1033.1969.tb00640.x" target="_blank" rel="noopener">doi:10.1111/j.1432-1033.1969.tb00640.x</a></li>
+  <li>Loveridge KM et al. A divergent mitochondrial cytochrome <i>c</i> in malaria parasites with an anomalously low redox potential. <i>J. Mol. Biol.</i> 2026; 438:169996 (+250 mV for canonical mitochondrial cytochrome <i>c</i>). <a href="https://doi.org/10.1016/j.jmb.2026.169996" target="_blank" rel="noopener">doi:10.1016/j.jmb.2026.169996</a></li>
+  <li>Traut TW. Physiological concentrations of purines and pyrimidines. <i>Mol. Cell. Biochem.</i> 1994; 140:1–22. <a href="https://doi.org/10.1007/BF00928361" target="_blank" rel="noopener">doi:10.1007/BF00928361</a></li>
+  <li>Schuetz R, Kuepfer L, Sauer U. Systematic evaluation of objective functions for predicting intracellular fluxes in <i>Escherichia coli</i>. <i>Mol. Syst. Biol.</i> 2007; 3:119. <a href="https://doi.org/10.1038/msb4100162" target="_blank" rel="noopener">doi:10.1038/msb4100162</a></li>
+  <li>Lu SC. Glutathione synthesis. <i>Biochim. Biophys. Acta</i> 2013; 1830:3143–3153. <a href="https://doi.org/10.1016/j.bbagen.2012.09.008" target="_blank" rel="noopener">doi:10.1016/j.bbagen.2012.09.008</a></li>
+  <li>Gille C et al. HepatoNet1: a comprehensive metabolic reconstruction of the human hepatocyte for the analysis of liver physiology. <i>Mol. Syst. Biol.</i> 2010; 6:411. <a href="https://doi.org/10.1038/msb.2010.62" target="_blank" rel="noopener">doi:10.1038/msb.2010.62</a></li>
+  <li>Richelle A et al. Model-based assessment of mammalian cell metabolic functionalities using omics data. <i>Cell Rep. Methods</i> 2021; 1:100040. <a href="https://doi.org/10.1016/j.crmeth.2021.100040" target="_blank" rel="noopener">doi:10.1016/j.crmeth.2021.100040</a></li>
+  <li>Huangfu Q, Hall JAJ. Parallelizing the dual revised simplex method. <i>Math. Program. Comput.</i> 2018; 10:119–142 (HiGHS). <a href="https://doi.org/10.1007/s12532-017-0130-5" target="_blank" rel="noopener">doi:10.1007/s12532-017-0130-5</a></li>
+</ul>
+</article>

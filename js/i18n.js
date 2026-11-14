@@ -1,5 +1,11 @@
-// Interface strings (Spanish / English). Model content (metabolite, reaction and pathway names)
-// comes from the GEM itself and is not translated.
+// Interface strings. English and Spanish live here; Portuguese, Italian, French, German and Greek in
+// js/i18n/<code>.js (any key missing there falls back to English). Model content (metabolite, reaction and
+// pathway names) comes from the GEM itself and is not translated.
+import pt from "./i18n/pt.js";
+import it from "./i18n/it.js";
+import fr from "./i18n/fr.js";
+import de from "./i18n/de.js";
+import el from "./i18n/el.js";
 
 const es = {
   // static page
@@ -861,6 +867,25 @@ const enQty = {
   "obj.note.gsh": "Maximises the net output of glutathione (its export, MAR09351), which the cell can only sustain by making GSH from glutamate, cysteine and glycine; cells raise GSH synthesis under oxidative stress. Maximising glutathione synthetase itself is not used: the model then makes GSH and cleaves it again at once, a futile cycle. In the standard medium the value (~0.02 mmol/gDW/h) is set by the supply of cysteine, cystine and methionine, as in real cells. Growth is 0.",
   "obj.note.user": "Objective saved by you (kept in this browser).",
   "obj.note.custom": "A reaction picked in the search box below. <b>Save</b> keeps it in the list.",
+  "obj.group.general": "Growth, energy and stress", "obj.group.liver": "Liver and lipid metabolism", "obj.group.neuro": "Neurons and endocrine cells", "obj.group.other": "Other cell types",
+  "obj.measHint": "This is the function of a specialised cell: the measured rates loaded (NCI-60, proliferating tumour cells) do not fit it. Set Measured exchange fluxes to \"None\".",
+  "obj.name.urea": "Urea output (hepatocyte, ammonia disposal)", "obj.name.glucose": "Glucose output (gluconeogenesis)", "obj.name.bhb": "Ketone body output (β-hydroxybutyrate)",
+  "obj.name.bile": "Bile acid output (glycocholate)", "obj.name.cholesterol": "Cholesterol output (synthesis)", "obj.name.palmitate": "De novo lipogenesis (palmitate)",
+  "obj.name.glutamate": "Glutamate release (glutamatergic neuron)", "obj.name.gaba": "GABA release (GABAergic neuron)", "obj.name.dopamine": "Dopamine release (dopaminergic neuron)",
+  "obj.name.cortisol": "Cortisol output (adrenal cortex)", "obj.name.no": "Nitric oxide output (endothelium, macrophage)", "obj.name.heme": "Heme synthesis (erythroid precursor)", "obj.name.creatine": "Creatine output",
+  "obj.note.urea": "Maximises urea release (MAR09438): the urea cycle disposing of the nitrogen of amino acids and ammonium, the main nitrogen function of the hepatocyte.",
+  "obj.note.glucose": "Maximises net glucose release (MAR09034) with glucose uptake closed: gluconeogenesis from amino acids, lactate or glycerol, as in liver and kidney during fasting. Remove glucose from the medium or not: it cannot be passed through.",
+  "obj.note.bhb": "Maximises the release of (R)-3-hydroxybutanoate (MAR09134), the main ketone body made by the liver from fatty acids and ketogenic amino acids during fasting.",
+  "obj.note.bile": "Maximises glycocholate release (MAR09281): bile acid synthesis from cholesterol and conjugation with glycine, a hepatocyte function.",
+  "obj.note.cholesterol": "Maximises cholesterol release (MAR09285): the capacity for de novo cholesterol synthesis, which the liver exports in lipoproteins.",
+  "obj.note.palmitate": "Maximises palmitate release (MAR00611): the capacity for de novo fatty acid synthesis from glucose and amino acids, as in hepatocytes and adipocytes.",
+  "obj.note.glutamate": "Maximises glutamate release (MAR09071), the transmitter of glutamatergic neurons.",
+  "obj.note.gaba": "Maximises the release of 4-aminobutyrate (GABA, MAR09091), the transmitter of GABAergic neurons, made from glutamate.",
+  "obj.note.dopamine": "Maximises dopamine release (MAR09092), made from tyrosine; its supply of aromatic amino acids sets the value.",
+  "obj.note.cortisol": "Maximises cortisol release (MAR09293): steroidogenesis from cholesterol in the adrenal cortex.",
+  "obj.note.no": "Maximises nitric oxide release (MAR09381) by nitric oxide synthase from arginine, as in endothelial cells and activated macrophages.",
+  "obj.note.heme": "Maximises heme release (MAR09107): the heme synthesis pathway (glycine + succinyl-CoA, iron), the main metabolic task of erythroid precursors.",
+  "obj.note.creatine": "Maximises creatine release (MAR09290), made from arginine, glycine and methionine in kidney and liver.",
   "qty.gAtoms": "Atoms", "qty.gRedox": "Redox", "qty.gEnergy": "Energy",
   "qty.carbon": "Carbon", "qty.nitrogen": "Nitrogen", "qty.nadh": "NADH", "qty.nadph": "NADPH", "qty.qh2": "Ubiquinol (QH₂)",
   "qty.atp": "ATP (and GTP, UTP, CTP)", "qty.dg": "Free energy (ΔG′m)",
@@ -902,6 +927,25 @@ const esQty = {
   "obj.note.gsh": "Maximiza la salida neta de glutatión (su exportación, MAR09351), que la célula sólo puede mantener fabricando GSH a partir de glutamato, cisteína y glicina; las células aumentan la síntesis de GSH con estrés oxidativo. No se usa la glutatión sintetasa como objetivo: el modelo fabrica entonces GSH y lo vuelve a romper enseguida, un ciclo fútil. En el medio estándar el valor (~0,02 mmol/gDW/h) lo fija el aporte de cisteína, cistina y metionina, como en células reales. El crecimiento es 0.",
   "obj.note.user": "Objetivo guardado por ti (se conserva en este navegador).",
   "obj.note.custom": "Una reacción elegida en el buscador de abajo. <b>Guardar</b> la añade a la lista.",
+  "obj.group.general": "Crecimiento, energía y estrés", "obj.group.liver": "Hígado y metabolismo lipídico", "obj.group.neuro": "Neuronas y células endocrinas", "obj.group.other": "Otros tipos celulares",
+  "obj.measHint": "Es la función de una célula especializada: las tasas medidas cargadas (NCI-60, células tumorales que proliferan) no le corresponden. Pon los flujos de intercambio medidos en «Ninguno».",
+  "obj.name.urea": "Salida de urea (hepatocito, eliminación de amonio)", "obj.name.glucose": "Salida de glucosa (gluconeogénesis)", "obj.name.bhb": "Salida de cuerpos cetónicos (β-hidroxibutirato)",
+  "obj.name.bile": "Salida de ácidos biliares (glicocolato)", "obj.name.cholesterol": "Salida de colesterol (síntesis)", "obj.name.palmitate": "Lipogénesis de novo (palmitato)",
+  "obj.name.glutamate": "Liberación de glutamato (neurona glutamatérgica)", "obj.name.gaba": "Liberación de GABA (neurona GABAérgica)", "obj.name.dopamine": "Liberación de dopamina (neurona dopaminérgica)",
+  "obj.name.cortisol": "Salida de cortisol (corteza suprarrenal)", "obj.name.no": "Salida de óxido nítrico (endotelio, macrófago)", "obj.name.heme": "Síntesis de hemo (precursor eritroide)", "obj.name.creatine": "Salida de creatina",
+  "obj.note.urea": "Maximiza la liberación de urea (MAR09438): el ciclo de la urea eliminando el nitrógeno de aminoácidos y amonio, la principal función nitrogenada del hepatocito.",
+  "obj.note.glucose": "Maximiza la liberación neta de glucosa (MAR09034) con su captación cerrada: gluconeogénesis a partir de aminoácidos, lactato o glicerol, como hacen hígado y riñón en ayunas. Da igual que el medio tenga glucosa: no puede pasarla sin más.",
+  "obj.note.bhb": "Maximiza la liberación de (R)-3-hidroxibutanoato (MAR09134), el principal cuerpo cetónico que fabrica el hígado a partir de ácidos grasos y aminoácidos cetogénicos en ayunas.",
+  "obj.note.bile": "Maximiza la liberación de glicocolato (MAR09281): síntesis de ácidos biliares a partir del colesterol y conjugación con glicina, una función del hepatocito.",
+  "obj.note.cholesterol": "Maximiza la liberación de colesterol (MAR09285): la capacidad de síntesis de novo de colesterol, que el hígado exporta en lipoproteínas.",
+  "obj.note.palmitate": "Maximiza la liberación de palmitato (MAR00611): la capacidad de síntesis de novo de ácidos grasos a partir de glucosa y aminoácidos, como en hepatocitos y adipocitos.",
+  "obj.note.glutamate": "Maximiza la liberación de glutamato (MAR09071), el transmisor de las neuronas glutamatérgicas.",
+  "obj.note.gaba": "Maximiza la liberación de 4-aminobutirato (GABA, MAR09091), el transmisor de las neuronas GABAérgicas, que se fabrica a partir de glutamato.",
+  "obj.note.dopamine": "Maximiza la liberación de dopamina (MAR09092), fabricada a partir de tirosina; el aporte de aminoácidos aromáticos fija el valor.",
+  "obj.note.cortisol": "Maximiza la liberación de cortisol (MAR09293): esteroidogénesis a partir del colesterol en la corteza suprarrenal.",
+  "obj.note.no": "Maximiza la liberación de óxido nítrico (MAR09381) por la óxido nítrico sintasa a partir de arginina, como en células endoteliales y macrófagos activados.",
+  "obj.note.heme": "Maximiza la liberación de hemo (MAR09107): la ruta de síntesis del hemo (glicina + succinil-CoA, hierro), la principal tarea metabólica de los precursores eritroides.",
+  "obj.note.creatine": "Maximiza la liberación de creatina (MAR09290), fabricada a partir de arginina, glicina y metionina en riñón e hígado.",
   "qty.gAtoms": "Átomos", "qty.gRedox": "Redox", "qty.gEnergy": "Energía",
   "qty.carbon": "Carbono", "qty.nitrogen": "Nitrógeno", "qty.nadh": "NADH", "qty.nadph": "NADPH", "qty.qh2": "Ubiquinol (QH₂)",
   "qty.atp": "ATP (y GTP, UTP, CTP)", "qty.dg": "Energía libre (ΔG′m)",
@@ -932,11 +976,14 @@ Object.assign(es, esEdit);
 Object.assign(en, enQty);
 Object.assign(es, esQty);
 
-export const DICT = { es, en };
-export const LANGS = [["en", "English"], ["es", "Español"]];
+export const DICT = { es, en, pt, it, fr, de, el };
+export const LANGS = [["en", "English"], ["es", "Español"], ["pt", "Português"], ["it", "Italiano"], ["fr", "Français"], ["de", "Deutsch"], ["el", "Ελληνικά"]];
+// languages the documentation (docs.html + docs/<code>.html) is written in; any other opens it in English
+export const DOCS_LANGS = ["en", "es", "pt", "it", "fr", "de", "el"];
 let lang = "en";
 
 export const getLang = () => lang;
+export const docsLang = () => (DOCS_LANGS.includes(lang) ? lang : "en");
 
 export function setLang(l) {
   lang = DICT[l] ? l : "en";
@@ -952,7 +999,7 @@ export function initLang() {
 }
 
 export function t(key, vars) {
-  let s = DICT[lang][key] ?? es[key] ?? key;
+  let s = DICT[lang][key] ?? en[key] ?? key;
   if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
   return s;
 }

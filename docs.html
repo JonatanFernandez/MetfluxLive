@@ -19,10 +19,16 @@
     a { color: var(--accent); }
     .btn, header button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; color: var(--text); text-decoration: none; font: inherit; font-size: 14px; cursor: pointer; }
     header button.on { border-color: var(--accent); color: var(--accent); }
+    #docLang { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; color: var(--text); font: inherit; font-size: 14px; }
     .wrap { display: grid; grid-template-columns: 250px minmax(0, 1fr); max-width: 1180px; margin: 0 auto; }
     nav { position: sticky; top: 52px; align-self: start; max-height: calc(100vh - 52px); overflow: auto; padding: 22px 12px 22px 20px; font-size: 13.5px; }
     nav a { display: block; padding: 4px 8px; border-radius: 6px; color: var(--muted); text-decoration: none; }
     nav a:hover { color: var(--text); background: var(--panel); }
+    nav a.sub { padding: 2px 8px 2px 22px; font-size: 12.5px; }
+    dl.objs { display: grid; grid-template-columns: minmax(180px, 30%) 1fr; gap: 6px 16px; max-width: 78ch; margin: 10px 0 16px; }
+    dl.objs dt { font-weight: 600; } dl.objs dd { margin: 0; color: var(--muted); }
+    dl.objs dt.grp { grid-column: 1 / -1; margin-top: 10px; color: var(--accent); text-transform: uppercase; font-size: 12.5px; letter-spacing: .5px; }
+    @media (max-width: 860px) { dl.objs { grid-template-columns: 1fr; } }
     article { padding: 10px 28px 80px; min-width: 0; }
     article[hidden] { display: none; }
     h1 { font-size: 28px; margin: 26px 0 6px; }
@@ -50,7 +56,7 @@
   <header>
     <div class="brand"><span class="logo"></span>Metflux<b>Live</b> · Docs</div>
     <div class="spacer"></div>
-    <button data-set="en">EN</button><button data-set="es">ES</button>
+    <select id="docLang" aria-label="Language"></select>
     <a class="btn" href="index.html" id="back">← App</a>
   </header>
   <div class="wrap">
@@ -165,7 +171,7 @@
 <ul>
   <li><b>Show</b>: everything, only what carries label, only the flux that changed (after a knockout, or against a compared scenario), or only the labelling that changed against a compared scenario.</li>
   <li><b>Panels</b>: drag the border between a side panel and the map to resize it; double-click the border to restore it. The sections of the left panel fold when you click their title.</li>
-  <li><b>Language</b>: English or Spanish (top right). Names of metabolites, reactions and pathways come from the model and stay in English.</li>
+  <li><b>Language</b>: English, Spanish, Portuguese, Italian, French, German or Greek (top right). Names of metabolites, reactions and pathways come from the model and stay in English. When the window is narrow or the labels are long, the top bar shrinks by itself: Edit, Import and Download become icons (their tooltip keeps the full name), then the brand name is hidden.</li>
   <li><b>Download</b>: exports tables, charts, the map and the session (see <a href="#en-download">section 15</a>). <b>Import</b> loads a session or model-edit file back.</li>
   <li><b>Compare</b> (left panel): saved scenarios to compare with (<a href="#en-compare">section 11</a>). <b>✎ Edit model</b> (top bar): add or remove reactions, enzymes and metabolites (<a href="#en-editing">section 12</a>).</li>
 </ul>
@@ -262,15 +268,65 @@
 </ul>
 
 <h3 id="en-objectives">Choosing the objective</h3>
-<p>The <b>Cellular objective</b> section has a list of built-in objectives, the objectives you have saved, and a search box to use any reaction:</p>
+<p>FBA needs an objective: what the cell is assumed to make as much of as possible. Growth is the usual hypothesis for proliferating cells, but most cells in a body do not grow: they make ATP, export a product, or detoxify. The <b>Cellular objective</b> section therefore lists, besides growth, a set of <b>cell functions</b> of the kind used as "metabolic tasks" in liver and human-cell models (Gille et al. 2010; Richelle et al. 2021), the objectives you have saved, and a search box to use any reaction. Every built-in objective was checked in Human-GEM and Mouse-GEM to give a finite, non-trivial optimum.</p>
+<p>Most functions are written as the <b>release of a product</b> (its exchange reaction, maximised). When the objective is the release of a metabolite, the app closes the uptake of that same metabolite: otherwise a medium that contains it (glucose, urea, creatine or GSH in Plasmax...) would simply be passed through, and the objective would measure the medium instead of the cell. Its measured rate, if any, is also left aside. The value is then the net synthesis.</p>
 <div class="tablebox"><table>
-  <tr><th>Objective</th><th>Reaction</th><th>What it asks</th></tr>
-  <tr><td><b>Growth (generic biomass)</b> (default)</td><td>The model's biomass reaction (Human-GEM <code>MAR13082</code>, Mouse-GEM <code>MAR00021</code>), maximised</td><td>Grow as fast as possible. The usual hypothesis for proliferating cells.</td></tr>
-  <tr><td><b>Maximum ATP production</b> (energy stress)</td><td><code>MAR03964</code>, cytosolic ATP hydrolysis (the ATP-maintenance reaction), maximised</td><td>Make as much ATP as possible from what is taken up, instead of growing. A classic alternative objective (Schuetz et al. 2007) for non-growing cells or energy stress. In the default run it reaches 14.1 mmol ATP/gDW/h (1.07 at the growth objective), limited by oxygen: lower O<sub>2</sub> in the medium to see how the cell shifts to glycolysis in hypoxia.</td></tr>
-  <tr><td><b>Maximum glutathione synthesis</b> (oxidative stress)</td><td><code>MAR09351</code>, exchange of GSH, maximised (positive flux = export)</td><td>Make as much glutathione as possible and release it. Cells raise GSH synthesis under oxidative stress, and the supply of cysteine sets its rate (Lu 2013). In the default run the value is 0.020 mmol/gDW/h, exactly what the cysteine, cystine and methionine of the standard medium allow.</td></tr>
+  <tr><th>Objective</th><th>Reaction (maximised)</th><th>Cell and function</th><th class="num">Value*</th><th>What limits it*</th></tr>
+  <tr><td colspan="5"><b>Growth, energy and stress</b></td></tr>
+  <tr><td>Growth (generic biomass) — default</td><td>biomass (<code>MAR13082</code>; Mouse-GEM <code>MAR00021</code>)</td><td>Proliferating cells</td><td class="num">0.037 h⁻¹</td><td>O<sub>2</sub>, amino acids</td></tr>
+  <tr><td>Maximum ATP production</td><td><code>MAR03964</code>, cytosolic ATP hydrolysis</td><td>Energy stress, non-growing cells; a classic alternative objective (Schuetz et al. 2007)</td><td class="num">13.2</td><td>O<sub>2</sub> (lower it to model hypoxia)</td></tr>
+  <tr><td>Maximum glutathione synthesis</td><td><code>MAR09351</code>, GSH release</td><td>Oxidative stress (Lu 2013)</td><td class="num">0.020</td><td>cysteine, cystine, methionine</td></tr>
+  <tr><td colspan="5"><b>Liver and lipid metabolism</b></td></tr>
+  <tr><td>Urea output</td><td><code>MAR09438</code></td><td>Hepatocyte: ammonia disposal</td><td class="num">0.30</td><td>nitrogen supply (glutamine)</td></tr>
+  <tr><td>Glucose output</td><td><code>MAR09034</code></td><td>Liver, kidney: gluconeogenesis in fasting</td><td class="num">0.27</td><td>amino acid carbon</td></tr>
+  <tr><td>Ketone body output</td><td><code>MAR09134</code>, β-hydroxybutyrate</td><td>Liver: ketogenesis in fasting</td><td class="num">0.99</td><td>glucose and O<sub>2</sub></td></tr>
+  <tr><td>Bile acid output</td><td><code>MAR09281</code>, glycocholate</td><td>Hepatocyte</td><td class="num">0.098</td><td>carbon, O<sub>2</sub></td></tr>
+  <tr><td>Cholesterol output</td><td><code>MAR09285</code></td><td>Liver: cholesterol synthesis for lipoproteins</td><td class="num">0.096</td><td>carbon</td></tr>
+  <tr><td>De novo lipogenesis</td><td><code>MAR00611</code>, palmitate release</td><td>Hepatocyte, adipocyte</td><td class="num">0.21</td><td>glucose</td></tr>
+  <tr><td colspan="5"><b>Neurons and endocrine cells</b></td></tr>
+  <tr><td>Glutamate release</td><td><code>MAR09071</code></td><td>Glutamatergic neuron</td><td class="num">0.55</td><td>nitrogen supply</td></tr>
+  <tr><td>GABA release</td><td><code>MAR09091</code></td><td>GABAergic neuron</td><td class="num">0.55</td><td>nitrogen supply</td></tr>
+  <tr><td>Dopamine release</td><td><code>MAR09092</code></td><td>Dopaminergic neuron</td><td class="num">0.019</td><td>tyrosine, phenylalanine</td></tr>
+  <tr><td>Cortisol output</td><td><code>MAR09293</code></td><td>Adrenal cortex</td><td class="num">0.095</td><td>carbon, O<sub>2</sub></td></tr>
+  <tr><td colspan="5"><b>Other cell types</b></td></tr>
+  <tr><td>Nitric oxide output</td><td><code>MAR09381</code></td><td>Endothelium, activated macrophage</td><td class="num">0.55</td><td>nitrogen supply (arginine)</td></tr>
+  <tr><td>Heme synthesis</td><td><code>MAR09107</code></td><td>Erythroid precursor</td><td class="num">0.11</td><td>carbon, O<sub>2</sub></td></tr>
+  <tr><td>Creatine output</td><td><code>MAR09290</code></td><td>Kidney, liver</td><td class="num">0.20</td><td>nitrogen supply</td></tr>
 </table></div>
-<p>Two choices may look more natural but do not work as objectives. Maximising <b>glutathione synthetase</b> (<code>MAR04326</code>) gives 6.5 mmol/gDW/h of GSH that γ-glutamyl aminopeptidase (<code>MAR04175</code>) cleaves again at once: a futile cycle that only burns ATP. Maximising <b>glutathione reductase</b> (NADPH regeneration) is unbounded, because the model can reoxidise GSH in a loop. Every objective is applied in the direction in which the reaction is written in the model (both GSH reactions above are written forwards, so they are maximised). With the non-growth objectives growth is 0.</p>
-<p>To use your own, search any reaction in the box, choose Maximise or Minimise, and press <b>Save</b>: the objective is kept in the list under a name of your choice (by reaction ID, so it also works in the other model when the reaction exists there). <b>Delete</b> removes it. Saved objectives are kept in the browser; a downloaded session stores the objective in use.</p>
+<p>* Human-GEM, standard medium, measured exchange fluxes set to "None", mmol/gDW/h unless stated (Mouse-GEM gives the same values within 5 %). With growth as objective, every other function is close to 0. In the standard medium many functions are limited by the glutamine and amino acids it offers; in a richer or physiological medium they change.</p>
+<h4 id="en-objlist">What each objective represents</h4>
+<p>The same explanations appear under the selector when an objective is chosen.</p>
+<dl class="objs">
+  <dt class="grp">Growth, energy and stress</dt>
+  <dt>Growth (generic biomass)</dt><dd>Maximises the model's biomass reaction: the cell grows as fast as the medium and the measured rates allow. The usual objective for proliferating cells.</dd>
+  <dt>Maximum ATP production (energy stress)</dt><dd>Maximises cytosolic ATP hydrolysis (MAR03964, the ATP-maintenance reaction) instead of growth: the most ATP the cell can make from what it takes up. A classic alternative objective, for non-growing cells and energy stress; with less O₂ in the medium it shows how ATP supply shifts in hypoxia. Growth is 0.</dd>
+  <dt>Maximum glutathione synthesis (oxidative stress)</dt><dd>Maximises the net output of glutathione (its export, MAR09351), which the cell can only sustain by making GSH from glutamate, cysteine and glycine; cells raise GSH synthesis under oxidative stress. Maximising glutathione synthetase itself is not used: the model then makes GSH and cleaves it again at once, a futile cycle. In the standard medium the value (~0.02 mmol/gDW/h) is set by the supply of cysteine, cystine and methionine, as in real cells. Growth is 0.</dd>
+  <dt class="grp">Liver and lipid metabolism</dt>
+  <dt>Urea output (hepatocyte, ammonia disposal)</dt><dd>Maximises urea release (MAR09438): the urea cycle disposing of the nitrogen of amino acids and ammonium, the main nitrogen function of the hepatocyte.</dd>
+  <dt>Glucose output (gluconeogenesis)</dt><dd>Maximises net glucose release (MAR09034) with glucose uptake closed: gluconeogenesis from amino acids, lactate or glycerol, as in liver and kidney during fasting. Remove glucose from the medium or not: it cannot be passed through.</dd>
+  <dt>Ketone body output (β-hydroxybutyrate)</dt><dd>Maximises the release of (R)-3-hydroxybutanoate (MAR09134), the main ketone body made by the liver from fatty acids and ketogenic amino acids during fasting.</dd>
+  <dt>Bile acid output (glycocholate)</dt><dd>Maximises glycocholate release (MAR09281): bile acid synthesis from cholesterol and conjugation with glycine, a hepatocyte function.</dd>
+  <dt>Cholesterol output (synthesis)</dt><dd>Maximises cholesterol release (MAR09285): the capacity for de novo cholesterol synthesis, which the liver exports in lipoproteins.</dd>
+  <dt>De novo lipogenesis (palmitate)</dt><dd>Maximises palmitate release (MAR00611): the capacity for de novo fatty acid synthesis from glucose and amino acids, as in hepatocytes and adipocytes.</dd>
+  <dt class="grp">Neurons and endocrine cells</dt>
+  <dt>Glutamate release (glutamatergic neuron)</dt><dd>Maximises glutamate release (MAR09071), the transmitter of glutamatergic neurons.</dd>
+  <dt>GABA release (GABAergic neuron)</dt><dd>Maximises the release of 4-aminobutyrate (GABA, MAR09091), the transmitter of GABAergic neurons, made from glutamate.</dd>
+  <dt>Dopamine release (dopaminergic neuron)</dt><dd>Maximises dopamine release (MAR09092), made from tyrosine; its supply of aromatic amino acids sets the value.</dd>
+  <dt>Cortisol output (adrenal cortex)</dt><dd>Maximises cortisol release (MAR09293): steroidogenesis from cholesterol in the adrenal cortex.</dd>
+  <dt class="grp">Other cell types</dt>
+  <dt>Nitric oxide output (endothelium, macrophage)</dt><dd>Maximises nitric oxide release (MAR09381) by nitric oxide synthase from arginine, as in endothelial cells and activated macrophages.</dd>
+  <dt>Heme synthesis (erythroid precursor)</dt><dd>Maximises heme release (MAR09107): the heme synthesis pathway (glycine + succinyl-CoA, iron), the main metabolic task of erythroid precursors.</dd>
+  <dt>Creatine output</dt><dd>Maximises creatine release (MAR09290), made from arginine, glycine and methionine in kidney and liver.</dd>
+</dl>
+<div class="note"><b>Measured fluxes and cell functions.</b> The measured rates loaded by default (NCI-60) belong to proliferating tumour cells, and pin glucose, lactate, glutamine and other exchanges to them. They do not describe a hepatocyte or a neuron, and they also limit unmeasured by-products to traces, which can cap a function artificially (cortisol falls from 0.095 to 0.001 because a side product of steroidogenesis may only leave in traces). When a cell-function objective is chosen with measured fluxes active, the objective note asks you to set them to "None". Growth, ATP and glutathione can be used with them.</div>
+<p><b>Objectives that were considered and left out</b>, because FBA does not give a meaningful answer for them in these models:</p>
+<ul>
+  <li><b>Glutathione synthetase</b> (<code>MAR04326</code>): 6.5 mmol/gDW/h of GSH that γ-glutamyl aminopeptidase (<code>MAR04175</code>) cleaves again at once, a futile cycle that only burns ATP. Net GSH release (above) is used instead.</li>
+  <li><b>Glutathione reductase</b> (NADPH regeneration): unbounded, because the model can reoxidise GSH in a closed loop.</li>
+  <li><b>Lipid droplet formation</b> (<code>MAR00031</code>): its product has no outlet in the model, so the optimum is 0. Lipogenesis is represented by palmitate release.</li>
+  <li><b>Lactate release</b>: feasible, but it is a by-product, not something a cell is thought to maximise.</li>
+</ul>
+<p>Every objective is applied in the direction in which the reaction is written in the model. To use your own, search any reaction in the box, choose Maximise or Minimise, and press <b>Save</b>: the objective is kept in the list under a name of your choice (by reaction ID, so it also works in the other model when the reaction exists there). <b>Delete</b> removes it. Saved objectives are kept in the browser; a downloaded session stores the objective in use.</p>
 
 <h2 id="en-modes">7. Steady state versus Dynamic</h2>
 <div class="tablebox"><table>
@@ -484,7 +540,7 @@
 <div class="exp">
 <h3>F. Maximise an antioxidant: glutathione</h3>
 <ol>
-  <li>In "Cellular objective", search <code>MAR09351</code> ("Exchange of GSH") and keep "Maximise".</li>
+  <li>In "Cellular objective", choose "Maximum glutathione synthesis" (the same as searching <code>MAR09351</code>, "Exchange of GSH", and keeping "Maximise").</li>
   <li>Read the objective value and the uptake list.</li>
   <li>Raise cystine, then cysteine, to 1 mM.</li>
 </ol>
@@ -671,6 +727,8 @@
   <li>Traut TW. Physiological concentrations of purines and pyrimidines. <i>Mol. Cell. Biochem.</i> 1994; 140:1–22. <a href="https://doi.org/10.1007/BF00928361" target="_blank" rel="noopener">doi:10.1007/BF00928361</a></li>
   <li>Schuetz R, Kuepfer L, Sauer U. Systematic evaluation of objective functions for predicting intracellular fluxes in <i>Escherichia coli</i>. <i>Mol. Syst. Biol.</i> 2007; 3:119. <a href="https://doi.org/10.1038/msb4100162" target="_blank" rel="noopener">doi:10.1038/msb4100162</a></li>
   <li>Lu SC. Glutathione synthesis. <i>Biochim. Biophys. Acta</i> 2013; 1830:3143–3153. <a href="https://doi.org/10.1016/j.bbagen.2012.09.008" target="_blank" rel="noopener">doi:10.1016/j.bbagen.2012.09.008</a></li>
+  <li>Gille C et al. HepatoNet1: a comprehensive metabolic reconstruction of the human hepatocyte for the analysis of liver physiology. <i>Mol. Syst. Biol.</i> 2010; 6:411. <a href="https://doi.org/10.1038/msb.2010.62" target="_blank" rel="noopener">doi:10.1038/msb.2010.62</a></li>
+  <li>Richelle A et al. Model-based assessment of mammalian cell metabolic functionalities using omics data. <i>Cell Rep. Methods</i> 2021; 1:100040. <a href="https://doi.org/10.1016/j.crmeth.2021.100040" target="_blank" rel="noopener">doi:10.1016/j.crmeth.2021.100040</a></li>
   <li>Huangfu Q, Hall JAJ. Parallelizing the dual revised simplex method. <i>Math. Program. Comput.</i> 2018; 10:119–142 (HiGHS). <a href="https://doi.org/10.1007/s12532-017-0130-5" target="_blank" rel="noopener">doi:10.1007/s12532-017-0130-5</a></li>
 </ul>
 </article>
@@ -783,7 +841,7 @@
 <ul>
   <li><b>Mostrar</b>: todo, solo lo que lleva marca, solo el flujo que cambió (tras un knockout o frente a un escenario comparado), o solo el marcaje que cambió frente a un escenario comparado.</li>
   <li><b>Paneles</b>: arrastra el borde entre un panel lateral y el mapa para cambiar su ancho; doble clic en el borde lo restaura. Las secciones del panel izquierdo se pliegan al hacer clic en su título.</li>
-  <li><b>Idioma</b>: inglés o español (arriba a la derecha). Los nombres de metabolitos, reacciones y rutas vienen del modelo y siguen en inglés.</li>
+  <li><b>Idioma</b>: inglés, español, portugués, italiano, francés, alemán o griego (arriba a la derecha). Los nombres de metabolitos, reacciones y rutas vienen del modelo y siguen en inglés. Si la ventana es estrecha o las etiquetas son largas, la barra superior se compacta sola: Editar, Importar y Descargar pasan a ser iconos (su etiqueta flotante conserva el nombre completo) y después se oculta el nombre de la aplicación.</li>
   <li><b>Descargar</b>: exporta tablas, gráficas, el mapa y la sesión (véase la <a href="#es-download">sección 15</a>). <b>Importar</b> vuelve a cargar una sesión o un archivo de ediciones.</li>
   <li><b>Comparar</b> (panel izquierdo): escenarios guardados con los que comparar (<a href="#es-compare">sección 11</a>). <b>✎ Editar modelo</b> (barra superior): añadir o quitar reacciones, enzimas y metabolitos (<a href="#es-editing">sección 12</a>).</li>
 </ul>
@@ -880,15 +938,65 @@
 </ul>
 
 <h3 id="es-objectives">Elegir el objetivo</h3>
-<p>La sección <b>Objetivo celular</b> tiene una lista de objetivos predefinidos, los objetivos que hayas guardado y un buscador para usar cualquier reacción:</p>
+<p>El FBA necesita un objetivo: aquello que se supone que la célula fabrica en la mayor cantidad posible. El crecimiento es la hipótesis habitual para células que proliferan, pero la mayoría de las células de un organismo no crecen: fabrican ATP, exportan un producto o eliminan desechos. Por eso la sección <b>Objetivo celular</b> ofrece, además del crecimiento, un conjunto de <b>funciones celulares</b> del tipo de las «tareas metabólicas» que se usan en modelos de hígado y de células humanas (Gille et al. 2010; Richelle et al. 2021), los objetivos que hayas guardado y un buscador para usar cualquier reacción. Todos los objetivos predefinidos se han comprobado en Human-GEM y Mouse-GEM: dan un óptimo finito y no trivial.</p>
+<p>La mayoría de las funciones se expresan como la <b>liberación de un producto</b> (su reacción de intercambio, maximizada). Cuando el objetivo es liberar un metabolito, la app cierra la captación de ese mismo metabolito: si no, un medio que lo contenga (glucosa, urea, creatina o GSH en Plasmax…) simplemente pasaría a través de la célula, y el objetivo mediría el medio en lugar de la célula. Su tasa medida, si la hay, también se deja de lado. El valor es entonces la síntesis neta.</p>
 <div class="tablebox"><table>
-  <tr><th>Objetivo</th><th>Reacción</th><th>Qué pide</th></tr>
-  <tr><td><b>Crecimiento (biomasa genérica)</b> (por defecto)</td><td>La reacción de biomasa del modelo (Human-GEM <code>MAR13082</code>, Mouse-GEM <code>MAR00021</code>), maximizada</td><td>Crecer lo más rápido posible. La hipótesis habitual para células que proliferan.</td></tr>
-  <tr><td><b>Máxima producción de ATP</b> (estrés energético)</td><td><code>MAR03964</code>, hidrólisis de ATP citosólico (la reacción de mantenimiento), maximizada</td><td>Fabricar todo el ATP posible con lo que se capta, en lugar de crecer. Un objetivo alternativo clásico (Schuetz et al. 2007) para células que no crecen o con estrés energético. En la ejecución por defecto llega a 14,1 mmol ATP/gDW/h (1,07 con el objetivo de crecimiento), limitado por el oxígeno: baja el O<sub>2</sub> del medio para ver cómo la célula pasa a la glucólisis en hipoxia.</td></tr>
-  <tr><td><b>Máxima síntesis de glutatión</b> (estrés oxidativo)</td><td><code>MAR09351</code>, intercambio de GSH, maximizado (flujo positivo = exportación)</td><td>Fabricar todo el glutatión posible y liberarlo. Las células aumentan la síntesis de GSH con estrés oxidativo, y el aporte de cisteína fija su velocidad (Lu 2013). En la ejecución por defecto el valor es 0,020 mmol/gDW/h, justo lo que permiten la cisteína, la cistina y la metionina del medio estándar.</td></tr>
+  <tr><th>Objetivo</th><th>Reacción (maximizada)</th><th>Célula y función</th><th class="num">Valor*</th><th>Qué lo limita*</th></tr>
+  <tr><td colspan="5"><b>Crecimiento, energía y estrés</b></td></tr>
+  <tr><td>Crecimiento (biomasa genérica) — por defecto</td><td>biomasa (<code>MAR13082</code>; Mouse-GEM <code>MAR00021</code>)</td><td>Células que proliferan</td><td class="num">0,037 h⁻¹</td><td>O<sub>2</sub>, aminoácidos</td></tr>
+  <tr><td>Máxima producción de ATP</td><td><code>MAR03964</code>, hidrólisis de ATP citosólico</td><td>Estrés energético, células que no crecen; un objetivo alternativo clásico (Schuetz et al. 2007)</td><td class="num">13,2</td><td>O<sub>2</sub> (bájalo para modelar hipoxia)</td></tr>
+  <tr><td>Máxima síntesis de glutatión</td><td><code>MAR09351</code>, liberación de GSH</td><td>Estrés oxidativo (Lu 2013)</td><td class="num">0,020</td><td>cisteína, cistina, metionina</td></tr>
+  <tr><td colspan="5"><b>Hígado y metabolismo lipídico</b></td></tr>
+  <tr><td>Salida de urea</td><td><code>MAR09438</code></td><td>Hepatocito: eliminación de amonio</td><td class="num">0,30</td><td>aporte de nitrógeno (glutamina)</td></tr>
+  <tr><td>Salida de glucosa</td><td><code>MAR09034</code></td><td>Hígado, riñón: gluconeogénesis en ayunas</td><td class="num">0,27</td><td>carbono de aminoácidos</td></tr>
+  <tr><td>Salida de cuerpos cetónicos</td><td><code>MAR09134</code>, β-hidroxibutirato</td><td>Hígado: cetogénesis en ayunas</td><td class="num">0,99</td><td>glucosa y O<sub>2</sub></td></tr>
+  <tr><td>Salida de ácidos biliares</td><td><code>MAR09281</code>, glicocolato</td><td>Hepatocito</td><td class="num">0,098</td><td>carbono, O<sub>2</sub></td></tr>
+  <tr><td>Salida de colesterol</td><td><code>MAR09285</code></td><td>Hígado: síntesis de colesterol para lipoproteínas</td><td class="num">0,096</td><td>carbono</td></tr>
+  <tr><td>Lipogénesis de novo</td><td><code>MAR00611</code>, liberación de palmitato</td><td>Hepatocito, adipocito</td><td class="num">0,21</td><td>glucosa</td></tr>
+  <tr><td colspan="5"><b>Neuronas y células endocrinas</b></td></tr>
+  <tr><td>Liberación de glutamato</td><td><code>MAR09071</code></td><td>Neurona glutamatérgica</td><td class="num">0,55</td><td>aporte de nitrógeno</td></tr>
+  <tr><td>Liberación de GABA</td><td><code>MAR09091</code></td><td>Neurona GABAérgica</td><td class="num">0,55</td><td>aporte de nitrógeno</td></tr>
+  <tr><td>Liberación de dopamina</td><td><code>MAR09092</code></td><td>Neurona dopaminérgica</td><td class="num">0,019</td><td>tirosina, fenilalanina</td></tr>
+  <tr><td>Salida de cortisol</td><td><code>MAR09293</code></td><td>Corteza suprarrenal</td><td class="num">0,095</td><td>carbono, O<sub>2</sub></td></tr>
+  <tr><td colspan="5"><b>Otros tipos celulares</b></td></tr>
+  <tr><td>Salida de óxido nítrico</td><td><code>MAR09381</code></td><td>Endotelio, macrófago activado</td><td class="num">0,55</td><td>aporte de nitrógeno (arginina)</td></tr>
+  <tr><td>Síntesis de hemo</td><td><code>MAR09107</code></td><td>Precursor eritroide</td><td class="num">0,11</td><td>carbono, O<sub>2</sub></td></tr>
+  <tr><td>Salida de creatina</td><td><code>MAR09290</code></td><td>Riñón, hígado</td><td class="num">0,20</td><td>aporte de nitrógeno</td></tr>
 </table></div>
-<p>Dos opciones parecen más naturales pero no sirven como objetivo. Maximizar la <b>glutatión sintetasa</b> (<code>MAR04326</code>) da 6,5 mmol/gDW/h de GSH que la γ-glutamil aminopeptidasa (<code>MAR04175</code>) vuelve a romper enseguida: un ciclo fútil que sólo quema ATP. Maximizar la <b>glutatión reductasa</b> (regeneración de NADPH) no tiene límite, porque el modelo puede reoxidar el GSH en un bucle. Cada objetivo se aplica en el sentido en que la reacción está escrita en el modelo (las dos reacciones de GSH de arriba están escritas en sentido directo, así que se maximizan). Con los objetivos que no son de crecimiento, el crecimiento es 0.</p>
-<p>Para usar uno propio, busca cualquier reacción en el buscador, elige Maximizar o Minimizar y pulsa <b>Guardar</b>: el objetivo queda en la lista con el nombre que elijas (por el ID de la reacción, así que también funciona en el otro modelo si allí existe la reacción). <b>Borrar</b> lo quita. Los objetivos guardados se conservan en el navegador; una sesión descargada guarda el objetivo en uso.</p>
+<p>* Human-GEM, medio estándar, flujos de intercambio medidos en «Ninguno», en mmol/gDW/h salvo que se indique (Mouse-GEM da los mismos valores con diferencias de menos del 5 %). Con el crecimiento como objetivo, todas las demás funciones quedan cerca de 0. En el medio estándar muchas funciones están limitadas por la glutamina y los aminoácidos que ofrece; en un medio más rico o fisiológico cambian.</p>
+<h4 id="es-objlist">Qué representa cada objetivo</h4>
+<p>Estas mismas explicaciones aparecen bajo el selector al elegir un objetivo.</p>
+<dl class="objs">
+  <dt class="grp">Crecimiento, energía y estrés</dt>
+  <dt>Crecimiento (biomasa genérica)</dt><dd>Maximiza la reacción de biomasa del modelo: la célula crece todo lo que permiten el medio y las tasas medidas. El objetivo habitual para células que proliferan.</dd>
+  <dt>Máxima producción de ATP (estrés energético)</dt><dd>Maximiza la hidrólisis de ATP citosólico (MAR03964, la reacción de mantenimiento) en lugar del crecimiento: el máximo ATP que la célula puede sacar de lo que capta. Un objetivo alternativo clásico, para células que no crecen y estrés energético; con menos O₂ en el medio muestra cómo cambia el suministro de ATP en hipoxia. El crecimiento es 0.</dd>
+  <dt>Máxima síntesis de glutatión (estrés oxidativo)</dt><dd>Maximiza la salida neta de glutatión (su exportación, MAR09351), que la célula sólo puede mantener fabricando GSH a partir de glutamato, cisteína y glicina; las células aumentan la síntesis de GSH con estrés oxidativo. No se usa la glutatión sintetasa como objetivo: el modelo fabrica entonces GSH y lo vuelve a romper enseguida, un ciclo fútil. En el medio estándar el valor (~0,02 mmol/gDW/h) lo fija el aporte de cisteína, cistina y metionina, como en células reales. El crecimiento es 0.</dd>
+  <dt class="grp">Hígado y metabolismo lipídico</dt>
+  <dt>Salida de urea (hepatocito, eliminación de amonio)</dt><dd>Maximiza la liberación de urea (MAR09438): el ciclo de la urea eliminando el nitrógeno de aminoácidos y amonio, la principal función nitrogenada del hepatocito.</dd>
+  <dt>Salida de glucosa (gluconeogénesis)</dt><dd>Maximiza la liberación neta de glucosa (MAR09034) con su captación cerrada: gluconeogénesis a partir de aminoácidos, lactato o glicerol, como hacen hígado y riñón en ayunas. Da igual que el medio tenga glucosa: no puede pasarla sin más.</dd>
+  <dt>Salida de cuerpos cetónicos (β-hidroxibutirato)</dt><dd>Maximiza la liberación de (R)-3-hidroxibutanoato (MAR09134), el principal cuerpo cetónico que fabrica el hígado a partir de ácidos grasos y aminoácidos cetogénicos en ayunas.</dd>
+  <dt>Salida de ácidos biliares (glicocolato)</dt><dd>Maximiza la liberación de glicocolato (MAR09281): síntesis de ácidos biliares a partir del colesterol y conjugación con glicina, una función del hepatocito.</dd>
+  <dt>Salida de colesterol (síntesis)</dt><dd>Maximiza la liberación de colesterol (MAR09285): la capacidad de síntesis de novo de colesterol, que el hígado exporta en lipoproteínas.</dd>
+  <dt>Lipogénesis de novo (palmitato)</dt><dd>Maximiza la liberación de palmitato (MAR00611): la capacidad de síntesis de novo de ácidos grasos a partir de glucosa y aminoácidos, como en hepatocitos y adipocitos.</dd>
+  <dt class="grp">Neuronas y células endocrinas</dt>
+  <dt>Liberación de glutamato (neurona glutamatérgica)</dt><dd>Maximiza la liberación de glutamato (MAR09071), el transmisor de las neuronas glutamatérgicas.</dd>
+  <dt>Liberación de GABA (neurona GABAérgica)</dt><dd>Maximiza la liberación de 4-aminobutirato (GABA, MAR09091), el transmisor de las neuronas GABAérgicas, que se fabrica a partir de glutamato.</dd>
+  <dt>Liberación de dopamina (neurona dopaminérgica)</dt><dd>Maximiza la liberación de dopamina (MAR09092), fabricada a partir de tirosina; el aporte de aminoácidos aromáticos fija el valor.</dd>
+  <dt>Salida de cortisol (corteza suprarrenal)</dt><dd>Maximiza la liberación de cortisol (MAR09293): esteroidogénesis a partir del colesterol en la corteza suprarrenal.</dd>
+  <dt class="grp">Otros tipos celulares</dt>
+  <dt>Salida de óxido nítrico (endotelio, macrófago)</dt><dd>Maximiza la liberación de óxido nítrico (MAR09381) por la óxido nítrico sintasa a partir de arginina, como en células endoteliales y macrófagos activados.</dd>
+  <dt>Síntesis de hemo (precursor eritroide)</dt><dd>Maximiza la liberación de hemo (MAR09107): la ruta de síntesis del hemo (glicina + succinil-CoA, hierro), la principal tarea metabólica de los precursores eritroides.</dd>
+  <dt>Salida de creatina</dt><dd>Maximiza la liberación de creatina (MAR09290), fabricada a partir de arginina, glicina y metionina en riñón e hígado.</dd>
+</dl>
+<div class="note"><b>Flujos medidos y funciones celulares.</b> Las tasas medidas que se cargan por defecto (NCI-60) son de células tumorales que proliferan y fijan a ellas los intercambios de glucosa, lactato, glutamina y otros. No describen un hepatocito ni una neurona, y además limitan a trazas los subproductos no medidos, lo que puede recortar artificialmente una función (el cortisol baja de 0,095 a 0,001 porque un subproducto de la esteroidogénesis sólo puede salir en trazas). Cuando se elige una función celular con los flujos medidos activos, la nota del objetivo pide ponerlos en «Ninguno». Crecimiento, ATP y glutatión sí se pueden usar con ellos.</div>
+<p><b>Objetivos que se consideraron y se descartaron</b>, porque el FBA no da con ellos una respuesta con sentido en estos modelos:</p>
+<ul>
+  <li><b>Glutatión sintetasa</b> (<code>MAR04326</code>): 6,5 mmol/gDW/h de GSH que la γ-glutamil aminopeptidasa (<code>MAR04175</code>) vuelve a romper enseguida, un ciclo fútil que sólo quema ATP. En su lugar se usa la liberación neta de GSH (arriba).</li>
+  <li><b>Glutatión reductasa</b> (regeneración de NADPH): no tiene límite, porque el modelo puede reoxidar el GSH en un bucle cerrado.</li>
+  <li><b>Formación de gotas lipídicas</b> (<code>MAR00031</code>): su producto no tiene salida en el modelo, así que el óptimo es 0. La lipogénesis se representa con la liberación de palmitato.</li>
+  <li><b>Liberación de lactato</b>: es posible, pero es un subproducto, no algo que se piense que la célula maximiza.</li>
+</ul>
+<p>Cada objetivo se aplica en el sentido en que la reacción está escrita en el modelo. Para usar uno propio, busca cualquier reacción en el buscador, elige Maximizar o Minimizar y pulsa <b>Guardar</b>: el objetivo queda en la lista con el nombre que elijas (por el ID de la reacción, así que también funciona en el otro modelo si allí existe la reacción). <b>Borrar</b> lo quita. Los objetivos guardados se conservan en el navegador; una sesión descargada guarda el objetivo en uso.</p>
 
 <h2 id="es-modes">7. Estacionario frente a Dinámico</h2>
 <div class="tablebox"><table>
@@ -1102,7 +1210,7 @@
 <div class="exp">
 <h3>F. Maximizar un antioxidante: el glutatión</h3>
 <ol>
-  <li>En «Objetivo celular», busca <code>MAR09351</code> («Exchange of GSH») y deja «Maximizar».</li>
+  <li>En «Objetivo celular», elige «Máxima síntesis de glutatión» (es lo mismo que buscar <code>MAR09351</code>, «Exchange of GSH», y dejar «Maximizar»).</li>
   <li>Lee el valor del objetivo y la lista de captación.</li>
   <li>Sube la cistina, y después la cisteína, a 1 mM.</li>
 </ol>
@@ -1289,6 +1397,8 @@
   <li>Traut TW. Physiological concentrations of purines and pyrimidines. <i>Mol. Cell. Biochem.</i> 1994; 140:1–22. <a href="https://doi.org/10.1007/BF00928361" target="_blank" rel="noopener">doi:10.1007/BF00928361</a></li>
   <li>Schuetz R, Kuepfer L, Sauer U. Systematic evaluation of objective functions for predicting intracellular fluxes in <i>Escherichia coli</i>. <i>Mol. Syst. Biol.</i> 2007; 3:119. <a href="https://doi.org/10.1038/msb4100162" target="_blank" rel="noopener">doi:10.1038/msb4100162</a></li>
   <li>Lu SC. Glutathione synthesis. <i>Biochim. Biophys. Acta</i> 2013; 1830:3143–3153. <a href="https://doi.org/10.1016/j.bbagen.2012.09.008" target="_blank" rel="noopener">doi:10.1016/j.bbagen.2012.09.008</a></li>
+  <li>Gille C et al. HepatoNet1: a comprehensive metabolic reconstruction of the human hepatocyte for the analysis of liver physiology. <i>Mol. Syst. Biol.</i> 2010; 6:411. <a href="https://doi.org/10.1038/msb.2010.62" target="_blank" rel="noopener">doi:10.1038/msb.2010.62</a></li>
+  <li>Richelle A et al. Model-based assessment of mammalian cell metabolic functionalities using omics data. <i>Cell Rep. Methods</i> 2021; 1:100040. <a href="https://doi.org/10.1016/j.crmeth.2021.100040" target="_blank" rel="noopener">doi:10.1016/j.crmeth.2021.100040</a></li>
   <li>Huangfu Q, Hall JAJ. Parallelizing the dual revised simplex method. <i>Math. Program. Comput.</i> 2018; 10:119–142 (HiGHS). <a href="https://doi.org/10.1007/s12532-017-0130-5" target="_blank" rel="noopener">doi:10.1007/s12532-017-0130-5</a></li>
 </ul>
 </article>
@@ -1296,28 +1406,45 @@
     </div>
   </div>
   <script>
-    // Language: ?lang=…, else the app's stored choice, else English.
+    // Language: ?lang=…, else the app's stored choice, else English. English and Spanish are in this page;
+    // the other languages are in docs/<code>.html and are loaded on demand.
     (function () {
-      var langs = ["en", "es"], lang = new URLSearchParams(location.search).get("lang");
-      if (langs.indexOf(lang) < 0) { try { lang = localStorage.getItem("metflux.lang"); } catch (e) { lang = null; } }
-      if (langs.indexOf(lang) < 0) lang = "en";
+      var LANGS = {
+        en: ["English", "Docs", "← App"], es: ["Español", "Documentación", "← Aplicación"],
+        pt: ["Português", "Documentação", "← Aplicação"], it: ["Italiano", "Documentazione", "← Applicazione"],
+        fr: ["Français", "Documentation", "← Application"], de: ["Deutsch", "Dokumentation", "← Anwendung"],
+        el: ["Ελληνικά", "Τεκμηρίωση", "← Εφαρμογή"]
+      };
+      var lang = new URLSearchParams(location.search).get("lang");
+      if (!LANGS[lang]) { try { lang = localStorage.getItem("metflux.lang"); } catch (e) { lang = null; } }
+      if (!LANGS[lang]) lang = "en";
+      var host = document.querySelector("article").parentNode, sel = document.getElementById("docLang");
+      Object.keys(LANGS).forEach(function (k) { sel.add(new Option(LANGS[k][0], k)); });
+      function ensure(l, done) {
+        if (document.querySelector('article[data-lang="' + l + '"]')) { done(l); return; }
+        fetch("docs/" + l + ".html").then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+          .then(function (h) { host.insertAdjacentHTML("beforeend", h); done(l); })
+          .catch(function () { done("en"); });
+      }
       function show(l, keepHash) {
         lang = l;
         document.documentElement.lang = l;
-        document.title = "MetfluxLive · " + (l === "es" ? "Documentación" : "Docs");
+        document.title = "MetfluxLive · " + LANGS[l][1];
         var art = null;
         document.querySelectorAll("article").forEach(function (a) { a.hidden = a.dataset.lang !== l; if (!a.hidden) art = a; });
-        document.querySelectorAll("header button").forEach(function (b) { b.classList.toggle("on", b.dataset.set === l); });
+        sel.value = l;
         var toc = document.getElementById("toc");
         toc.textContent = "";
-        art.querySelectorAll("h2").forEach(function (h) { var a = document.createElement("a"); a.href = "#" + h.id; a.textContent = h.textContent; toc.appendChild(a); });
-        document.getElementById("back").textContent = l === "es" ? "← Aplicación" : "← App";
-        // keep the reader in the same section when switching language
+        art.querySelectorAll("h2, h3[id]").forEach(function (h) { var a = document.createElement("a"); a.href = "#" + h.id; a.textContent = h.textContent; if (h.tagName === "H3") a.className = "sub"; toc.appendChild(a); });
+        document.getElementById("back").textContent = LANGS[l][2];
+        // keep the reader in the same section when switching language (ids are "<lang>-<section>")
         if (!keepHash && location.hash.length > 4) { var t = document.getElementById(l + location.hash.slice(3)); if (t) { history.replaceState(null, "", "#" + t.id); t.scrollIntoView(); } }
       }
-      document.querySelectorAll("header button").forEach(function (b) { b.onclick = function () { show(b.dataset.set, false); }; });
-      show(lang, true);
-      if (location.hash) { var el = document.getElementById(location.hash.slice(1)); if (el && !el.closest("article").hidden) el.scrollIntoView(); }
+      sel.onchange = function () { ensure(sel.value, function (l) { show(l, false); }); };
+      ensure(lang, function (l) {
+        show(l, true);
+        if (location.hash) { var el = document.getElementById(location.hash.slice(1)); if (el && !el.closest("article").hidden) el.scrollIntoView(); }
+      });
     })();
   </script>
 </body>

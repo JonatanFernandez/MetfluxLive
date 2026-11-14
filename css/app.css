@@ -194,7 +194,7 @@ dialog header, dialog footer { display: flex; align-items: center; gap: 8px; }
 .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
-@media (max-width: 1100px) { main { grid-template-columns: 280px 1fr; } #right { position: absolute; right: 0; top: 49px; bottom: 0; width: 320px; z-index: 4; box-shadow: -10px 0 30px var(--shadow); } #right:has(#details:empty) { display: none; } }
+@media (max-width: 1100px) { main { grid-template-columns: min(var(--left-w, 280px), 300px) 0 minmax(0, 1fr) 0; } #resRight { display: none; } #right { position: absolute; right: 0; top: 49px; bottom: 0; width: 320px; z-index: 4; box-shadow: -10px 0 30px var(--shadow); } #right:has(#details:empty) { display: none; } }
 
 /* collapsible sections of the left panel */
 section.fold > h2 { justify-content: flex-start; gap: 6px; cursor: pointer; user-select: none; border-radius: 4px; }
@@ -330,3 +330,11 @@ dialog.editor input[type=number] { width: 100%; text-align: left; }
 :root[data-theme="light"] svg.mol text.atom.el-R { fill: #5b6784; } :root[data-theme="light"] svg.mol text.atom.el-I { fill: #7550c0; }
 :root[data-theme="light"] svg.mol text.atom.el-x { fill: #3e4759; }
 .chart-cursor { stroke: var(--text); opacity: .5; }
+/* header that does not fit (narrow window, long words): icon buttons, then no brand text */
+#topbar.compact2 .brand-text { display: none; }
+#topbar .tb-side.right > button.iconized { padding: 6px 10px; }
+#topbar.compact3 #modelSelect { max-width: 118px; }
+#topbar.compact3 .search { min-width: 70px; }
+#topbar.compact4 #autoBtn span { display: none; }
+#topbar.compact3 .tb-center { gap: 6px; }
+#topbar.compact4 .tb-center, #topbar.compact4 .tb-side { gap: 6px; }

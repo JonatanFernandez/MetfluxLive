@@ -5,7 +5,7 @@ import { MEASURED_SETS, DEFAULT_TOL, measuredPreset, measuredNgam } from "./core
 import { gprActivity } from "./core/gpr.js";
 import { ModelIndex, fmtFlux, fmtTime, escapeHtml as esc } from "./modelindex.js";
 import { MapView, COMP_COLORS, enrichColor, deltaColor, energyColor, setMapTheme } from "./ui/mapview.js";
-import { OBJECTIVES, objectiveIndex } from "./core/objectives.js";
+import { OBJECTIVES, OBJECTIVE_GROUPS, objectiveIndex } from "./core/objectives.js";
 import { SearchIndex, attachSearch } from "./ui/search.js";
 import { renderMolecule, tracerName } from "./ui/molecule.js";
 import { buildCellLayout } from "./celllayout.js";
@@ -13,7 +13,7 @@ import { metDepths, cascadeGlobal, cascadeSub } from "./cascade.js";
 import { IsotopologueSampler, naturalMid } from "./core/isotopologues.js";
 import { DATASETS, buildResults } from "./export/results.js";
 import { makeZip, readStoredZip } from "./export/zip.js";
-import { t, initLang, setLang, getLang, applyDom, LANGS } from "./i18n.js";
+import { t, initLang, setLang, getLang, docsLang, applyDom, LANGS } from "./i18n.js";
 import { applyEdits, editedLayout, editsFile, readEditsFile, modelLookups, EDIT_FORMAT } from "./core/edits.js";
 import { createEditor } from "./ui/editor.js";
 import { createCompare } from "./ui/compare.js";
@@ -43,9 +43,11 @@ async function boot() {
   for (const [code] of LANGS) ls.add(new Option(code.toUpperCase(), code));
   ls.value = getLang();
   bindFolds(); bindResizers();
-  applyDom();
-  $("docsBtn").href = "docs.html?lang=" + getLang();
-  document.querySelectorAll("a[data-docs]").forEach((a) => { a.href = `docs.html?lang=${getLang()}#${getLang()}-${a.dataset.docs}`; });
+  applyDom(); fitHeader();
+  let fitTimer = null;
+  window.addEventListener("resize", () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitHeader, 120); });
+  $("docsBtn").href = "docs.html?lang=" + docsLang();
+  document.querySelectorAll("a[data-docs]").forEach((a) => { a.href = `docs.html?lang=${docsLang()}#${docsLang()}-${a.dataset.docs}`; });
   // "metflux.view" replaces "metflux.grouping" (2026-11-14), so that the new default (cascade) is seen once
   try { const g = localStorage.getItem("metflux.view"); if (g === "cell" || g === "pathway" || g === "cascade") S.grouping = g; } catch { /* storage unavailable */ }
   try { const a = JSON.parse(localStorage.getItem("metflux.auto") || "null"); if (a) S.auto = { steady: a.steady !== false, dynamic: !!a.dynamic }; } catch { /* storage unavailable */ }
@@ -889,7 +891,7 @@ function renderMeasured() {
   for (const x of MEASURED_SETS) sel.add(new Option(t("meas.name." + x.id), x.id));
   sel.value = S.measured.set;
   $("measTol").value = Math.round(100 * S.measured.tol);
-  $("measuredNote").innerHTML = t("meas.note." + S.measured.set, { lang: getLang() }) + (S.measured.edited ? " " + t("meas.note.edited") : "") + (S.measured.items.length && S.perturb.length ? t("meas.perturbNote") : "");
+  $("measuredNote").innerHTML = t("meas.note." + S.measured.set, { lang: docsLang() }) + (S.measured.edited ? " " + t("meas.note.edited") : "") + (S.measured.items.length && S.perturb.length ? t("meas.perturbNote") : "");
   const list = $("measuredList");
   list.textContent = "";
   if (!S.measured.items.length && !S.measured.ngam) return;
@@ -1086,7 +1088,7 @@ function pickSupplyMet(base) {
 
 // ---------------------------------------------------------- perturbations ----
 function renderPerturb() {
-  if (S.measured.items.length) $("measuredNote").innerHTML = t("meas.note." + S.measured.set, { lang: getLang() }) + (S.measured.edited ? " " + t("meas.note.edited") : "") + (S.perturb.length ? t("meas.perturbNote") : "");
+  if (S.measured.items.length) $("measuredNote").innerHTML = t("meas.note." + S.measured.set, { lang: docsLang() }) + (S.measured.edited ? " " + t("meas.note.edited") : "") + (S.perturb.length ? t("meas.perturbNote") : "");
   const list = $("perturbList");
   list.textContent = "";
   $("clearPerturb").hidden = !S.perturb.length;
@@ -1181,7 +1183,7 @@ function userObjectives() {
 }
 function objectiveChoices() {
   const out = [];
-  for (const o of OBJECTIVES) { const j = objectiveIndex(S.model, S.index, o); if (j >= 0) out.push({ key: "preset:" + o.id, name: t("obj.name." + o.id), j, max: o.max, preset: o.id }); }
+  for (const o of OBJECTIVES) { const j = objectiveIndex(S.model, S.index, o); if (j >= 0) out.push({ key: "preset:" + o.id, name: t("obj.name." + o.id), j, max: o.max, preset: o.id, group: o.group, cellType: !!o.cellType }); }
   const L = modelLookups(S.model), all = userObjectives();
   for (const name of Object.keys(all).sort((a, b) => a.localeCompare(b))) {
     const j = L.rxn.get(all[name].rxn);
@@ -1206,13 +1208,14 @@ function renderObjective() {
     for (const c of list) g.appendChild(new Option(c.name, c.key));
     sel.appendChild(g);
   };
-  group(t("obj.builtin"), choices.filter((c) => c.preset));
+  for (const g of OBJECTIVE_GROUPS) group(t("obj.group." + g), choices.filter((c) => c.preset && c.group === g));
   group(t("obj.saved"), choices.filter((c) => !c.preset));
   if (!cur) sel.appendChild(new Option(t("obj.custom", { dir: t(S.cfg.maximize ? "h.max" : "h.min"), name: r.n }), "custom"));
   sel.value = cur ? cur.key : "custom";
   $("deleteObjective").hidden = !cur || !!cur.preset;
   $("saveObjective").hidden = !!cur;
-  $("objNote").innerHTML = cur?.preset ? t("obj.note." + cur.preset) : cur ? t("obj.note.user") : t("obj.note.custom");
+  $("objNote").innerHTML = (cur?.preset ? t("obj.note." + cur.preset) : cur ? t("obj.note.user") : t("obj.note.custom"))
+    + (cur?.cellType && S.measured.items.length ? `<br><b>${t("obj.measHint")}</b>` : "");
 }
 
 function pickObjective(key) {
@@ -1833,15 +1836,38 @@ function bindResizers() {
 }
 
 // --------------------------------------------------------------------- ui ----
+// ----------------------------------------------------------------- header ----
+// When the three groups of the top bar do not fit (narrow window, or a language with long words), the
+// right-hand buttons are reduced to their icon (full label kept as tooltip and accessible name), then the
+// brand text is hidden.
+const HEADER_ICONS = { editBtn: "✎", importBtn: "⤒", exportBtn: "⤓" };
+function fitHeader() {
+  const tb = $("topbar");
+  const over = () => [...tb.children].some((c) => c.scrollWidth > c.clientWidth);
+  tb.classList.remove("compact1", "compact2", "compact3", "compact4");
+  for (const id of Object.keys(HEADER_ICONS)) {
+    const b = $(id);
+    if (b.dataset.full) { b.textContent = b.dataset.full; delete b.dataset.full; b.classList.remove("iconized"); b.removeAttribute("aria-label"); }
+  }
+  if (!over()) return;
+  tb.classList.add("compact1");
+  for (const [id, icon] of Object.entries(HEADER_ICONS)) {
+    const b = $(id);
+    b.dataset.full = b.textContent; b.setAttribute("aria-label", b.textContent); b.textContent = icon; b.classList.add("iconized");
+  }
+  for (const c of ["compact2", "compact3", "compact4"]) { if (!over()) break; tb.classList.add(c); }
+}
+
 function changeLanguage(lang) {
   setLang(lang);
   applyDom();
+  fitHeader();
   if (!S.model) return;
   S.search = new SearchIndex(S.model, S.index);
   S.scenes = {}; // region and level labels are translated
   for (const k of [...S.subScenes.keys()]) if (String(k).startsWith("c")) S.subScenes.delete(k);
-  $("docsBtn").href = "docs.html?lang=" + getLang();
-  document.querySelectorAll("a[data-docs]").forEach((a) => { a.href = `docs.html?lang=${getLang()}#${getLang()}-${a.dataset.docs}`; });
+  $("docsBtn").href = "docs.html?lang=" + docsLang();
+  document.querySelectorAll("a[data-docs]").forEach((a) => { a.href = `docs.html?lang=${docsLang()}#${docsLang()}-${a.dataset.docs}`; });
   if (S.view.kind === "global") map.setScene(globalScene(), true);
   else if (S.view.kind === "sub" && isCascade()) map.setScene(subScene(S.view.ss), true);
   renderMediumSel(); renderSupplies(); renderMeasured(); renderPerturb(); renderEvents(); renderObjective(); renderCrumbs(); applyFrame(); renderDetails();
@@ -1874,7 +1900,7 @@ function bindUi() {
   $("saveMedium").onclick = saveMedium;
   $("deleteMedium").onclick = deleteMedium;
   $("clearPerturb").onclick = () => { S.perturb = []; renderPerturb(); renderMeasured(); changed(); };
-  $("measuredSel").onchange = (ev) => loadMeasured(ev.target.value);
+  $("measuredSel").onchange = (ev) => { loadMeasured(ev.target.value); renderObjective(); };
   $("resetMeasured").onclick = () => loadMeasured(S.measured.set);
   $("measTol").onchange = (ev) => { S.measured.tol = Math.min(1, Math.max(0, (+ev.target.value || 0) / 100)); renderMeasured(); changed(); };
   attachSearch($("addMeasured"), $("measuredResults"), () => S.search, (it) => addMeasured(it.ref), { filter: (it) => it.type === "met" && S.index.metsOfBase[it.ref].some((m) => S.sim.exchanges.has(m)), limit: 80 });

@@ -93,6 +93,13 @@ export class Simulator {
     // a perturbed cell keeps the measured phenotype of the reference; only if that becomes impossible are the
     // measured fluxes relaxed (below), as in any other case
     if (measured) this._applyMeasured(measured, medium, lb, ub, capLimit, !!cfg.relaxed, cfg.objective);
+    // Maximising the release of a metabolite asks the cell to make it: its uptake is closed, otherwise a medium
+    // that contains it (glucose, urea, lactate, GSH in Plasmax...) would just be passed through.
+    for (const [, e] of this.exchanges) {
+      if (e.rxn !== cfg.objective || (cfg.maximize ? 1 : -1) !== -e.dir) continue;
+      if (e.dir < 0) lb[e.rxn] = Math.max(lb[e.rxn], 0); else ub[e.rxn] = Math.min(ub[e.rxn], 0); // uptake = dir * v <= 0
+      if (lb[e.rxn] > ub[e.rxn]) lb[e.rxn] = ub[e.rxn] = 0;
+    }
     if (pertCaps) {
       for (const [j, cap] of pertCaps) {
         ub[j] = Math.min(ub[j], cap); lb[j] = Math.max(lb[j], -cap);
@@ -119,7 +126,7 @@ export class Simulator {
    * Pin exchange fluxes to measured values (± tol). They replace the uptake ceilings that the medium gives.
    * An uptake is only applied when the metabolite is in the medium, and never above what is physically left
    * (dynamic mode). Relaxed (when the pinned problem has no solution): uptakes keep only their measured
-   * maximum and secretions are left free. The objective's own exchange is never capped as a trace.
+   * maximum and secretions are left free. The objective's own exchange is never capped as a trace nor pinned to a measurement.
    */
   _applyMeasured(meas, medium, lb, ub, capLimit, perturbed, objective) {
     const tol = Math.max(0, meas.tol ?? 0.2), present = new Map(medium.map((it) => [it.met, it]));
@@ -133,7 +140,7 @@ export class Simulator {
     }
     for (const { met, rate } of meas.items) {
       const e = this.exchanges.get(met);
-      if (!e || !rate) continue;
+      if (!e || !rate || e.rxn === objective) continue; // the objective's own exchange is left to the objective
       let lo, hi; // range of uptake (positive) or secretion (negative), in "uptake" terms
       if (rate > 0) {
         const it = present.get(met);

@@ -18,8 +18,10 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
 
 - **Docs** — the "Docs" button opens `docs.html`: methods explained for non-specialists (FBA, steady state
   vs dynamic, isotope tracing), data sources, limitations and a set of worked in-silico experiments.
-- **Language** — EN / ES selector at the top right, English by default (metabolite, reaction and pathway names come from the
-  model and are not translated). The texts live in `js/i18n.js`.
+- **Language** — selector at the top right: English (default), Spanish, Portuguese (Brazil), Italian, French, German and
+  Greek (metabolite, reaction and pathway names come from the model and are not translated). English and Spanish live in
+  `js/i18n.js`, the others in `js/i18n/<code>.js`; a missing string falls back to English. The Docs exist in all seven
+  languages (English and Spanish in `docs.html`, the others in `docs/<code>.html`, loaded on demand).
 - **Global map** — "Group: cascade" (default) orders pathways top to bottom by reaction steps from the medium (below); "Group: cell" distributes the reactions
   by compartment in a cell diagram (cytosol, mitochondrion, ER, Golgi, lysosome, peroxisome, nucleus,
   extracellular medium) and places the reactions that cross a membrane on that membrane; "Group: pathways"
@@ -76,7 +78,7 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
 - **Steady state / Dynamic** — the `?` button explains both methods.
 - **Simulate / Auto** — Simulate solves the model with the current inputs; the Auto switch next to it re-runs after
   every change (on by default in Steady state, off in Dynamic, remembered per mode).
-- **Cellular objective** — built-in objectives (growth, maximum ATP production, maximum glutathione synthesis), any
+- **Cellular objective** — built-in objectives (growth, maximum ATP, glutathione, and cell functions: urea, gluconeogenesis, ketone bodies, bile acids, lipogenesis, neurotransmitters, cortisol, NO, heme, creatine), any
   reaction from the search box, and objectives you save yourself. Docs › Flux balance analysis › Choosing the objective.
 - **Light / dark mode** — the moon/sun button at the top right (dark by default; also applies to the Docs).
 
@@ -201,8 +203,10 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
 
 - **Docs** — el botón «Docs» abre `docs.html`: métodos explicados para no especialistas (FBA, estacionario
   frente a dinámico, trazado isotópico), fuentes de datos, limitaciones y experimentos in silico resueltos.
-- **Idioma** — selector EN / ES arriba a la derecha, inglés por defecto (los nombres de metabolitos, reacciones y rutas vienen
-  del modelo y no se traducen). Los textos están en `js/i18n.js`.
+- **Idioma** — selector arriba a la derecha: inglés (por defecto), español, portugués (Brasil), italiano, francés, alemán y
+  griego (los nombres de metabolitos, reacciones y rutas vienen del modelo y no se traducen). Inglés y español están en
+  `js/i18n.js`, los demás en `js/i18n/<código>.js`; una cadena que falte se muestra en inglés. Los Docs existen en los siete
+  idiomas (inglés y español en `docs.html`, los demás en `docs/<código>.html`, que se cargan al elegirlos).
 - **Mapa global** — «Agrupar: cascada» (por defecto) ordena las rutas de arriba abajo por pasos de reacción desde el medio (ver abajo); «Agrupar: célula» reparte las reacciones
   por compartimento en un esquema de célula (citosol, mitocondria, retículo, Golgi, lisosoma, peroxisoma,
   núcleo, medio extracelular) y coloca sobre cada membrana las reacciones que la cruzan; «Agrupar: rutas»
@@ -263,7 +267,7 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
 - **Estacionario / Dinámico** — el botón `?` explica ambos métodos.
 - **Simular / Auto** — Simular resuelve el modelo con las entradas actuales; el interruptor Auto, a su lado, lo repite
   tras cada cambio (activado por defecto en Estacionario, desactivado en Dinámico, se recuerda por modo).
-- **Objetivo celular** — objetivos predefinidos (crecimiento, máxima producción de ATP, máxima síntesis de glutatión),
+- **Objetivo celular** — objetivos predefinidos (crecimiento, máximo ATP, glutatión y funciones celulares: urea, gluconeogénesis, cuerpos cetónicos, ácidos biliares, lipogénesis, neurotransmisores, cortisol, NO, hemo, creatina),
   cualquier reacción del buscador y objetivos que guardes tú. Docs › Balance de flujos › Elegir el objetivo.
 - **Modo claro / oscuro** — el botón de luna/sol arriba a la derecha (oscuro por defecto; también se aplica a los Docs).
 
