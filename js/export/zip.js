@@ -45,3 +45,16 @@ export function makeZip(files, date = new Date()) {
   end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
   return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: "application/zip" });
 }
+
+/** Entries of a ZIP written without compression (as makeZip does); compressed entries are skipped. */
+export function readStoredZip(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), dec = new TextDecoder(), out = [];
+  let p = 0;
+  while (p + 30 <= u8.length && dv.getUint32(p, true) === 0x04034b50) {
+    const method = dv.getUint16(p + 8, true), size = dv.getUint32(p + 18, true), nLen = dv.getUint16(p + 26, true), xLen = dv.getUint16(p + 28, true);
+    const name = dec.decode(u8.subarray(p + 30, p + 30 + nLen)), start = p + 30 + nLen + xLen;
+    if (method === 0) out.push({ name, data: u8.subarray(start, start + size) });
+    p = start + size;
+  }
+  return out;
+}

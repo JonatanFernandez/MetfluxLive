@@ -110,7 +110,8 @@ export class FbaProblem {
       const slack = Math.max(1e-9, Math.abs(objective) * 1e-6);
       if (sign < 0) M.changeRowBounds(this.objRow, objective - slack, INF);
       else M.changeRowBounds(this.objRow, -INF, objective + slack);
-      cost.fill(1);
+      const pc = this.net.pcost;
+      for (let j = 0; j < nRxns; j++) cost[j] = cost[nRxns + j] = pc ? pc[j] : 1;
       for (let i = n2; i < this.numCols; i++) cost[i] = 0;
       M.changeColsCost(all, cost);
       M.clearSolver();
@@ -141,5 +142,40 @@ export function packNetwork(model) {
     nRxns: model.rxns.length,
     rxnMets: model.rxns.map((r) => Int32Array.from(r.m)),
     rxnCoefs: model.rxns.map((r) => Float64Array.from(r.c)),
+    pcost: parsimonyCosts(model),
   };
+}
+
+// Deoxynucleotides and the ribonucleotide each one stands in for.
+const DEOXY = { dATP: "ATP", dADP: "ADP", dAMP: "AMP", dGTP: "GTP", dGDP: "GDP", dGMP: "GMP",
+  dCTP: "CTP", dCDP: "CDP", dCMP: "CMP", dUTP: "UTP", dUDP: "UDP", dUMP: "UMP" };
+export const DEOXY_PENALTY = 1e-3;
+
+/**
+ * Weight of each reaction in the parsimonious (second) stage: 1, or 1 + DEOXY_PENALTY for a reaction that
+ * is a copy of another one with a deoxynucleotide in place of the ribonucleotide (hexokinase with dATP,
+ * pyruvate kinase with dADP...). Without it pFBA picks either copy at the same cost, and a dATP/dADP cycle
+ * can stand in for ATP/ADP in glycolysis. Deoxynucleotides are ~1 % of the ribonucleotide pools in cells.
+ */
+export function parsimonyCosts(model) {
+  const { mets, bases, rxns } = model;
+  const w = new Float64Array(rxns.length).fill(1);
+  const byName = new Map(bases.map((b, i) => [b.n, i]));
+  const swap = new Map(); // base index of a deoxynucleotide -> base index of its ribonucleotide
+  for (const [d, r] of Object.entries(DEOXY)) if (byName.has(d) && byName.has(r)) swap.set(byName.get(d), byName.get(r));
+  if (!swap.size) return w;
+  const metKey = new Map(mets.map((m, i) => [m.b + "|" + m.c, i]));
+  const sig = (pairs) => pairs.map(([m, c]) => `${m}:${+c.toFixed(6)}`).sort().join(" ");
+  const sigs = new Set(rxns.map((r) => (r.removed ? "" : sig(r.m.map((m, q) => [m, r.c[q]])))));
+  const ribo = new Set(swap.values());
+  rxns.forEach((r, j) => {
+    // only reactions where the deoxynucleotides do the ribonucleotides' job: none of those present
+    if (r.removed || r.m.length < 2 || !r.m.some((m) => swap.has(mets[m].b)) || r.m.some((m) => ribo.has(mets[m].b))) return;
+    const twin = r.m.map((m, q) => {
+      const b = swap.get(mets[m].b);
+      return [b === undefined ? m : metKey.get(b + "|" + mets[m].c) ?? -1, r.c[q]];
+    });
+    if (twin.every(([m]) => m >= 0) && sigs.has(sig(twin))) w[j] = 1 + DEOXY_PENALTY;
+  });
+  return w;
 }

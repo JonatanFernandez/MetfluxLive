@@ -24,7 +24,7 @@ export class ModelIndex {
     const fill = count.slice(0, mets.length);
     rxns.forEach((r, j) => r.m.forEach((m, q) => { const p = fill[m]++; this.rxnList[p] = j; this.rxnCoef[p] = r.c[q]; }));
     this.rxnsOfSub = subsystems.map(() => []);
-    rxns.forEach((r, j) => this.rxnsOfSub[r.ss].push(j));
+    rxns.forEach((r, j) => { if (!r.removed) this.rxnsOfSub[r.ss].push(j); }); // removed by a model edit: kept in place, left out
     const low = subsystems.map((s) => s.toLowerCase());
     this.isTransportSub = Uint8Array.from(low, (s) => (s.includes("transport") ? 1 : 0));
     this.isExchangeSub = Uint8Array.from(low, (s) => (s.includes("exchange") ? 1 : 0));
@@ -37,7 +37,7 @@ export class ModelIndex {
       const hit = ROLE_RX.find(([, rx]) => rx.test(name));
       if (hit && !this.roleComp[hit[0]]) { this.compRole[c] = hit[0]; this.roleComp[hit[0]] = c; }
     }
-    this.pathwayGroups = { key: "pathway", n: subsystems.length, groupOf: Int32Array.from(rxns, (r) => r.ss), skip: this.isTransportSub, perMet: false };
+    this.pathwayGroups = { key: "pathway", n: subsystems.length, groupOf: Int32Array.from(rxns, (r) => (r.removed ? -1 : r.ss)), skip: this.isTransportSub, perMet: false };
   }
 
   /** Reactions carrying label: active, with a labelled non-currency metabolite. */
@@ -90,12 +90,14 @@ export class ModelIndex {
   }
 
   /**
-   * Carbon highways between reaction groups: what group A produces and group B consumes.
+   * Highways between reaction groups: what group A produces and group B consumes, weighted by what each
+   * molecule carries (carbon atoms by default).
    * G = { n, groupOf, skip, perMet }: with perMet each compartment's pool is separate (cell view);
    * otherwise compartments are merged per metabolite and groups flagged in `skip` (transport) are ignored.
    * vRef (optional) gives the reference fluxes for the per-group change gD in [-1, 1].
+   * Q (optional) = { w: weight per metabolite, skipBase: bases left out, lineLabel: colour lines by metE }.
    */
-  groupFlows(v, metE, G, vRef) {
+  groupFlows(v, metE, G, vRef, Q) {
     const { model } = this;
     const nG = G.n, groupOf = G.groupOf, skip = G.skip;
     const gFlux = new Float32Array(nG), gLab = new Float32Array(nG), gE = new Float32Array(nG), gRef = new Float32Array(nG), gD = new Float32Array(nG);
@@ -117,18 +119,23 @@ export class ModelIndex {
       const mx = Math.max(gFlux[g], gRef[g]);
       gD[g] = vRef && mx > 0 ? (gFlux[g] - gRef[g]) / mx : 0;
     }
+    const W = Q?.w || (this._wC || (this._wC = Float32Array.from(model.mets, (m) => this.baseCarbons[m.b])));
+    const skipBase = Q?.skipBase || this.currency;
+    const lineE = Q ? (Q.lineLabel ? metE : null) : metE;
     const flows = new Map();
     const P = new Map(), C = new Map();
-    const pool = (b, mets, carbons) => {
+    const pool = (b, mets) => {
       P.clear(); C.clear();
       let tp = 0, tc = 0, lab = 0, tot = 0;
       for (const m of mets) {
+        const wm = W[m];
+        if (!wm) continue;
         for (let p = this.rxnStart[m]; p < this.rxnStart[m + 1]; p++) {
-          const j = this.rxnList[p], f = v[j] * this.rxnCoef[p];
+          const j = this.rxnList[p], f = v[j] * this.rxnCoef[p] * wm;
           if (!f) continue;
           const g = groupOf[j];
           if (g < 0 || (skip && skip[g])) continue;
-          if (f > 0) { P.set(g, (P.get(g) || 0) + f); tp += f; if (metE) { lab += f * metE[m]; tot += f; } }
+          if (f > 0) { P.set(g, (P.get(g) || 0) + f); tp += f; if (lineE) { lab += f * lineE[m]; tot += f; } }
           else { C.set(g, (C.get(g) || 0) - f); tc -= f; }
         }
       }
@@ -136,7 +143,7 @@ export class ModelIndex {
       const norm = Math.max(tp, tc), e = tot ? lab / tot : 0;
       for (const [a, pa] of P) for (const [c, cb] of C) {
         if (a === c) continue;
-        const key = a * nG + c, flow = (pa * cb * carbons) / norm;
+        const key = a * nG + c, flow = (pa * cb) / norm;
         let o = flows.get(key);
         if (!o) flows.set(key, (o = { a, b: c, flow: 0, lab: 0, top: null, topFlow: 0 }));
         o.flow += flow; o.lab += flow * e;
@@ -145,10 +152,9 @@ export class ModelIndex {
     };
     const one = [0];
     for (let b = 0; b < model.bases.length; b++) {
-      const carbons = this.baseCarbons[b];
-      if (this.currency[b] || !carbons) continue;
-      if (G.perMet) for (const m of this.metsOfBase[b]) { one[0] = m; pool(b, one, carbons); }
-      else pool(b, this.metsOfBase[b], carbons);
+      if (skipBase[b]) continue;
+      if (G.perMet) for (const m of this.metsOfBase[b]) { one[0] = m; pool(b, one); }
+      else pool(b, this.metsOfBase[b]);
     }
     const list = [...flows.values()].sort((x, y) => y.flow - x.flow).slice(0, G.perMet ? 320 : 220);
     for (const o of list) o.e = o.flow ? o.lab / o.flow : 0;

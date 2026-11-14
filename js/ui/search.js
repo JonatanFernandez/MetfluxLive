@@ -9,13 +9,16 @@ export class SearchIndex {
     const items = [];
     model.subsystems.forEach((s, i) => items.push({ type: "sub", ref: i, title: s, sub: t("search.nRxns", { n: index.rxnsOfSub[i].length }), hay: norm(s), w: 3 }));
     model.bases.forEach((b, i) => {
-      const comps = index.metsOfBase[i].map((m) => model.mets[m].c).join(", ");
+      const live = index.metsOfBase[i].filter((m) => !model.mets[m].removed);
+      if (!live.length) return; // every compartment removed by a model edit
+      const comps = live.map((m) => model.mets[m].c).join(", ");
       items.push({
         type: "met", ref: i, title: b.n, sub: [b.f, comps && t("search.comps", { c: comps })].filter(Boolean).join(" · "),
         hay: norm([b.n, b.id, b.f, b.kegg, b.hmdb, b.chebi, b.bigg].filter(Boolean).join(" | ")), name: norm(b.n), w: 2,
       });
     });
     model.rxns.forEach((r, j) => {
+      if (r.removed) return;
       items.push({
         type: "rxn", ref: j, title: r.n === r.id ? r.id : r.n, sub: [r.id, r.ec && "EC " + r.ec.join(", "), model.subsystems[r.ss]].filter(Boolean).join(" · "),
         hay: norm([r.n, r.id, r.ec && r.ec.join(" "), r.kegg, r.rhea, r.bigg].filter(Boolean).join(" | ")), name: norm(r.n), w: 1,
@@ -24,7 +27,7 @@ export class SearchIndex {
     // gene -> reactions
     const bySymbol = new Map();
     model.rxns.forEach((r, j) => {
-      if (!r.g) return;
+      if (!r.g || r.removed) return;
       for (const tok of new Set(r.g.split(/[\s()]+/))) {
         if (!tok || tok === "and" || tok === "or") continue;
         let l = bySymbol.get(tok); if (!l) bySymbol.set(tok, (l = [])); l.push(j);

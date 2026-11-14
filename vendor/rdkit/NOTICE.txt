@@ -1,0 +1,7 @@
+RDKit MinimalLib 2026.03.6 (npm package @rdkit/rdkit), WebAssembly build of RDKit.
+Copyright (c) 2006-2026 Greg Landrum and other RDKit contributors.
+License: BSD-3-Clause — https://github.com/rdkit/rdkit/blob/master/license.txt
+
+Used by MetfluxLive only in the model editor (reading SMILES, depicting structures,
+reading atom-mapped reaction SMILES and computing maximum common substructures).
+It is loaded on demand the first time a structure is needed.

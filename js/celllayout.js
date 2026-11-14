@@ -118,6 +118,7 @@ export function buildCellLayout(model, index) {
   const groups = [], byKey = new Map();
   const groupOf = new Int32Array(model.rxns.length).fill(-1);
   model.rxns.forEach((r, j) => {
+    if (r.removed) return; // removed by a model edit
     const comps = [...new Set(r.m.map((m) => model.mets[m].c))].sort();
     if (!comps.length) return;
     let loc;
