@@ -107,6 +107,7 @@ export class FbaProblem {
     if (status !== optimal) return { status: this._statusName(status), objective: 0, v: new Float64Array(nRxns), sourceFlux: new Float64Array(sources.length) };
     const objective = sign * M.getObjectiveValue() || 0;
     const limits = this._limits(M, lo, up, sign, o, n2, sources);
+    if (p.fva !== undefined) return { status: "optimal", objective, range: this._range(M, p.fva, objective, sign), v: new Float64Array(nRxns), sourceFlux: new Float64Array(sources.length) };
 
     if (p.parsimonious !== false) {
       const slack = Math.max(1e-9, Math.abs(objective) * 1e-6);
@@ -163,6 +164,22 @@ export class FbaProblem {
     }
     out.sort((a, b) => b.gain - a.gain);
     return out.slice(0, top);
+  }
+
+  /** Flux variability of one reaction: min and max of v_j with the objective held at its optimum (within 1e-6). */
+  _range(M, j, objective, sign) {
+    const { nRxns } = this.net, H = this.highs, all = { kind: "range", from: 0, to: this.numCols - 1 };
+    const slack = Math.max(1e-9, Math.abs(objective) * 1e-6);
+    if (sign < 0) M.changeRowBounds(this.objRow, objective - slack, INF); else M.changeRowBounds(this.objRow, -INF, objective + slack);
+    const out = [];
+    for (const dir of [1, -1]) { // minimise v_j, then maximise it
+      const cost = new Float64Array(this.numCols);
+      cost[j] = dir; cost[nRxns + j] = -dir;
+      M.changeColsCost(all, cost); M.clearSolver(); M.run();
+      const st = M.getModelStatus();
+      out.push(st === H.constants.modelStatus.optimal ? dir * M.getObjectiveValue() : -dir * Infinity);
+    }
+    return out;
   }
 
   _statusName(code) {

@@ -1449,6 +1449,25 @@ function changedHtml(f) {
     bars(rows.slice(0, 12).map(([name, d, j]) => [name, `${fmtFlux(f.ref.v[j])} → ${fmtFlux(f.v[j])}`, `rxn:${j}`, d / mx]), "linear-gradient(90deg,#5a96ff,#ff9f5a)", true);
 }
 
+/** Flux variability of the selected reaction, on demand (two LPs with the objective held at its optimum). */
+async function fluxRange(j) {
+  const box = $("fvaOut");
+  if (!box) return;
+  if (S.mode !== "steady") { box.innerHTML = `<div class="note">${t("rxn.fvaSteady")}</div>`; return; }
+  box.innerHTML = `<p class="meta">${t("rxn.fvaBusy")}</p>`;
+  const cfg = { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+    context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
+  try {
+    const r = await S.sim.fluxRange(cfg, S.supplies, j, frame()?.ref?.v);
+    if (!$("fvaOut") || S.sel?.rxn !== j) return;
+    if (!r.range) { $("fvaOut").innerHTML = `<div class="note">${t("sum.nosol", { why: esc(statusWhy(r.status)) })}</div>`; return; }
+    const [lo, hi] = r.range, fixed = Math.abs(hi - lo) <= 1e-6 * Math.max(1, Math.abs(hi), Math.abs(lo));
+    const fmt = (x) => (Number.isFinite(x) ? fmtFlux(x) : x > 0 ? "∞" : "−∞");
+    const kind = fixed ? (Math.abs(lo) < 1e-9 ? "rxn.fvaZero" : "rxn.fvaFixed") : lo > 1e-9 || hi < -1e-9 ? "rxn.fvaRequired" : "rxn.fvaFree";
+    $("fvaOut").innerHTML = `<div class="note"><b>${t("rxn.fvaRange", { lo: fmt(lo), hi: fmt(hi) })}</b><br>${t(kind)}${Math.max(Math.abs(lo), Math.abs(hi)) >= 999 ? " " + t("rxn.fvaLoop") : ""}${r.relaxed ? " " + t("sum.relaxed") : ""}</div>`;
+  } catch (err) { $("fvaOut").innerHTML = `<div class="note err">${esc(err.message)}</div>`; }
+}
+
 /** "What limits the objective": the bounds with the largest reduced cost in the FBA stage (js/core/fba.js). */
 function limitsHtml(f) {
   if (!f.limits || Math.abs(f.objective) < 1e-12) return "";
@@ -1739,7 +1758,7 @@ function rxnHtml(j) {
       <dt>${t("rxn.atommap")}</dt><dd>${mapTxt}</dd>
       ${dgHtml(j, v)}
     </dl>
-    <div class="actions"><button data-act="perturb">${t("pert.button")}</button><button data-act="objective">${t("rxn.useObjective")}</button></div>
+    <div class="actions"><button data-act="perturb">${t("pert.button")}</button><button data-act="objective">${t("rxn.useObjective")}</button><button data-act="fva" title="${t("rxn.fvaTitle")}">${t("rxn.fva")}</button></div><div id="fvaOut"></div>
     ${S.editMode ? `<div class="actions edit"><button data-act="editRxn">${t(r.user ? "ed.act.editAdded" : "ed.act.editRxn")}</button><button data-act="copyRxn">${t("ed.act.copyRxn")}</button><button data-act="removeRxn" class="danger">${t(r.user ? "ed.act.dropRxn" : "ed.act.removeRxn")}</button></div>` : ""}`;
 }
 
@@ -1805,6 +1824,7 @@ function renderDetails() {
   } else if (sel?.type === "rxn") {
     on("objective", () => { S.cfg.objective = sel.rxn; renderObjective(); changed(); });
     on("perturb", () => addPerturb("rxn", sel.rxn));
+    on("fva", () => fluxRange(sel.rxn));
     on("editRxn", () => { const r = S.model.rxns[sel.rxn]; if (r.user) { const i = S.edits.findIndex((op) => op.op === "addRxn" && op.id === r.id); editor.openRxnDialog({ op: S.edits[i], index: i }); } else { const i = S.edits.findIndex((op) => op.op === "editRxn" && op.id === r.id); editor.openRxnDialog(i >= 0 ? { op: S.edits[i], index: i, j: sel.rxn } : { j: sel.rxn }); } });
     on("copyRxn", () => editor.openRxnDialog({ copyOf: sel.rxn }));
     on("removeRxn", () => editor.removeRxn(sel.rxn));

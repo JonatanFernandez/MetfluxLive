@@ -71,6 +71,16 @@ export class Simulator {
     return JSON.stringify([cfg.objective, cfg.maximize, cfg.parsimonious, cfg.measured || null, cfg.context ? [cfg.context.id, cfg.context.mode, cfg.context.block.length] : null, supplies.map((it) => [it.met, it.conc, it.vmax, it.km, it.unlimited ? 1 : 0, it.hold ? 1 : 0])]);
   }
 
+  /**
+   * Flux range of reaction j (FVA): [min, max] with the objective at its optimum, under the same medium, measured
+   * fluxes, cell type and (given the reference fluxes) perturbations as a steady-state run.
+   */
+  async fluxRange(cfg, supplies, j, refV) {
+    const caps = cfg.perturb?.length && refV ? this._caps(cfg.perturb, refV) : null;
+    const res = await this._solve({ ...cfg, fva: j }, supplies, null, null, caps);
+    return res.status === "optimal" ? { range: res.range, relaxed: !!res.relaxed } : { status: res.status };
+  }
+
   /** The unperturbed reference is reused while medium and objective stay the same. */
   async _reference(key, compute) {
     if (this.refCache && this.refCache.key === key) return this.refCache.value;
@@ -115,7 +125,7 @@ export class Simulator {
     let res = await this._call({
       type: "solve",
       params: { lb, ub, objective: cfg.objective, maximize: cfg.maximize, parsimonious: cfg.parsimonious, sources,
-        penalty: ctx && ctx.mode === "penalty" ? { rxns: ctx.block, w: CONTEXT_PENALTY } : undefined },
+        penalty: ctx && ctx.mode === "penalty" ? { rxns: ctx.block, w: CONTEXT_PENALTY } : undefined, fva: cfg.fva },
     });
     // the measured fluxes belong to cells in a rich medium: when they cannot be met (a nutrient removed or
     // exhausted, a perturbation…) they are relaxed instead of leaving the user without a solution
