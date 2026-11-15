@@ -81,6 +81,23 @@ export class Simulator {
     return res.status === "optimal" ? { range: res.range, relaxed: !!res.relaxed } : { status: res.status };
   }
 
+  /**
+   * Knockout screen: the objective with each group of reactions closed (FBA only, no pFBA), under the same medium,
+   * measured fluxes and cell type. Measured fluxes that become impossible are relaxed, as in a normal knockout.
+   * @param groups [Int32Array of reactions]  @param onProgress (done, total) -> false to stop
+   * @returns [{ objective, status, relaxed }] in the order of groups (shorter if stopped)
+   */
+  async screenKnockouts(cfg, supplies, groups, onProgress) {
+    const base = { ...cfg, parsimonious: false, perturb: [] }, out = [];
+    for (let i = 0; i < groups.length; i++) {
+      const caps = new Map(Array.from(groups[i], (j) => [j, 0]));
+      const r = await this._solve(base, supplies, null, null, caps);
+      out.push({ objective: r.status === "optimal" ? r.objective : 0, status: r.status, relaxed: !!r.relaxed });
+      if (onProgress && onProgress(i + 1, groups.length) === false) break;
+    }
+    return out;
+  }
+
   /** The unperturbed reference is reused while medium and objective stay the same. */
   async _reference(key, compute) {
     if (this.refCache && this.refCache.key === key) return this.refCache.value;

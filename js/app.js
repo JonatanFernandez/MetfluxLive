@@ -1468,6 +1468,63 @@ async function fluxRange(j) {
   } catch (err) { $("fvaOut").innerHTML = `<div class="note err">${esc(err.message)}</div>`; }
 }
 
+/**
+ * Essential-gene screen in the current situation (cell type included): knock out, one by one, every detected gene
+ * whose reactions carry flux. Genes that close the same reactions share one LP; genes whose loss is covered by an
+ * isoenzyme need none.
+ */
+async function geneScreen() {
+  const out = $("screenOut"), f = frame();
+  if (S.mode !== "steady" || !f || f.status !== "optimal") { out.innerHTML = `<div class="note">${t("scr.needSteady")}</div>`; return; }
+  const ref = f.ref ? f.ref.objective : f.objective;
+  if (!(Math.abs(ref) > 1e-12)) { out.innerHTML = `<div class="note">${t("sum.zero")}</div>`; return; }
+  const ctx = currentContext(), off = ctx ? offGenes(ctx, S.base.model.genes) : new Set();
+  const blocked = S.ctxBlock ? (S.ctxBlockSet ??= new Set(S.ctxBlock)) : new Set();
+  const groups = new Map(); // key -> { rxns, genes }
+  const free = [];
+  for (const [sym, rx] of S.search.geneRxns) {
+    if (off.has(sym) || !rx.some((j) => Math.abs(f.v[j]) > 1e-9)) continue;
+    const levels = new Map([...off].map((g) => [g, 0])); levels.set(sym, 0);
+    const lost = rx.filter((j) => !blocked.has(j) && gprActivity(S.model.rxns[j].g, levels) === 0).sort((a, b) => a - b);
+    if (!lost.length) { free.push(sym); continue; }
+    const key = lost.join(",");
+    if (!groups.has(key)) groups.set(key, { rxns: Int32Array.from(lost), genes: [] });
+    groups.get(key).genes.push(sym);
+  }
+  const list = [...groups.values()];
+  const cfg = { ...S.cfg, measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+    context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
+  S.screening = { stop: false };
+  $("geneScreen").textContent = t("scr.stop");
+  const t0 = performance.now();
+  let res;
+  try {
+    res = await S.sim.screenKnockouts(cfg, S.supplies, list.map((g) => g.rxns), (done, total) => {
+      out.innerHTML = `<p class="meta">${t("scr.progress", { done, total, genes: list.reduce((s, g) => s + g.genes.length, 0) })}</p>`;
+      return !S.screening.stop;
+    });
+  } catch (err) { out.innerHTML = `<div class="note err">${esc(err.message)}</div>`; }
+  S.screening = null; $("geneScreen").textContent = t("scr.button");
+  if (!res) return;
+  const rows = [];
+  res.forEach((r, i) => { for (const g of list[i].genes) rows.push({ g, x: r.objective / ref, relaxed: r.relaxed, status: r.status, rxns: list[i].rxns }); });
+  const rescued = new Map((ctx?.rescued || []).map(([k, ti]) => [S.base.model.genes[k][1], taskName(S.ctxData, ti)]));
+  rows.sort((a, b) => a.x - b.x);
+  const ess = rows.filter((r) => r.x < 0.01), red = rows.filter((r) => r.x >= 0.01 && r.x < 0.95);
+  const row = (r) => {
+    const names = Array.from(r.rxns, (j) => S.model.rxns[j].n).join("\n"), resc = rescued.get(r.g);
+    return `<div class="bar-row"><span class="nm"><span class="linkish" data-gene="${esc(r.g)}">${esc(r.g)}</span>${resc ? ` <span class="warn" title="${esc(t("scr.rescuedTitle", { task: resc }))}">↺</span>` : ""}${r.relaxed ? " *" : ""} <small class="meta" title="${esc(names)}">${t("scr.nRxns", { n: r.rxns.length })}</small></span><span class="val">${Math.round(100 * r.x)} %</span><button class="link" data-ko="${esc(r.g)}" title="${esc(t("scr.addTitle"))}">✂</button></div>`;
+  };
+  const none = rows.filter((r) => r.x >= 0.95).map((r) => r.g).concat(free).sort();
+  out.innerHTML = `<div class="note">${t("scr.summary", { n: rows.length + free.length, lp: res.length, s: ((performance.now() - t0) / 1000).toFixed(0), ess: ess.length, red: red.length, ctx: esc(ctx?.name || t("ctx.none")) })}${res.length < list.length ? " " + t("scr.stopped") : ""}</div>`
+    + (ess.length ? `<h4>${t("scr.ess")}</h4>${ess.map(row).join("")}` : "") + (red.length ? `<h4>${t("scr.red")}</h4>${red.map(row).join("")}` : "")
+    + (none.length ? `<details><summary>${t("scr.none", { n: none.length })}</summary><p class="meta">${none.map(esc).join(", ")}</p></details>` : "")
+    + (rows.some((r) => rescued.has(r.g)) ? `<p class="meta">${t("scr.rescuedNote")}</p>` : "")
+    + (rows.some((r) => r.relaxed) ? `<p class="meta">${t("scr.relaxedNote")}</p>` : "");
+  out.querySelectorAll("[data-ko]").forEach((b) => { b.onclick = () => addPerturb("gene", b.dataset.ko); });
+  out.querySelectorAll("[data-gene]").forEach((b) => { b.onclick = () => { S.sel = { type: "gene", sym: b.dataset.gene }; renderDetails(); }; });
+}
+
 /** "What limits the objective": the bounds with the largest reduced cost in the FBA stage (js/core/fba.js). */
 function limitsHtml(f) {
   if (!f.limits || Math.abs(f.objective) < 1e-12) return "";
@@ -2094,6 +2151,7 @@ function bindUi() {
   $("mediumSel").onchange = (ev) => loadMedium(ev.target.value);
   $("saveMedium").onclick = saveMedium;
   $("deleteMedium").onclick = deleteMedium;
+  $("geneScreen").onclick = () => (S.screening ? (S.screening.stop = true) : geneScreen());
   $("clearPerturb").onclick = () => { S.perturb = []; renderPerturb(); renderMeasured(); changed(); };
   $("measuredSel").onchange = (ev) => { loadMeasured(ev.target.value); renderObjective(); renderContext(); };
   $("resetMeasured").onclick = () => loadMeasured(S.measured.set);
