@@ -68,7 +68,8 @@ export class FbaProblem {
 
   /**
    * @param p { lb, ub: Float64Array(nRxns), objective: rxn index, maximize: bool,
-   *            parsimonious: bool, sources: [{met, max}] }
+   *            parsimonious: bool, sources: [{met, max}], penalty?: { rxns: Int32Array, w: number } }
+   *            penalty: extra weight (1 + w) of those reactions in the parsimonious stage only
    * @returns { status, objective, v: Float64Array(nRxns), sourceFlux: Float64Array }
    */
   solve(p) {
@@ -105,6 +106,7 @@ export class FbaProblem {
     let status = M.getModelStatus();
     if (status !== optimal) return { status: this._statusName(status), objective: 0, v: new Float64Array(nRxns), sourceFlux: new Float64Array(sources.length) };
     const objective = sign * M.getObjectiveValue() || 0;
+    const limits = this._limits(M, lo, up, sign, o, n2, sources);
 
     if (p.parsimonious !== false) {
       const slack = Math.max(1e-9, Math.abs(objective) * 1e-6);
@@ -112,6 +114,7 @@ export class FbaProblem {
       else M.changeRowBounds(this.objRow, -INF, objective + slack);
       const pc = this.net.pcost;
       for (let j = 0; j < nRxns; j++) cost[j] = cost[nRxns + j] = pc ? pc[j] : 1;
+      if (p.penalty) for (const j of p.penalty.rxns) cost[j] = cost[nRxns + j] = cost[j] * (1 + p.penalty.w);
       for (let i = n2; i < this.numCols; i++) cost[i] = 0;
       M.changeColsCost(all, cost);
       M.clearSolver();
@@ -125,7 +128,41 @@ export class FbaProblem {
       const val = x[j] - x[nRxns + j];
       v[j] = Math.abs(val) < 1e-9 ? 0 : val;
     }
-    return { status: "optimal", objective, v, sourceFlux: Float64Array.from(sources, (_, i) => x[n2 + i]) };
+    return { status: "optimal", objective, v, sourceFlux: Float64Array.from(sources, (_, i) => x[n2 + i]), limits };
+  }
+
+  /**
+   * Bounds that limit the objective, from the reduced costs of the first (FBA) stage. A column at a bound with
+   * reduced cost d changes the minimised cost by d per unit the bound moves, so the objective gains sign * d per
+   * unit an upper bound rises and -sign * d per unit a positive lower bound falls. Degenerate LPs have several dual
+   * solutions: the list is one valid explanation, not the only one.
+   * @returns [{ j (reaction, or -1 - i for injection i), half: 1 forward / -1 reverse, kind: "ub" | "lb" | "closed", gain }]
+   */
+  _limits(M, lo, up, sign, o, n2, sources, top = 12) {
+    let sol;
+    try { sol = M.getSolution(); } catch { return []; }
+    const d = sol.colDual, x = sol.colValue, nR = this.net.nRxns, out = [];
+    if (!d) return [];
+    for (let c = 0; c < this.numCols; c++) {
+      const j = c < n2 ? c % nR : -1 - (c - n2);
+      if (j === o) continue;
+      const dc = d[c];
+      if (!Number.isFinite(dc) || Math.abs(dc) < 1e-9) continue;
+      const tol = 1e-7 * Math.max(1, Math.abs(up[c])), atUp = up[c] < INF / 2 && Math.abs(x[c] - up[c]) <= tol, atLo = lo[c] > 0 && Math.abs(x[c] - lo[c]) <= tol;
+      let kind = null, gain = 0;
+      if (atUp && up[c] === 0 && lo[c] === 0) {
+        // only a closure the published model does not have (cell type, knockout, edit), and not an exchange
+        const net = this.net, half = c < nR ? 1 : -1;
+        if (j < 0 || !net.lb0 || net.rxnMets[j].length < 2 || (half > 0 ? net.ub0[j] <= 0 : net.lb0[j] >= 0)) continue;
+        kind = "closed"; gain = sign * dc;
+      }
+      else if (atUp && up[c] > 0) { kind = "ub"; gain = sign * dc; }
+      else if (atLo) { kind = "lb"; gain = -sign * dc; }
+      if (!kind || gain <= 1e-9) continue;
+      out.push({ j, half: c < n2 && c >= nR ? -1 : 1, kind, gain });
+    }
+    out.sort((a, b) => b.gain - a.gain);
+    return out.slice(0, top);
   }
 
   _statusName(code) {
@@ -143,6 +180,7 @@ export function packNetwork(model) {
     rxnMets: model.rxns.map((r) => Int32Array.from(r.m)),
     rxnCoefs: model.rxns.map((r) => Float64Array.from(r.c)),
     pcost: parsimonyCosts(model),
+    lb0: Float64Array.from(model.rxns, (r) => r.lb), ub0: Float64Array.from(model.rxns, (r) => r.ub), // published bounds
   };
 }
 

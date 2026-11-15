@@ -1025,6 +1025,90 @@ Object.assign(es, {
   "medium.name.williamsE": "Williams E (cortes de hígado, Grankvist 2024)",
   "medium.note.williamsE": "Williams E sin suero, como el usado para cortes de hígado humano por Grankvist et al. 2024 (nutrientes de ayuno, sin insulina), según su tabla suplementaria 2. Menadiona, manganeso y nitrato no están en los modelos y se omiten."
 });
+Object.assign(en, {
+  "h.context": "Cell type (gene expression)",
+  "ctx.clear": "all enzymes",
+  "ctx.ph": "Search a cell line, cell type, tissue or cancer…",
+  "ctx.modeTitle": "What happens to reactions whose enzymes are not detected in this cell type",
+  "ctx.mode.block": "Block reactions of non-detected enzymes",
+  "ctx.mode.penalty": "Only make them costlier (pFBA)",
+  "ctx.none": "All enzymes of the genome (generic model)",
+  "ctx.noneNote": "The generic model can use every enzyme in the genome. Choose a cell line, cell type or tissue to switch off the genes that are not detected in it. <a href=\"docs.html?lang={lang}#{lang}-contexts\" target=\"_blank\" rel=\"noopener\">Docs › Cell types</a>.",
+  "ctx.summary": "{off} of {n} genes not detected · {rx} reactions blocked",
+  "ctx.rescued": "{n} genes switched back on because a metabolic task needs them",
+  "ctx.failed": "Tasks still not possible: {list}",
+  "ctx.pair": "Measured exchange fluxes from these cells: {sets}.",
+  "ctx.measOther": "The measured fluxes loaded ({set}) come from other cells and may not fit this cell type.",
+  "ctx.penaltyNoPfba": "Making them costlier only acts through pFBA: turn on pFBA in Objective.",
+  "ctx.license.hpa": "Data: <a href=\"https://www.proteinatlas.org\" target=\"_blank\" rel=\"noopener\">Human Protein Atlas</a> 26.0 (<a href=\"https://creativecommons.org/licenses/by-sa/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 4.0</a>) and <a href=\"https://www.cellosaurus.org\" target=\"_blank\" rel=\"noopener\">Cellosaurus</a> (CC BY 4.0). <a href=\"docs.html?lang={lang}#{lang}-contexts\" target=\"_blank\" rel=\"noopener\">How it was made</a>.",
+  "ctx.license.bgee": "Data: <a href=\"https://www.bgee.org\" target=\"_blank\" rel=\"noopener\">Bgee</a> (CC0). <a href=\"docs.html?lang={lang}#{lang}-contexts\" target=\"_blank\" rel=\"noopener\">How it was made</a>.",
+  "ctx.group.consensus": "Panel consensus",
+  "ctx.group.lineCancer": "Cancer cell line",
+  "ctx.group.lineOther": "Non-cancer cell line",
+  "ctx.group.cellType": "Cell type",
+  "ctx.group.tissue": "Tissue",
+  "ctx.badge.consensus": "Panel",
+  "ctx.badge.lineCancer": "Cancer",
+  "ctx.badge.lineOther": "Line",
+  "ctx.badge.cellType": "Cell",
+  "ctx.badge.tissue": "Tissue",
+  "ctx.src.hpaLine": "HPA cell lines",
+  "ctx.src.hpaCell": "HPA single cell types",
+  "ctx.src.hpaTissue": "HPA tissues",
+  "ctx.src.bgee": "Bgee",
+  "ctx.nci60Sub": "Median of the {n} NCI-60 lines in the HPA cell line atlas",
+  "ctx.rxnBlocked": "Blocked in {ctx}: none of its enzymes is detected (not detected: {genes}).",
+  "ctx.rxnPenal": "Costlier in {ctx}: none of its enzymes is detected (not detected: {genes}).",
+  "ctx.geneOff": "Not detected in {ctx}: switched off.",
+  "ctx.geneOn": "Detected in {ctx}.",
+  "ctx.geneRescued": "Not detected in {ctx}, but kept on because a metabolic task needs it."
+});
+Object.assign(es, {
+  "h.context": "Tipo celular (expresión génica)",
+  "ctx.clear": "todas las enzimas",
+  "ctx.ph": "Buscar línea celular, tipo celular, tejido o cáncer…",
+  "ctx.modeTitle": "Qué pasa con las reacciones cuyas enzimas no se detectan en este tipo celular",
+  "ctx.mode.block": "Bloquear reacciones de enzimas no detectadas",
+  "ctx.mode.penalty": "Solo encarecerlas (pFBA)",
+  "ctx.none": "Todas las enzimas del genoma (modelo genérico)",
+  "ctx.noneNote": "El modelo genérico puede usar todas las enzimas del genoma. Elige una línea celular, un tipo celular o un tejido para apagar los genes que no se detectan en él. <a href=\"docs.html?lang={lang}#{lang}-contexts\" target=\"_blank\" rel=\"noopener\">Docs › Tipos celulares</a>.",
+  "ctx.summary": "{off} de {n} genes no detectados · {rx} reacciones bloqueadas",
+  "ctx.rescued": "{n} genes vueltos a encender porque una tarea metabólica los necesita",
+  "ctx.failed": "Tareas que siguen sin ser posibles: {list}",
+  "ctx.pair": "Flujos de intercambio medidos en estas células: {sets}.",
+  "ctx.measOther": "Los flujos medidos cargados ({set}) son de otras células y puede que no encajen con este tipo celular.",
+  "ctx.penaltyNoPfba": "Encarecerlas solo actúa a través del pFBA: activa pFBA en Objetivo.",
+  "ctx.license.hpa": "Datos: <a href=\"https://www.proteinatlas.org\" target=\"_blank\" rel=\"noopener\">Human Protein Atlas</a> 26.0 (<a href=\"https://creativecommons.org/licenses/by-sa/4.0/\" target=\"_blank\" rel=\"noopener\">CC BY-SA 4.0</a>) y <a href=\"https://www.cellosaurus.org\" target=\"_blank\" rel=\"noopener\">Cellosaurus</a> (CC BY 4.0). <a href=\"docs.html?lang={lang}#{lang}-contexts\" target=\"_blank\" rel=\"noopener\">Cómo se hizo</a>.",
+  "ctx.license.bgee": "Datos: <a href=\"https://www.bgee.org\" target=\"_blank\" rel=\"noopener\">Bgee</a> (CC0). <a href=\"docs.html?lang={lang}#{lang}-contexts\" target=\"_blank\" rel=\"noopener\">Cómo se hizo</a>.",
+  "ctx.group.consensus": "Consenso de panel",
+  "ctx.group.lineCancer": "Línea tumoral",
+  "ctx.group.lineOther": "Línea no tumoral",
+  "ctx.group.cellType": "Tipo celular",
+  "ctx.group.tissue": "Tejido",
+  "ctx.badge.consensus": "Panel",
+  "ctx.badge.lineCancer": "Cáncer",
+  "ctx.badge.lineOther": "Línea",
+  "ctx.badge.cellType": "Célula",
+  "ctx.badge.tissue": "Tejido",
+  "ctx.src.hpaLine": "HPA líneas celulares",
+  "ctx.src.hpaCell": "HPA tipos celulares",
+  "ctx.src.hpaTissue": "HPA tejidos",
+  "ctx.src.bgee": "Bgee",
+  "ctx.nci60Sub": "Mediana de las {n} líneas del NCI-60 del atlas de líneas celulares del HPA",
+  "ctx.rxnBlocked": "Bloqueada en {ctx}: no se detecta ninguna de sus enzimas (no detectados: {genes}).",
+  "ctx.rxnPenal": "Encarecida en {ctx}: no se detecta ninguna de sus enzimas (no detectados: {genes}).",
+  "ctx.geneOff": "No detectado en {ctx}: apagado.",
+  "ctx.geneOn": "Detectado en {ctx}.",
+  "ctx.geneRescued": "No detectado en {ctx}, pero se mantiene encendido porque una tarea metabólica lo necesita."
+});
+Object.assign(en, {"methods.contextH": "Cell type", "methods.context": "When a cell line, cell type or tissue is chosen, genes that are not detected in it (below 1 nTPM in the Human Protein Atlas, or absent in Bgee for mouse) are switched off, and every reaction whose <b>GPR rule</b> becomes false is blocked (or, optionally, only made 11 times costlier in pFBA). Transports of freely diffusing molecules are never blocked. Genes needed by the 57 essential metabolic tasks of Human-GEM, and by the measured phenotype when the context has one, were switched back on offline."});
+Object.assign(es, {"methods.contextH": "Tipo celular", "methods.context": "Al elegir una línea celular, un tipo celular o un tejido, se apagan los genes que no se detectan en él (menos de 1 nTPM en el Human Protein Atlas, o ausentes en Bgee para ratón) y se bloquea toda reacción cuya <b>regla GPR</b> pasa a ser falsa (o, como opción, sólo se encarece 11 veces en el pFBA). Los transportes de moléculas que difunden libremente nunca se bloquean. Los genes que necesitan las 57 tareas metabólicas esenciales de Human-GEM, y el fenotipo medido cuando el contexto lo tiene, se volvieron a encender de antemano."});
+Object.assign(en, {"ctx.browse": "catalogue", "ctx.browseTitle": "Browse every cell line, cell type and tissue in a table", "cat.title": "Cell types", "cat.filter": "Filter by name, cancer, organ, Cellosaurus ID…", "cat.all": "All groups", "cat.count": "{n} of {total}", "cat.docs": "How they were made", "cat.back": "Back to the app", "cat.note": "Every context of the model, with the number of genes switched off, the reactions they block and the genes switched back on for the metabolic tasks. Click a column to sort; \"use\" opens the app with that context. Sources: Human Protein Atlas 26.0 (CC BY-SA 4.0), Cellosaurus 57.0 (CC BY 4.0), Bgee 15.2 (CC0).", "cat.th.group": "Group", "cat.th.name": "Name", "cat.th.desc": "Description", "cat.th.src": "Source", "cat.th.off": "Genes off", "cat.th.blocked": "Reactions blocked", "cat.th.rescued": "Genes rescued", "cat.th.pairs": "Measured fluxes", "cat.use": "use"});
+Object.assign(es, {"ctx.browse": "catálogo", "ctx.browseTitle": "Ver todas las líneas, tipos celulares y tejidos en una tabla", "cat.title": "Tipos celulares", "cat.filter": "Filtrar por nombre, cáncer, órgano, ID de Cellosaurus…", "cat.all": "Todos los grupos", "cat.count": "{n} de {total}", "cat.docs": "Cómo se hicieron", "cat.back": "Volver a la app", "cat.note": "Todos los contextos del modelo, con el número de genes apagados, las reacciones que bloquean y los genes vueltos a encender por las tareas metabólicas. Haz clic en una columna para ordenar; «usar» abre la app con ese contexto. Fuentes: Human Protein Atlas 26.0 (CC BY-SA 4.0), Cellosaurus 57.0 (CC BY 4.0), Bgee 15.2 (CC0).", "cat.th.group": "Grupo", "cat.th.name": "Nombre", "cat.th.desc": "Descripción", "cat.th.src": "Fuente", "cat.th.off": "Genes apagados", "cat.th.blocked": "Reacciones bloqueadas", "cat.th.rescued": "Genes rescatados", "cat.th.pairs": "Flujos medidos", "cat.use": "usar"});
+Object.assign(en, {"legend.ctxBlocked": "Grey dashed: no enzyme detected in {ctx} (blocked)", "legend.ctxPenal": "Grey dashed: no enzyme detected in {ctx} (costlier in pFBA)"});
+Object.assign(es, {"legend.ctxBlocked": "Gris discontinuo: ninguna enzima detectada en {ctx} (bloqueada)", "legend.ctxPenal": "Gris discontinuo: ninguna enzima detectada en {ctx} (encarecida en pFBA)"});
+Object.assign(en, {"sum.limits": "What limits the objective", "sum.limitsUnit": "objective gained per mmol/gDW/h relaxed", "sum.limitsNote": "Reduced costs of the FBA solution: how much the objective would rise if that bound were relaxed by one unit. When FBA has alternative optima, another set of limits can be equally valid.", "lim.maxUptake": "maximum uptake of {n}", "lim.maxSecretion": "maximum secretion of {n}", "lim.minUptake": "minimum uptake of {n} (measured)", "lim.minSecretion": "minimum secretion of {n} (measured)", "lim.exClosed": "{n}: exchange closed", "lim.maxFwd": "{n}: upper bound", "lim.maxRev": "{n}: lower bound (reverse direction)", "lim.minFwd": "{n}: minimum flux", "lim.minRev": "{n}: minimum reverse flux", "lim.closed": "{n}: closed", "lim.byCtx": " (cell type)", "lim.byKo": " (knockout)", "lim.injection": "injection of {n}"});
+Object.assign(es, {"sum.limits": "Qué limita el objetivo", "sum.limitsUnit": "objetivo ganado por mmol/gDW/h relajado", "sum.limitsNote": "Costes reducidos de la solución del FBA: cuánto subiría el objetivo si ese límite se relajara una unidad. Cuando el FBA tiene óptimos alternativos, otro conjunto de límites puede ser igual de válido.", "lim.maxUptake": "captación máxima de {n}", "lim.maxSecretion": "excreción máxima de {n}", "lim.minUptake": "captación mínima de {n} (medida)", "lim.minSecretion": "excreción mínima de {n} (medida)", "lim.exClosed": "{n}: intercambio cerrado", "lim.maxFwd": "{n}: límite superior", "lim.maxRev": "{n}: límite inferior (sentido inverso)", "lim.minFwd": "{n}: flujo mínimo", "lim.minRev": "{n}: flujo inverso mínimo", "lim.closed": "{n}: cerrada", "lim.byCtx": " (tipo celular)", "lim.byKo": " (knockout)", "lim.injection": "inyección de {n}"});
 export const DICT = { es, en, pt, it, fr, de, el };
 export const LANGS = [["en", "English"], ["es", "Español"], ["pt", "Português"], ["it", "Italiano"], ["fr", "Français"], ["de", "Deutsch"], ["el", "Ελληνικά"]];
 // languages the documentation (docs.html + docs/<code>.html) is written in; any other opens it in English

@@ -19,7 +19,7 @@ const THEMES = {
     inactiveEdge: "rgba(125,145,190,0.13)", structEdge: "rgba(125,145,190,0.10)", guide: "rgba(125,145,190,0.25)", guideText: "rgba(147,162,198,0.9)",
     metOn: "#1d3350", metOff: "#141c30", rxnOn: "#e8eefc", rxnTransport: "#9fb4d8", rxnOff: "#2a3552",
     labelOn: "#eef3ff", labelOff: "rgba(170,185,215,0.6)", rxnLabelOn: "#b8c6e6", rxnLabelOff: "rgba(140,155,190,0.5)", groupLabelOff: "rgba(165,180,212,0.62)",
-    hover: "rgba(255,255,255,0.55)", selected: "#ffffff", pulse: [255, 255, 255], gene: "#b48cff", ko: "#ff5d6c",
+    hover: "rgba(255,255,255,0.55)", selected: "#ffffff", pulse: [255, 255, 255], gene: "#b48cff", ko: "#ff5d6c", blocked: "#6b768f",
     groupOff: "#151d33", groupRing: "rgba(235,242,255,0.9)", groupRingOff: "rgba(130,148,190,0.45)", groupListOnly: "rgba(160,175,210,0.45)",
     groupFill: (s) => `rgb(${28 + 30 * s},${60 + 90 * s},${92 + 110 * s})`, unknown: [70, 80, 108],
   },
@@ -28,7 +28,7 @@ const THEMES = {
     inactiveEdge: "rgba(90,105,140,0.18)", structEdge: "rgba(90,105,140,0.13)", guide: "rgba(90,105,140,0.3)", guideText: "rgba(95,108,135,0.95)",
     metOn: "#d3e3f0", metOff: "#eef1f6", rxnOn: "#3a4560", rxnTransport: "#7f8fb2", rxnOff: "#c9d0dd",
     labelOn: "#263046", labelOff: "rgba(90,102,128,0.65)", rxnLabelOn: "#4a5672", rxnLabelOff: "rgba(110,122,148,0.55)", groupLabelOff: "rgba(95,108,135,0.7)",
-    hover: "rgba(40,50,70,0.45)", selected: "#283044", pulse: [40, 60, 90], gene: "#8d68d6", ko: "#d04452",
+    hover: "rgba(40,50,70,0.45)", selected: "#283044", pulse: [40, 60, 90], gene: "#8d68d6", ko: "#d04452", blocked: "#9aa3b4",
     groupOff: "#e6eaf1", groupRing: "rgba(45,62,92,0.75)", groupRingOff: "rgba(120,134,165,0.45)", groupListOnly: "rgba(120,134,165,0.45)",
     groupFill: (s) => `rgb(${222 - 150 * s},${234 - 100 * s},${244 - 60 * s})`, unknown: [196, 202, 214],
   },
@@ -167,6 +167,7 @@ export class MapView {
           n.d = rel(n.flux, f0); n.lost = !n.flux && f0 > 0;
           n.hidden = !!mask && !mask.rxn[n.ref];
           n.pert = d.perturb ? d.perturb.get(n.ref) : undefined;
+          n.blk = !!(d.blocked && d.blocked.has(n.ref)); // no detected enzyme in the chosen cell type
         }
       }
       if (d.dG) { // reactions coloured by dG'm in the direction they run: -40 kJ/mol and below is full red
@@ -390,6 +391,15 @@ export class MapView {
       }
       ctx.strokeStyle = TH.inactiveEdge; ctx.lineWidth = 1; ctx.stroke();
     }
+    // reactions without a detected enzyme in the cell type: grey dashed edges
+    {
+      ctx.beginPath(); let any = false;
+      for (const e of sc.edges) {
+        if (!sc.nodes[e.r]?.blk || e.hidden || (!onScreen(e.r) && !onScreen(e.m))) continue;
+        ctx.moveTo(sx[e.r], sy[e.r]); ctx.lineTo(sx[e.m], sy[e.m]); any = true;
+      }
+      if (any) { ctx.setLineDash([4, 4]); ctx.strokeStyle = TH.blocked; ctx.lineWidth = 1.3; ctx.stroke(); ctx.setLineDash([]); }
+    }
     // flux that existed in the reference and is gone now
     if (this.mode === "delta") {
       ctx.beginPath();
@@ -438,7 +448,12 @@ export class MapView {
       } else {
         ctx.save(); ctx.translate(sx[i], sy[i]); ctx.rotate(Math.PI / 4);
         ctx.fillStyle = this.mode === "delta" ? this._dc(n.lost ? -1 : n.d, n.s ? 1 : 0.7) : n.s ? (n.transport ? TH.rxnTransport : TH.rxnOn) : TH.rxnOff;
+        if (n.blk && !n.s) ctx.fillStyle = TH.blocked;
         ctx.fillRect(-r, -r, 2 * r, 2 * r); ctx.restore();
+        if (n.blk) { // not detected in the cell type: grey dashed ring
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 3, 0, 6.283);
+          ctx.strokeStyle = TH.blocked; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]);
+        }
         if (this.marks && this.marks.has(n.ref)) { // reactions of the selected gene
           ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 6, 0, 6.283);
           ctx.strokeStyle = TH.gene; ctx.lineWidth = 2; ctx.stroke();

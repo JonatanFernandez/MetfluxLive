@@ -38,6 +38,13 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
   human liver slices ([Grankvist et al. 2024](https://doi.org/10.1038/s42255-024-01119-3)). "save…" stores the current medium
   with your changes under a name (in the browser's localStorage, shared by both models); "reset" discards
   the changes. The sections of the left panel collapse by clicking their title.
+- **Cell type (gene expression)** — switches off the genes that are not detected in a chosen cell line
+  (1,206 from the [Human Protein Atlas](https://www.proteinatlas.org) cell line atlas, cancer and non-cancer,
+  described with [Cellosaurus](https://www.cellosaurus.org)), cell type (155, HPA single cell types), tissue
+  (HPA tissue consensus) or the NCI-60 panel, and in Mouse-GEM in 276 tissues and cell types from
+  [Bgee](https://www.bgee.org). The reactions left without a detected enzyme are blocked or, as an option,
+  only made costlier in pFBA. Genes that the 57 essential metabolic tasks of Human-GEM need are switched back
+  on. Off by default. Sources, cut-off and preprocessing: Docs › Cell types.
 - **Measured exchange fluxes** — by default the uptake and secretion of glucose, lactate, glutamine and
   15 more metabolites are pinned (±20 %) to the median of 59 NCI-60 tumour cell lines (Jain et al. 2012),
   together with a measured ATP maintenance cost; unmeasured organic products may only leave in traces.
@@ -93,6 +100,7 @@ index.html, css/, js/        application (no build dependencies)
 js/core/                     FBA/pFBA (fba.js), medium (medium.js), isotope tracing (tracer.js), GPR rules (gpr.js), worker
 js/core/isotopologues.js     isotopologue distributions (Monte-Carlo over atom maps)
 js/core/measured.js          measured exchange fluxes (NCI-60, HEK293, fibroblasts, liver) and ATP maintenance
+js/core/contexts.js          cell-type contexts: genes off, blocked reactions, search
 js/core/edits.js, chem.js    model edits (apply, validate, layout) and chemistry (SMILES, atom maps via RDKit)
 js/ui/editor.js, compare.js  model editor dialogs; scenarios and comparison
 js/celllayout.js, js/cascade.js, js/i18n.js   cell and cascade layouts; EN/ES texts
@@ -100,9 +108,15 @@ js/export/                   results download: datasets, SVG charts, zip writer
 docs.html                    documentation (EN/ES)
 vendor/highs/                HiGHS LP solver compiled to WebAssembly (MIT)
 vendor/rdkit/                RDKit MinimalLib 2026.03.6, WebAssembly (BSD-3), used only by the model editor
-data/<model>/                model.json, structures.json, atommaps.json, layout.json
+data/<model>/                model.json, structures.json, atommaps.json, layout.json, thermo.json, contexts.json
 tools/                       preprocessing (Python) and tests (Node)
 ```
+
+**Licence of the cell-type data.** `data/human-gem/contexts.json` is derived from the Human Protein Atlas
+(version 26.0, CC BY-SA 4.0) and is distributed under
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), with attribution to the Human Protein Atlas;
+its cell line descriptions come from Cellosaurus 57.0 (CC BY 4.0). `data/mouse-gem/contexts.json` is derived
+from Bgee 15.2 and is CC0. The licence is also written inside each file (`meta.license`).
 
 To share or host the app you only need `index.html`, `docs.html`, `css/`, `js/`, `vendor/` and `data/` (about 31 MB, 7 MB of it RDKit).
 Python is used only for preprocessing, never at run time.
@@ -140,6 +154,21 @@ dependencies. The first run downloads the eQuilibrator compound database (1.3 GB
 python3 -m venv --without-pip tools/.venv-thermo
 python3 -m pip --python tools/.venv-thermo/bin/python install equilibrator-api==0.8.1 rdkit
 tools/.venv-thermo/bin/python tools/build_thermo.py human-gem   # and mouse-gem
+```
+
+Cell-type contexts (`data/<slug>/contexts.json`, optional) are built from the Human Protein Atlas
+(`rna_celline.tsv.zip`, `rna_single_cell_type.tsv.zip`, `rna_tissue_consensus.tsv.zip`), Cellosaurus
+(`cellosaurus.txt`) and Bgee (`Mus_musculus_expr_simple.tsv.gz`), downloaded into `tools/cache/expression/`.
+The last step runs the 57 essential metabolic tasks for every context with HiGHS and takes hours; it can be
+split into shards that run in parallel:
+
+```bash
+tools/.venv/bin/python tools/contexts/cellline_meta.py       # HPA cell lines -> Cellosaurus
+tools/.venv/bin/python tools/contexts/build_expression.py    # expression of the model genes per context
+node tools/contexts/build_contexts.mjs human-gem 0/2 &        # genes off, task rescue (shard 0 of 2)
+node tools/contexts/build_contexts.mjs human-gem 1/2
+node tools/contexts/build_contexts.mjs human-gem merge 2      # -> data/human-gem/contexts.json
+node tools/contexts/build_contexts.mjs mouse-gem 0/1 && node tools/contexts/build_contexts.mjs mouse-gem merge 1
 ```
 
 ### Atom-to-atom maps
@@ -188,6 +217,8 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # show the atom
   caused by the perturbation. With pFBA enabled the comparison is more stable.
 - A partial knockdown of a reaction with no flux in the reference does not constrain it; in dynamic mode
   the knockdown limits are taken from the first time point of the reference.
+- Cell types only switch off enzymes whose mRNA is not detected (a cut-off, not proof of absence); they do
+  not scale fluxes with expression, and the expression was measured in each line's own medium or in vivo.
 - Mouse-GEM 1.8.0 ships `MAR00021` as its objective, whose scale differs from the Human-GEM biomass:
   absolute growth comes out very low with the default medium. Another objective can be chosen in the app.
 
@@ -227,6 +258,14 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
   cortes de hígado humano ([Grankvist et al. 2024](https://doi.org/10.1038/s42255-024-01119-3)). «guardar…» almacena el medio actual
   con tus cambios bajo un nombre (en el localStorage del navegador, común a ambos modelos); «restaurar»
   descarta los cambios. Las secciones del panel izquierdo se pliegan haciendo clic en su título.
+- **Tipo celular (expresión génica)** — apaga los genes que no se detectan en una línea celular elegida
+  (1.206 del atlas de líneas celulares del [Human Protein Atlas](https://www.proteinatlas.org), tumorales y
+  no tumorales, descritas con [Cellosaurus](https://www.cellosaurus.org)), un tipo celular (155, tipos
+  celulares del HPA), un tejido (consenso de tejidos del HPA) o el panel NCI-60, y en Mouse-GEM en 276 tejidos
+  y tipos celulares de [Bgee](https://www.bgee.org). Las reacciones que se quedan sin enzima detectada se
+  bloquean o, como opción, sólo se encarecen en el pFBA. Los genes que necesitan las 57 tareas metabólicas
+  esenciales de Human-GEM se vuelven a encender. Desactivado por defecto. Fuentes, umbral y preprocesado:
+  Docs › Tipos celulares.
 - **Flujos de intercambio medidos** — por defecto, la captación y excreción de glucosa, lactato, glutamina y
   otros 15 metabolitos se fijan (±20 %) a la mediana de 59 líneas tumorales del NCI-60 (Jain et al. 2012),
   junto con un gasto de ATP de mantenimiento medido; los productos orgánicos no medidos solo salen en trazas.
@@ -286,6 +325,7 @@ index.html, css/, js/        aplicación (sin dependencias de compilación)
 js/core/                     FBA/pFBA (fba.js), medio (medium.js), trazado isotópico (tracer.js), reglas GPR (gpr.js), worker
 js/core/isotopologues.js     distribuciones de isotopólogos (Monte Carlo sobre los mapas atómicos)
 js/core/measured.js          flujos de intercambio medidos (NCI-60, HEK293, fibroblastos, hígado) y ATP de mantenimiento
+js/core/contexts.js          tipos celulares: genes apagados, reacciones bloqueadas, búsqueda
 js/core/edits.js, chem.js    ediciones del modelo (aplicar, validar, disposición) y química (SMILES, mapas de átomos con RDKit)
 js/ui/editor.js, compare.js  diálogos del editor del modelo; escenarios y comparación
 js/celllayout.js, js/cascade.js, js/i18n.js   disposición celular y en cascada; textos EN/ES
@@ -293,9 +333,15 @@ js/export/                   descarga de resultados: tablas, gráficas SVG, escr
 docs.html                    documentación (EN/ES)
 vendor/highs/                solver LP HiGHS compilado a WebAssembly (MIT)
 vendor/rdkit/                RDKit MinimalLib 2026.03.6, WebAssembly (BSD-3), sólo para el editor del modelo
-data/<modelo>/               model.json, structures.json, atommaps.json, layout.json
+data/<modelo>/               model.json, structures.json, atommaps.json, layout.json, thermo.json, contexts.json
 tools/                       preprocesado (Python) y pruebas (Node)
 ```
+
+**Licencia de los datos de tipos celulares.** `data/human-gem/contexts.json` deriva del Human Protein Atlas
+(versión 26.0, CC BY-SA 4.0) y se distribuye bajo
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), con atribución al Human Protein Atlas; la
+descripción de las líneas celulares sale de Cellosaurus 57.0 (CC BY 4.0). `data/mouse-gem/contexts.json`
+deriva de Bgee 15.2 y es CC0. La licencia también va escrita dentro de cada archivo (`meta.license`).
 
 Para compartir o alojar la app basta con `index.html`, `docs.html`, `css/`, `js/`, `vendor/` y `data/` (unos 31 MB, 7 de ellos RDKit).
 Python solo se usa en el preprocesado, nunca en ejecución.
@@ -333,6 +379,21 @@ dependencias. La primera vez descarga la base de compuestos de eQuilibrator (1,3
 python3 -m venv --without-pip tools/.venv-thermo
 python3 -m pip --python tools/.venv-thermo/bin/python install equilibrator-api==0.8.1 rdkit
 tools/.venv-thermo/bin/python tools/build_thermo.py human-gem   # y mouse-gem
+```
+
+Los tipos celulares (`data/<slug>/contexts.json`, opcional) se generan a partir del Human Protein Atlas
+(`rna_celline.tsv.zip`, `rna_single_cell_type.tsv.zip`, `rna_tissue_consensus.tsv.zip`), Cellosaurus
+(`cellosaurus.txt`) y Bgee (`Mus_musculus_expr_simple.tsv.gz`), descargados en `tools/cache/expression/`.
+El último paso ejecuta las 57 tareas metabólicas esenciales en cada contexto con HiGHS y tarda horas; se
+puede repartir en fragmentos que corren en paralelo:
+
+```bash
+tools/.venv/bin/python tools/contexts/cellline_meta.py       # líneas del HPA -> Cellosaurus
+tools/.venv/bin/python tools/contexts/build_expression.py    # expresión de los genes del modelo por contexto
+node tools/contexts/build_contexts.mjs human-gem 0/2 &        # genes apagados, rescate por tareas (fragmento 0 de 2)
+node tools/contexts/build_contexts.mjs human-gem 1/2
+node tools/contexts/build_contexts.mjs human-gem merge 2      # -> data/human-gem/contexts.json
+node tools/contexts/build_contexts.mjs mouse-gem 0/1 && node tools/contexts/build_contexts.mjs mouse-gem merge 1
 ```
 
 ### Mapas átomo a átomo
@@ -382,5 +443,7 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # ver el mapa a
   se deben a la perturbación. Con pFBA activado la comparación es más estable.
 - El knockdown parcial de una reacción sin flujo en la referencia no la restringe; en modo dinámico los
   límites de knockdown se toman del primer instante de la referencia.
+- Los tipos celulares sólo apagan enzimas cuyo ARNm no se detecta (un umbral, no una prueba de ausencia);
+  no escalan los flujos con la expresión, y la expresión se midió en el medio propio de cada línea o in vivo.
 - Mouse-GEM 1.8.0 trae como objetivo `MAR00021`, cuya escala difiere de la biomasa de Human-GEM: el
   crecimiento absoluto sale muy bajo con el medio por defecto. Se puede elegir otro objetivo en la app.

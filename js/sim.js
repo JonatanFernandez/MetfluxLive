@@ -2,6 +2,7 @@
 import { packNetwork } from "./core/fba.js";
 import { applyMedium, findExchanges, uptakeCapacity, UNLIMITED } from "./core/medium.js";
 import { TRACE_SECRETION, FREE_SECRETION, atpMaintenanceRxn } from "./core/measured.js";
+import { CONTEXT_PENALTY } from "./core/contexts.js";
 import { Tracer } from "./core/tracer.js";
 import { t } from "./i18n.js";
 
@@ -67,7 +68,7 @@ export class Simulator {
   }
 
   _key(cfg, supplies) {
-    return JSON.stringify([cfg.objective, cfg.maximize, cfg.parsimonious, cfg.measured || null, supplies.map((it) => [it.met, it.conc, it.vmax, it.km, it.unlimited ? 1 : 0, it.hold ? 1 : 0])]);
+    return JSON.stringify([cfg.objective, cfg.maximize, cfg.parsimonious, cfg.measured || null, cfg.context ? [cfg.context.id, cfg.context.mode, cfg.context.block.length] : null, supplies.map((it) => [it.met, it.conc, it.vmax, it.km, it.unlimited ? 1 : 0, it.hold ? 1 : 0])]);
   }
 
   /** The unperturbed reference is reused while medium and objective stay the same. */
@@ -100,6 +101,10 @@ export class Simulator {
       if (e.dir < 0) lb[e.rxn] = Math.max(lb[e.rxn], 0); else ub[e.rxn] = Math.min(ub[e.rxn], 0); // uptake = dir * v <= 0
       if (lb[e.rxn] > ub[e.rxn]) lb[e.rxn] = ub[e.rxn] = 0;
     }
+    // cell-type context: reactions without a detected enzyme are closed ("block") or only made costlier in the
+    // parsimonious stage ("penalty"); the cell keeps them in both the reference and any perturbed run
+    const ctx = cfg.context;
+    if (ctx && ctx.mode !== "penalty") for (const j of ctx.block) { lb[j] = 0; ub[j] = 0; }
     if (pertCaps) {
       for (const [j, cap] of pertCaps) {
         ub[j] = Math.min(ub[j], cap); lb[j] = Math.max(lb[j], -cap);
@@ -109,7 +114,8 @@ export class Simulator {
     await this.ready;
     let res = await this._call({
       type: "solve",
-      params: { lb, ub, objective: cfg.objective, maximize: cfg.maximize, parsimonious: cfg.parsimonious, sources },
+      params: { lb, ub, objective: cfg.objective, maximize: cfg.maximize, parsimonious: cfg.parsimonious, sources,
+        penalty: ctx && ctx.mode === "penalty" ? { rxns: ctx.block, w: CONTEXT_PENALTY } : undefined },
     });
     // the measured fluxes belong to cells in a rich medium: when they cannot be met (a nutrient removed or
     // exhausted, a perturbation…) they are relaxed instead of leaving the user without a solution
@@ -186,7 +192,7 @@ export class Simulator {
   }
 
   _frame(t, res, inputs, prog, sol, elements, extra = {}) {
-    const frame = { t, v: res.v, status: res.status, objective: res.objective, inputs, sourceFlux: res.sourceFlux, srcItems: res.srcItems, elements, relaxed: !!res.relaxed, ...extra };
+    const frame = { t, v: res.v, status: res.status, objective: res.objective, inputs, sourceFlux: res.sourceFlux, srcItems: res.srcItems, elements, relaxed: !!res.relaxed, limits: res.limits, ...extra };
     if (sol) {
       const sum = this.tracer.summarize(prog, sol, elements);
       frame.e = Float32Array.from(sol.e.subarray(0, this.tracer.nAtoms));

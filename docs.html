@@ -84,7 +84,7 @@
 
 <h2 id="en-ui">3. The interface</h2>
 <h3 id="en-run">Simulate and Auto</h3>
-<p>The centre of the top bar holds the mode (<b>Steady state</b> / <b>Dynamic</b>, <a href="#en-modes">section 7</a>), the <b>?</b> with a summary of the methods, and <b>Simulate</b> with its <b>Auto</b> switch.</p>
+<p>The centre of the top bar holds the mode (<b>Steady state</b> / <b>Dynamic</b>, <a href="#en-modes">section 8</a>), the <b>?</b> with a summary of the methods, and <b>Simulate</b> with its <b>Auto</b> switch.</p>
 <ul>
   <li><b>Simulate</b> solves the model now with everything in the left panel (medium, tracers, measured fluxes, knockouts, objective, and in Dynamic the duration and events) and redraws the map with the new result. Nothing else computes fluxes: the map and the panels only display the last result.</li>
   <li><b>Auto</b> presses Simulate for you shortly after every change. It is remembered separately for each mode: <b>on</b> by default in Steady state, where a run takes a second or two, and <b>off</b> by default in Dynamic, where a run takes half a minute or more and you usually want to set several things (events, tracers) before starting. Turn it on in Dynamic too if you prefer; a new change stops the run in progress and starts again.</li>
@@ -173,8 +173,8 @@
   <li><b>Show</b>: everything, only what carries label, only the flux that changed (after a knockout, or against a compared scenario), or only the labelling that changed against a compared scenario.</li>
   <li><b>Panels</b>: drag the border between a side panel and the map to resize it; double-click the border to restore it. The sections of the left panel fold when you click their title.</li>
   <li><b>Language</b>: English, Spanish, Portuguese, Italian, French, German or Greek (top right). Names of metabolites, reactions and pathways come from the model and stay in English. When the window is narrow or the labels are long, the top bar shrinks by itself: Edit, Import and Download become icons (their tooltip keeps the full name), then the brand name is hidden.</li>
-  <li><b>Download</b>: exports tables, charts, the map and the session (see <a href="#en-download">section 15</a>). <b>Import</b> loads a session or model-edit file back.</li>
-  <li><b>Compare</b> (left panel): saved scenarios to compare with (<a href="#en-compare">section 11</a>). <b>✎ Edit model</b> (top bar): add or remove reactions, enzymes and metabolites (<a href="#en-editing">section 12</a>).</li>
+  <li><b>Download</b>: exports tables, charts, the map and the session (see <a href="#en-download">section 16</a>). <b>Import</b> loads a session or model-edit file back.</li>
+  <li><b>Compare</b> (left panel): saved scenarios to compare with (<a href="#en-compare">section 12</a>). <b>✎ Edit model</b> (top bar): add or remove reactions, enzymes and metabolites (<a href="#en-editing">section 13</a>).</li>
 </ul>
 
 <h2 id="en-data">4. Data sources</h2>
@@ -184,12 +184,13 @@
   <tr><td>Mouse-GEM 1.8.0</td><td><a href="https://github.com/SysBioChalmers/Mouse-GEM" target="_blank" rel="noopener">SysBioChalmers/Mouse-GEM</a>; Wang et al., <i>PNAS</i> 2021</td><td>The mouse network. It shares identifiers with Human-GEM, so structures are reused.</td></tr>
   <tr><td>Atom-to-atom maps</td><td>Computed for this app with <a href="https://github.com/rxn4chemistry/rxnmapper" target="_blank" rel="noopener">RXNMapper</a> (Schwaller et al., <i>Sci. Adv.</i> 2021) and RDKit, plus hand-curated corrections for central metabolism</td><td>Following individual atoms through each reaction.</td></tr>
   <tr><td>Plasmax and HPLM</td><td>Table S1 of <a href="https://pubmed.ncbi.nlm.nih.gov/30613774/" target="_blank" rel="noopener">Vande Voorde et al., <i>Sci. Adv.</i> 2019</a>; HPLM originally from Cantor et al., <i>Cell</i> 2017</td><td>Physiological media.</td></tr>
-  <tr><td>Williams E</td><td>Supplementary Table 2 of Grankvist et al., <i>Nat. Metab.</i> 2024</td><td>The medium of the human liver slices (<a href="#en-medium">section 8</a>).</td></tr>
+  <tr><td>Williams E</td><td>Supplementary Table 2 of Grankvist et al., <i>Nat. Metab.</i> 2024</td><td>The medium of the human liver slices (<a href="#en-medium">section 9</a>).</td></tr>
   <tr><td>Standard medium</td><td>Loosely follows DMEM / Ham's F-12</td><td>Default medium.</td></tr>
   <tr><td>Measured exchange fluxes</td><td>Jain et al., <i>Science</i> 2012 (NCI-60 cell lines), per-line values from S1 Table Q of Aurich et al., <i>PLoS Comput. Biol.</i> 2017; other sets: Dietmair et al., <i>PLoS ONE</i> 2012 (HEK293), Lemons et al., <i>PLoS Biol.</i> 2010 (fibroblasts), Grankvist et al., <i>Nat. Metab.</i> 2024 (human liver)</td><td>The default uptake and secretion of glucose, lactate, glutamine and 15 more metabolites (<a href="#en-measured">section 5</a>).</td></tr>
   <tr><td>ATP maintenance</td><td>Kilburn, Lilly &amp; Webb, <i>J. Cell Sci.</i> 1969, value as used by Zielinski et al., <i>Sci. Rep.</i> 2017</td><td>The ATP the cell spends whether it grows or not.</td></tr>
   <tr><td>Uptake kinetics (V<sub>max</sub>, K<sub>m</sub>)</td><td>Order-of-magnitude values for cultured mammalian cells, set by hand</td><td>Maximum uptake of the medium components whose exchange was not measured (vitamins, cystine, histidine…), and of all of them when measured fluxes are switched off. <b>Not measured values.</b></td></tr>
   <tr><td>Linear solver</td><td><a href="https://highs.dev" target="_blank" rel="noopener">HiGHS</a>, compiled to WebAssembly</td><td>Solving the flux balance problem.</td></tr>
+  <tr><td>Gene expression (cell types)</td><td>Human Protein Atlas 26.0 (cell lines, single cell types, tissues), Cellosaurus 57.0; Bgee 15.2 for mouse</td><td>The genes switched off in each cell line, cell type or tissue (<a href="#en-contexts">section 6</a>).</td></tr>
 </table></div>
 <p>The models are converted once, offline, into the JSON files in <code>data/</code>; the app itself needs only those files.</p>
 <h3>How good are the atom maps?</h3>
@@ -302,7 +303,7 @@
   <tr><td>isoleucine</td><td>uptake</td><td class="num">1.45</td><td class="num">−0.311 … 10.9</td><td class="num">0.000199</td></tr>
   <tr><td>tryptophan</td><td>uptake</td><td class="num">0.775</td><td class="num">0.531 … 1.54</td><td class="num">0.000107</td></tr>
 </table></div>
-<p>The tissue does not grow and its rates are one to two orders of magnitude lower than those of cultured cells. Use the set with the Williams E medium (<a href="#en-medium">section 8</a>) and a liver objective: with Human-GEM, glucose release then reaches 0.0724 mmol/gDW/h and urea release 0.0676; growth is 0. When the objective is the release of glucose or urea, its own measured rate is set aside (<a href="#en-objectives">section 6</a>).</p>
+<p>The tissue does not grow and its rates are one to two orders of magnitude lower than those of cultured cells. Use the set with the Williams E medium (<a href="#en-medium">section 9</a>) and a liver objective: with Human-GEM, glucose release then reaches 0.0724 mmol/gDW/h and urea release 0.0676; growth is 0. When the objective is the release of glucose or urea, its own measured rate is set aside (<a href="#en-objectives">section 7</a>).</p>
 <p>Considered and left out: CHO cells (Ahn &amp; Antoniewicz, <i>Metab. Eng.</i> 2011: hamster cells, article not openly available), exchange across pig organs (Jang et al., <i>Cell Metab.</i> 2019: arteriovenous concentration differences, not rates per mass of tissue) and endothelial cells (De Bock et al., <i>Cell</i> 2013: no absolute rates in the published data).</p>
 <h3>ATP maintenance</h3>
 <p>Cells spend ATP whether they grow or not: ion pumps, protein turnover, and so on. Human-GEM leaves this at zero. With the NCI-60 set on, the cytosolic ATP hydrolysis reaction (<code>MAR03964</code>) must carry at least 1.07 mmol/gDW/h, the value Zielinski et al. took from measurements by Kilburn, Lilly &amp; Webb (<i>J. Cell Sci.</i> 1969) in mouse LS cells. It forces the respiration and TCA cycle turnover that real cells have. Without it, a glucose tracer labels fumarate at 0 % instead of about 9 % M+2.</p>
@@ -313,7 +314,59 @@
   <li>In dynamic mode, the size of the intracellular pools.</li>
 </ul>
 
-<h2 id="en-fba">6. Flux balance analysis, in plain words</h2>
+<h2 id="en-contexts">6. Cell types: which enzymes the cell has</h2>
+<p>The generic model can use every metabolic enzyme in the genome, which no real cell does: in the cell lines of the Human Protein Atlas a median of 30 % of the model's genes are not detected. "Cell type (gene expression)" switches off the genes that are not detected in a chosen cell line, cell type or tissue, and with them the reactions that only they catalyse. By default nothing is switched off (the generic model), so the numbers quoted in the other sections stay valid.</p>
+<h3 id="en-contexts-list">What you can choose</h3>
+<div class="tablebox"><table>
+  <tr><th>Group</th><th>Model</th><th>Source</th><th>Number</th><th>Expression measure</th></tr>
+  <tr><td>NCI-60 panel consensus</td><td>Human-GEM</td><td>HPA cell line atlas</td><td>1 (median of 50 lines)</td><td>nTPM</td></tr>
+  <tr><td>Cancer cell lines</td><td>Human-GEM</td><td>HPA cell line atlas; description from Cellosaurus</td><td>1132</td><td>nTPM (bulk RNA-seq)</td></tr>
+  <tr><td>Non-cancer cell lines</td><td>Human-GEM</td><td>HPA cell line atlas; description from Cellosaurus</td><td>74 (HEK293, BJ fibroblasts, hTERT-immortalised lines, HaCaT, MCF-10A…)</td><td>nTPM (bulk RNA-seq)</td></tr>
+  <tr><td>Cell types</td><td>Human-GEM</td><td>HPA single cell type atlas</td><td>155</td><td>nCPM (single-cell RNA-seq pooled per cell type)</td></tr>
+  <tr><td>Tissues</td><td>Human-GEM</td><td>HPA tissue consensus (HPA and GTEx)</td><td>51</td><td>nTPM</td></tr>
+  <tr><td>Mouse tissues and cell types</td><td>Mouse-GEM</td><td>Bgee 15.2</td><td>264 tissues, 12 cell types</td><td>present / absent calls</td></tr>
+</table></div>
+<p>Search by name, cancer type, organ of origin or Cellosaurus accession; with an empty search box the list starts with the contexts that have measured data. Lines that Cellosaurus flags as problematic (misidentified, contaminated or misclassified) are kept, and its warning is shown. Five contexts have measured exchange fluxes from the same kind of cells (<a href="#en-measured">section 5</a>): the NCI-60 consensus, HEK293, BJ fibroblasts (newborn foreskin fibroblasts, like those of Lemons et al.), liver tissue and hepatocytes. The panel offers to load them. The full list is in the <a href="contexts.html">catalogue of cell types</a>.</p>
+<h3>How the list of genes switched off is made</h3>
+<ol>
+  <li><b>Not detected.</b> A gene is off when it is below 1 nTPM (cell lines, tissues) or 1 nCPM (cell types), the cut-off below which the HPA itself calls a gene "not detected". In mouse, when Bgee calls it absent. Mouse-GEM genes are matched to Bgee through their Ensembl identifiers (Mouse-GEM's <code>MGI_gene_ID_mapping.tsv</code>). A gene without data stays on. For the NCI-60 consensus the value of each gene is its median over the 50 NCI-60 lines in the HPA atlas, as the NCI-60 measured fluxes are a median over the panel.</li>
+  <li><b>Blocked reactions.</b> A reaction is blocked when its GPR rule is false with those genes off: isoenzymes (<code>or</code>) compensate one another, a complex (<code>and</code>) needs every subunit. Reactions without a GPR rule (most transports, spontaneous reactions) are never blocked, and neither are the transports of molecules that cross membranes by diffusion (water, O<sub>2</sub>, CO<sub>2</sub>, NH<sub>3</sub>, urea, NO, H<sub>2</sub>S). Human-GEM assigns these to aquaporins or channels, and blocking them would, for example, trap in the mitochondria the urea that arginase 2 makes there in cells without AQP9: with the HEK293 measured fluxes, that alone cut the growth of HEK293 to less than half.</li>
+  <li><b>Metabolic tasks.</b> Every context must still be able to do the 57 essential metabolic tasks of Human-GEM 2.1.1 (<code>data/metabolicTasks/metabolicTasks_Essential.txt</code>): make ATP from glucose, synthesise nucleotides, cholesterol, phospholipids, heme and cofactors, take up the essential amino acids, oxidise fatty acids and grow on Ham's medium. They are run as in the RAVEN toolbox, with all the model's exchanges closed and only the inputs and outputs of each task open; both full models pass all 57 (Mouse-GEM uses the same metabolite names). When a context cannot do a task, a linear program looks for the cheapest way to make it possible through blocked reactions (each costs 2 minus the expression of its best-expressed gene relative to the cut-off, so genes just below it are preferred) and the genes those reactions need are switched back on. This is how tINIT protects metabolic functions (Agren et al. 2014), applied here to a list of genes switched off instead of to a reduced model.</li>
+  <li><b>Measured phenotype.</b> The five contexts with measured fluxes must also reproduce them, in their medium and within ±20 %: one more task.</li>
+</ol>
+<p>The panel lists the genes switched back on and the task that needed each one. Over the 1413 human contexts the median is 14 genes (range 5–152); over the 276 mouse contexts, 10 (0–72). Some are false negatives of the data: <i>POLR2A</i>, the largest subunit of RNA polymerase II and needed in every cell, is below 1 nTPM in 1157 of the 1206 HPA cell lines and in 50 of the 51 tissues, a problem of that gene in the data rather than a real absence; it is switched back on in 1228 of the 1413 contexts. Others say more about the tasks than about the cell: "Protein synthesis from AAs" asks for albumin, so <i>ALB</i> is switched back on in every context that does not make albumin (81 % of the human contexts).</p>
+<h3>Block, or only make costlier</h3>
+<ul>
+  <li><b>Block</b> (default): the reactions are closed in every run, including the reference of a knockout and every step of a dynamic run.</li>
+  <li><b>Only make them costlier</b>: the reactions stay open, but in the second stage of pFBA their flux counts 11 times (1 + 10) as much as that of other reactions. The value of the objective does not change; among the solutions that reach it, the one that uses fewer non-detected enzymes is chosen. It only acts with pFBA on.</li>
+</ul>
+<p>The details of a reaction say when it is blocked and which of its genes are not detected; the details of a gene say whether it is detected in the chosen context or was switched back on. The downloads record the context, the genes switched off and rescued and the reactions blocked (<code>settings.json</code>, <a href="#en-download">section 16</a>).</p>
+<h3>What it changes: some numbers</h3>
+<p>Human-GEM, standard medium, pFBA, steady state, growth as objective unless stated, "Block":</p>
+<div class="tablebox"><table>
+  <tr><th>Context</th><th>Measured fluxes</th><th>Generic model</th><th>With the context</th><th>Reactions blocked</th></tr>
+    <tr><td>NCI-60</td><td>NCI-60, median of 59 lines (Jain 2012)</td><td class="num">0.0341 h⁻¹</td><td class="num">0.0341 h⁻¹</td><td class="num">1811</td></tr>
+  <tr><td>HEK293</td><td>HEK293, exponential growth (Dietmair 2012)</td><td class="num">0.0313 h⁻¹</td><td class="num">0.0313 h⁻¹</td><td class="num">1906</td></tr>
+  <tr><td>BJ [Human fibroblast]</td><td>Human fibroblasts, proliferating (Lemons 2010)</td><td class="num">0.0370 h⁻¹</td><td class="num">0.0370 h⁻¹</td><td class="num">1791</td></tr>
+  <tr><td>A-549</td><td>None (medium ceilings only)</td><td class="num">0.0370 h⁻¹</td><td class="num">0.0370 h⁻¹</td><td class="num">1563</td></tr>
+  <tr><td>HEK293</td><td>None (medium ceilings only)</td><td class="num">0.0370 h⁻¹</td><td class="num">0.0370 h⁻¹</td><td class="num">1906</td></tr>
+  <tr><td>hepatocytes <small>(Glucose output (gluconeogenesis), Williams E)</small></td><td>Human liver tissue ex vivo (Grankvist 2024)</td><td class="num">0.0724 mmol/gDW/h</td><td class="num">0.0700 mmol/gDW/h</td><td class="num">855</td></tr>
+  <tr><td>liver <small>(Urea output (hepatocyte, ammonia disposal), Williams E)</small></td><td>None (medium ceilings only)</td><td class="num">0.281 mmol/gDW/h</td><td class="num">0.281 mmol/gDW/h</td><td class="num">408</td></tr>
+
+</table></div>
+<p>In none of these cases does the context lower growth: the metabolic tasks keep biomass synthesis possible, and the network has alternative routes for most blocked steps. What changes is which routes carry the flux; compare the maps with and without the context (<a href="#en-compare">section 12</a>) or look at "What limits the objective" in the summary, which names a blocked reaction when one becomes limiting.</p>
+<h3>What it does not tell you</h3>
+<ul>
+  <li>mRNA is not enzyme activity. A gene below 1 nTPM may still give enough enzyme for a small flux, and a detected gene says nothing about how much flux its enzyme can carry: the context only switches enzymes off, it never caps a flux by expression level.</li>
+  <li>The cut-off is a convention: below it the HPA's sequencing does not detect the gene, which is not proof that it is absent.</li>
+  <li>The HPA cell lines were grown in their own media, and tissues were taken from donors: expression may differ in the medium you simulate.</li>
+  <li>Bgee's absent calls depend on how much data exists for a tissue: tissues studied in few experiments have more genes called absent (from 0.5 % to 42 % of the Mouse-GEM genes).</li>
+  <li>The tasks protect generic functions only. A function of a particular cell (bile acids in hepatocytes, neurotransmitters in neurons) is not protected: it is possible if its genes are detected, otherwise not.</li>
+</ul>
+<h3>Data and licences</h3>
+<p>Human: Human Protein Atlas version 26.0 (cell lines: Jin et al. 2023; single cell types: Karlsson et al. 2021; tissues: Uhlén et al. 2015), released under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>. The derived file <code>data/human-gem/contexts.json</code> (genes switched off and rescued in each context) is therefore distributed under CC BY-SA 4.0, with attribution to the Human Protein Atlas. Cell line descriptions: Cellosaurus 57.0 (Bairoch 2018), CC BY 4.0. Mouse: Bgee 15.2 (Bastian et al. 2021), CC0; <code>data/mouse-gem/contexts.json</code> is CC0 too. The files are built by the scripts in <code>tools/contexts/</code> (<code>cellline_meta.py</code>, <code>build_expression.py</code>, <code>build_contexts.mjs</code>, <code>tasks.mjs</code>), which are not part of the published app.</p>
+
+<h2 id="en-fba">7. Flux balance analysis, in plain words</h2>
 <p>A cell runs thousands of reactions at once. We rarely know the speed of each one, but we do know two solid things: the <b>recipe</b> of every reaction (what it consumes and what it makes), and the fact that a cell cannot create or destroy matter.</p>
 <p>Flux balance analysis (FBA) builds on that. Think of the cell as a city's water network:</p>
 <ul>
@@ -393,7 +446,7 @@
 </ul>
 <p>Every objective is applied in the direction in which the reaction is written in the model. To use your own, search any reaction in the box, choose Maximise or Minimise, and press <b>Save</b>: the objective is kept in the list under a name of your choice (by reaction ID, so it also works in the other model when the reaction exists there). <b>Delete</b> removes it. Saved objectives are kept in the browser; a downloaded session stores the objective in use.</p>
 
-<h2 id="en-modes">7. Steady state versus Dynamic</h2>
+<h2 id="en-modes">8. Steady state versus Dynamic</h2>
 <div class="tablebox"><table>
   <tr><th></th><th>Steady state</th><th>Dynamic</th></tr>
   <tr><td>Question</td><td>"With this medium, what does the cell do?"</td><td>"What happens over the next hours as the medium is used up?"</td></tr>
@@ -423,7 +476,7 @@
 <div class="note">A metabolite the cells secrete into the medium and later take up again (lactate, alanine …) is counted as unlabelled when it comes back.</div>
 <div class="note">The dynamic mode is an approximation ("dynamic FBA"). All intracellular pools are given the same size, which is not true in real cells: read labelling <em>times</em> as indicative, and the <em>order</em> in which things get labelled as the informative part.</div>
 
-<h2 id="en-medium">8. The medium</h2>
+<h2 id="en-medium">9. The medium</h2>
 <p>A stoichiometric model has no concentrations, only limits on uptake. The app converts each concentration into a maximum uptake rate with a saturating rule:</p>
 <div class="formula">maximum uptake = V<sub>max</sub> · C / (K<sub>m</sub> + C)</div>
 <p>So doubling a low concentration roughly doubles what the cell may take, while doubling an already saturating one changes little. Hover a concentration box to see the resulting limit. The cell does not have to use the whole allowance: FBA takes what serves the objective.</p>
@@ -436,7 +489,7 @@
 </ul>
 <p>For Plasmax and HPLM, components that the models do not contain (selenite, manganese, vanadate, nitrate, p-aminobenzoate, methyl acetoacetate, phenol red) are left out. Essential fatty acids and fat-soluble vitamins, which in the real media come from serum, are added at the standard medium's values.</p>
 
-<h2 id="en-tracing">9. Isotope tracing</h2>
+<h2 id="en-tracing">10. Isotope tracing</h2>
 <p>Press <b>⚛</b> next to a medium component to open the molecule editor, click the atoms to label (<sup>13</sup>C, <sup>15</sup>N, <sup>18</sup>O or <sup>34</sup>S) and choose which fraction of the molecules carries the label.</p>
 <h3>Positional enrichment</h3>
 <p>For each atom of each metabolite the app computes its <b>enrichment</b>: the fraction of molecules in which that atom is the heavy isotope. An atom inherits its enrichment from the atoms it was made from, weighted by flux:</p>
@@ -458,7 +511,7 @@
 <h3>Where the label ends up</h3>
 <p>With a tracer, the summary shows what share of the labelled atoms leaves the cell in each product (CO<sub>2</sub>, lactate, biomass …).</p>
 
-<h2 id="en-ko">10. Knockout and knockdown</h2>
+<h2 id="en-ko">11. Knockout and knockdown</h2>
 <p>Add a gene or a reaction in the "Knockout / knockdown" section and set its residual activity: 0 % is a knockout, anything in between a knockdown.</p>
 <ul>
   <li><b>Genes act through gene–protein–reaction rules.</b> If a reaction needs <code>A and B</code> (a complex), losing either stops it. If it needs <code>A or B</code> (isoenzymes), losing one changes nothing. The list shows, for example, "2/7": two of the seven reactions that mention the gene actually depend on it. A struck-through gene has no effect at all.</li>
@@ -469,7 +522,7 @@
 </ul>
 <div class="note">FBA assumes the cell reroutes perfectly and instantly. A knockout that is harmless in the model means "an alternative route exists in the network", not "the cell will not notice". Conversely, a knockout that stops growth in the model points to a reaction with no bypass.</div>
 
-<h2 id="en-compare">11. Comparing two situations</h2>
+<h2 id="en-compare">12. Comparing two situations</h2>
 <p>The comparison mode puts any two situations side by side: two media or initial concentrations, a pulse or a medium change, a knockout, a different tracer, or an edited model against the published one.</p>
 <ol>
   <li>Set up the first situation and simulate it. In <b>Compare</b>, press <b>Save current as scenario…</b> and give it a name (for example "Control").</li>
@@ -490,10 +543,10 @@
   <li>Two dynamic runs are compared at the closest time point. A steady-state scenario is compared with every time point of a dynamic run.</li>
   <li>If the two situations use different model edits, reactions and metabolites are matched by ID. Those that exist on one side only count as zero flux on the other.</li>
   <li>While a scenario is selected it replaces the automatic unperturbed reference of a knockout. Stop comparing to get that reference back.</li>
-  <li>Scenarios live in memory. To keep them, download the session (<a href="#en-download">section 15</a>). Importing it recomputes every scenario.</li>
+  <li>Scenarios live in memory. To keep them, download the session (<a href="#en-download">section 16</a>). Importing it recomputes every scenario.</li>
 </ul>
 
-<h2 id="en-editing">12. Editing the model</h2>
+<h2 id="en-editing">13. Editing the model</h2>
 <p>Press <b>✎ Edit model</b> in the top bar. The "Model edits" section lists every change, and the reaction and metabolite panels get edit buttons. You can:</p>
 <ul>
   <li><b>add a reaction</b>, with stoichiometry, bounds, enzymes (GPR rule) and an atom map;</li>
@@ -539,7 +592,7 @@
 <div class="note">Exchanges you add are exempt from the "unmeasured products only as traces" rule of the measured fluxes (<a href="#en-measured">section 5</a>): you added them to be used. If the measured phenotype should include the new product, add it to "Measured exchange fluxes" with its measured rate.</div>
 <p>Edits are saved with the session or alone (<code>model_edits.json</code>), and the import replays them on the published model. <code>model_edits_report.csv</code> lists every edit with its checks, for a methods section.</p>
 
-<h2 id="en-cascade">13. The cascade order</h2>
+<h2 id="en-cascade">14. The cascade order</h2>
 <p>Each metabolite gets a <b>depth</b>: the smallest number of reaction steps needed to reach it from the metabolites of the current medium. Medium components are at 0; glucose inside the cell is at 1; glucose 6-phosphate at 2; and so on. Reaction directions follow the model, not the simulated fluxes, so the order does not jump when you change a concentration — only when you add or remove a medium component.</p>
 <ul>
   <li>Cofactors (ATP, NAD, water, CoA …) are ignored, otherwise everything would be one step from everything.</li>
@@ -551,7 +604,7 @@
   <li>Cycles cannot be drawn without some arrows pointing up; that is expected.</li>
 </ul>
 
-<h2 id="en-experiments">14. In-silico experiments</h2>
+<h2 id="en-experiments">15. In-silico experiments</h2>
 <p>Each example gives the steps and what we obtained with Human-GEM, the standard medium, the NCI-60 measured fluxes and pFBA on (all defaults). Your numbers should match closely. With these defaults the cell grows at 0.0341 h⁻¹, takes up 0.742 mmol/gDW/h of glucose and secretes 1.35 of lactate.</p>
 
 <div class="exp">
@@ -699,7 +752,7 @@
   <li><b>Combine</b>: a tracer plus a knockout shows how label is rerouted.</li>
 </ul>
 
-<h2 id="en-download">15. Downloading results</h2>
+<h2 id="en-download">16. Downloading results</h2>
 <p>"Download" opens a list of everything the current result can provide. Tick what you want; you get one <code>.zip</code> with a <code>README.txt</code> describing each file. Tables are CSV (open them in any spreadsheet), charts are SVG (vector, editable), and the map is a PNG of what is on screen.</p>
 <div class="tablebox"><table>
   <tr><th>File</th><th>Content</th><th>Available</th></tr>
@@ -723,7 +776,7 @@
 <p>"Import" in the top bar reads a <code>session.json</code>, a <code>model_edits.json</code>, or directly the <code>.zip</code> of a download that contains one of them. A session replaces the current settings and model edits, switches model if needed and recomputes every saved scenario, so you see the same comparison as its author. Edits imported alone can replace the current ones or be added after them. Everything is stored by ID, so a session also works after the model has been updated. IDs that no longer exist are skipped, and the status bar says how many. A file with only <code>session.json</code> (or only the edits) is downloaded as plain JSON.</p>
 <p>In dynamic mode the per-reaction tables refer to the time point selected on the slider.</p>
 
-<h2 id="en-limits">16. Limitations</h2>
+<h2 id="en-limits">17. Limitations</h2>
 <ul>
   <li><b>No kinetics or regulation.</b> Concentrations only set uptake limits. Enzyme levels, allostery and signalling are absent.</li>
   <li><b>A generic cell.</b> Human-GEM contains every reaction known in any human tissue. A specific cell type expresses a subset; the app does not yet build tissue-specific models.</li>
@@ -737,9 +790,10 @@
   <li><b>Model edits are checked, not curated.</b> The checks catch impossible or unbalanced reactions and dead ends, not wrong biology. Automatic atom maps (maximum common substructure) can pair the wrong atoms; prefer a mapped SMILES.</li>
   <li><b>Scenarios are kept in memory</b> with their results. Download the session to keep them after closing the page.</li>
   <li><b>Mouse-GEM 1.8.0</b> ships with an objective (<code>MAR00021</code>) on a different scale from the human biomass reaction, so its absolute growth is very low with the default medium. You can choose another objective.</li>
+  <li><b>Cell types</b> switch enzymes off where their mRNA is not detected, but do not scale fluxes with expression (<a href="#en-contexts">section 6</a>).</li>
 </ul>
 
-<h2 id="en-glossary">17. Glossary</h2>
+<h2 id="en-glossary">18. Glossary</h2>
 <div class="tablebox"><table>
   <tr><td><b>Flux</b></td><td>Rate of a reaction, in mmol per gram dry weight per hour.</td></tr>
   <tr><td><b>Carbon / nitrogen flow</b></td><td>Transferable carbon or nitrogen atoms per hour that one group of reactions produces and another consumes, through shared metabolites; atoms of recycled carriers such as CoA are not counted (<a href="#en-carbonflow">section 3</a>).</td></tr>
@@ -762,7 +816,7 @@
   <tr><td><b>SMILES</b></td><td>A line notation of a molecule's structure, for example <code>CC(O)C(C)=O</code> for acetoin.</td></tr>
 </table></div>
 
-<h2 id="en-refs">18. References</h2>
+<h2 id="en-refs">19. References</h2>
 <ul>
   <li>Orth JD, Thiele I, Palsson BØ. What is flux balance analysis? <i>Nat. Biotechnol.</i> 2010; 28:245–248. <a href="https://doi.org/10.1038/nbt.1614" target="_blank" rel="noopener">doi:10.1038/nbt.1614</a></li>
   <li>Lewis NE et al. Omic data from evolved <i>E. coli</i> are consistent with computed optimal growth from genome-scale models. <i>Mol. Syst. Biol.</i> 2010; 6:390 (parsimonious FBA). <a href="https://doi.org/10.1038/msb.2010.47" target="_blank" rel="noopener">doi:10.1038/msb.2010.47</a></li>
@@ -780,6 +834,12 @@
   <li>Grankvist N, Jönsson C, Hedin K, Sundqvist N, Sandström P, Björnsson B, Begzati A, Mickols E, Artursson P, Jain M, Cedersund G, Nilsson R. Global <sup>13</sup>C tracing and metabolic flux analysis of intact human liver tissue ex vivo. <i>Nat. Metab.</i> 2024; 6:1963–1975. <a href="https://doi.org/10.1038/s42255-024-01119-3" target="_blank" rel="noopener">doi:10.1038/s42255-024-01119-3</a></li>
   <li>Lemons JMS, Feng XJ, Bennett BD, Legesse-Miller A, Johnson EL, Raitman I, Pollina EA, Rabitz HA, Rabinowitz JD, Coller HA. Quiescent fibroblasts exhibit high metabolic activity. <i>PLoS Biol.</i> 2010; 8:e1000514 (Fig. S1A). <a href="https://doi.org/10.1371/journal.pbio.1000514" target="_blank" rel="noopener">doi:10.1371/journal.pbio.1000514</a></li>
   <li>Wimmer M, Wilmering B, Sasse D. The relation of rat liver wet weight to dry weight. <i>Histochemistry</i> 1985; 83:571–572. <a href="https://doi.org/10.1007/BF00492462" target="_blank" rel="noopener">doi:10.1007/BF00492462</a></li>
+  <li>Uhlén M, Fagerberg L, Hallström BM, et al. Tissue-based map of the human proteome. <i>Science</i> 2015; 347:1260419. <a href="https://doi.org/10.1126/science.1260419" target="_blank" rel="noopener">doi:10.1126/science.1260419</a></li>
+  <li>Karlsson M, Zhang C, Méar L, et al. A single–cell type transcriptomics map of human tissues. <i>Sci. Adv.</i> 2021; 7:eabh2169. <a href="https://doi.org/10.1126/sciadv.abh2169" target="_blank" rel="noopener">doi:10.1126/sciadv.abh2169</a></li>
+  <li>Jin H, Zhang C, Zwahlen M, et al. Systematic transcriptional analysis of human cell lines for gene expression landscape and tumor representation. <i>Nat. Commun.</i> 2023; 14:5417. <a href="https://doi.org/10.1038/s41467-023-41132-w" target="_blank" rel="noopener">doi:10.1038/s41467-023-41132-w</a></li>
+  <li>Bairoch A. The Cellosaurus, a cell-line knowledge resource. <i>J. Biomol. Tech.</i> 2018; 29:25–38. <a href="https://doi.org/10.7171/jbt.18-2902-002" target="_blank" rel="noopener">doi:10.7171/jbt.18-2902-002</a></li>
+  <li>Bastian FB, Roux J, Niknejad A, et al. The Bgee suite: integrated curated expression atlas and comparative transcriptomics in animals. <i>Nucleic Acids Res.</i> 2021; 49:D831–D847. <a href="https://doi.org/10.1093/nar/gkaa793" target="_blank" rel="noopener">doi:10.1093/nar/gkaa793</a></li>
+  <li>Agren R, Mardinoglu A, Asplund A, et al. Identification of anticancer drugs for hepatocellular carcinoma through personalized genome-scale metabolic modeling. <i>Mol. Syst. Biol.</i> 2014; 10:721. <a href="https://doi.org/10.1002/msb.145122" target="_blank" rel="noopener">doi:10.1002/msb.145122</a></li>
   <li>Dolfi SC et al. The metabolic demands of cancer cells are coupled to their size and protein synthesis rates. <i>Cancer Metab.</i> 2013; 1:20 (NCI-60 culture conditions). <a href="https://doi.org/10.1186/2049-3002-1-20" target="_blank" rel="noopener">doi:10.1186/2049-3002-1-20</a></li>
   <li>Thiele I, Palsson BØ. A protocol for generating a high-quality genome-scale metabolic reconstruction. <i>Nat. Protoc.</i> 2010; 5:93–121 (quality checks for model edits). <a href="https://doi.org/10.1038/nprot.2009.203" target="_blank" rel="noopener">doi:10.1038/nprot.2009.203</a></li>
   <li>Lieven C et al. MEMOTE for standardized genome-scale metabolic model testing. <i>Nat. Biotechnol.</i> 2020; 38:272–276. <a href="https://doi.org/10.1038/s41587-020-0446-y" target="_blank" rel="noopener">doi:10.1038/s41587-020-0446-y</a></li>
@@ -824,7 +884,7 @@
 
 <h2 id="es-ui">3. La interfaz</h2>
 <h3 id="es-run">Simular y Auto</h3>
-<p>En el centro de la barra superior están el modo (<b>Estacionario</b> / <b>Dinámico</b>, <a href="#es-modes">sección 7</a>), el <b>?</b> con un resumen de los métodos, y <b>Simular</b> con su interruptor <b>Auto</b>.</p>
+<p>En el centro de la barra superior están el modo (<b>Estacionario</b> / <b>Dinámico</b>, <a href="#es-modes">sección 8</a>), el <b>?</b> con un resumen de los métodos, y <b>Simular</b> con su interruptor <b>Auto</b>.</p>
 <ul>
   <li><b>Simular</b> resuelve el modelo en ese momento con todo lo que hay en el panel izquierdo (medio, trazadores, flujos medidos, knockouts, objetivo y, en Dinámico, la duración y los eventos) y redibuja el mapa con el resultado nuevo. Nada más calcula flujos: el mapa y los paneles sólo muestran el último resultado.</li>
   <li><b>Auto</b> pulsa Simular por ti poco después de cada cambio. Se recuerda por separado para cada modo: <b>activado</b> por defecto en Estacionario, donde una simulación tarda uno o dos segundos, y <b>desactivado</b> por defecto en Dinámico, donde tarda medio minuto o más y lo normal es preparar varias cosas (eventos, trazadores) antes de empezar. Puedes activarlo también en Dinámico; un cambio nuevo detiene la simulación en curso y empieza otra.</li>
@@ -913,8 +973,8 @@
   <li><b>Mostrar</b>: todo, solo lo que lleva marca, solo el flujo que cambió (tras un knockout o frente a un escenario comparado), o solo el marcaje que cambió frente a un escenario comparado.</li>
   <li><b>Paneles</b>: arrastra el borde entre un panel lateral y el mapa para cambiar su ancho; doble clic en el borde lo restaura. Las secciones del panel izquierdo se pliegan al hacer clic en su título.</li>
   <li><b>Idioma</b>: inglés, español, portugués, italiano, francés, alemán o griego (arriba a la derecha). Los nombres de metabolitos, reacciones y rutas vienen del modelo y siguen en inglés. Si la ventana es estrecha o las etiquetas son largas, la barra superior se compacta sola: Editar, Importar y Descargar pasan a ser iconos (su etiqueta flotante conserva el nombre completo) y después se oculta el nombre de la aplicación.</li>
-  <li><b>Descargar</b>: exporta tablas, gráficas, el mapa y la sesión (véase la <a href="#es-download">sección 15</a>). <b>Importar</b> vuelve a cargar una sesión o un archivo de ediciones.</li>
-  <li><b>Comparar</b> (panel izquierdo): escenarios guardados con los que comparar (<a href="#es-compare">sección 11</a>). <b>✎ Editar modelo</b> (barra superior): añadir o quitar reacciones, enzimas y metabolitos (<a href="#es-editing">sección 12</a>).</li>
+  <li><b>Descargar</b>: exporta tablas, gráficas, el mapa y la sesión (véase la <a href="#es-download">sección 16</a>). <b>Importar</b> vuelve a cargar una sesión o un archivo de ediciones.</li>
+  <li><b>Comparar</b> (panel izquierdo): escenarios guardados con los que comparar (<a href="#es-compare">sección 12</a>). <b>✎ Editar modelo</b> (barra superior): añadir o quitar reacciones, enzimas y metabolitos (<a href="#es-editing">sección 13</a>).</li>
 </ul>
 
 <h2 id="es-data">4. Fuentes de datos</h2>
@@ -924,12 +984,13 @@
   <tr><td>Mouse-GEM 1.8.0</td><td><a href="https://github.com/SysBioChalmers/Mouse-GEM" target="_blank" rel="noopener">SysBioChalmers/Mouse-GEM</a>; Wang et al., <i>PNAS</i> 2021</td><td>La red de ratón. Comparte identificadores con Human-GEM, así que se reutilizan las estructuras.</td></tr>
   <tr><td>Mapas átomo a átomo</td><td>Calculados para esta aplicación con <a href="https://github.com/rxn4chemistry/rxnmapper" target="_blank" rel="noopener">RXNMapper</a> (Schwaller et al., <i>Sci. Adv.</i> 2021) y RDKit, más correcciones manuales en el metabolismo central</td><td>Seguir cada átomo a través de cada reacción.</td></tr>
   <tr><td>Plasmax y HPLM</td><td>Tabla S1 de <a href="https://pubmed.ncbi.nlm.nih.gov/30613774/" target="_blank" rel="noopener">Vande Voorde et al., <i>Sci. Adv.</i> 2019</a>; HPLM procede de Cantor et al., <i>Cell</i> 2017</td><td>Medios fisiológicos.</td></tr>
-  <tr><td>Williams E</td><td>Tabla suplementaria 2 de Grankvist et al., <i>Nat. Metab.</i> 2024</td><td>El medio de los cortes de hígado humano (<a href="#es-medium">sección 8</a>).</td></tr>
+  <tr><td>Williams E</td><td>Tabla suplementaria 2 de Grankvist et al., <i>Nat. Metab.</i> 2024</td><td>El medio de los cortes de hígado humano (<a href="#es-medium">sección 9</a>).</td></tr>
   <tr><td>Medio estándar</td><td>Sigue de forma aproximada DMEM / Ham's F-12</td><td>Medio por defecto.</td></tr>
   <tr><td>Flujos de intercambio medidos</td><td>Jain et al., <i>Science</i> 2012 (líneas celulares del NCI-60), valores por línea de la Tabla Q de S1 de Aurich et al., <i>PLoS Comput. Biol.</i> 2017; otros conjuntos: Dietmair et al., <i>PLoS ONE</i> 2012 (HEK293), Lemons et al., <i>PLoS Biol.</i> 2010 (fibroblastos), Grankvist et al., <i>Nat. Metab.</i> 2024 (hígado humano)</td><td>La captación y excreción por defecto de glucosa, lactato, glutamina y otros 15 metabolitos (<a href="#es-measured">sección 5</a>).</td></tr>
   <tr><td>ATP de mantenimiento</td><td>Kilburn, Lilly y Webb, <i>J. Cell Sci.</i> 1969, valor tal como lo usan Zielinski et al., <i>Sci. Rep.</i> 2017</td><td>El ATP que la célula gasta crezca o no.</td></tr>
   <tr><td>Cinética de captación (V<sub>max</sub>, K<sub>m</sub>)</td><td>Órdenes de magnitud para células de mamífero en cultivo, fijados a mano</td><td>Captación máxima de los componentes del medio cuyo intercambio no se midió (vitaminas, cistina, histidina…), y de todos cuando los flujos medidos están desactivados. <b>No son valores medidos.</b></td></tr>
   <tr><td>Solver lineal</td><td><a href="https://highs.dev" target="_blank" rel="noopener">HiGHS</a>, compilado a WebAssembly</td><td>Resolver el problema de balance de flujos.</td></tr>
+  <tr><td>Expresión génica (tipos celulares)</td><td>Human Protein Atlas 26.0 (líneas celulares, tipos celulares, tejidos), Cellosaurus 57.0; Bgee 15.2 para ratón</td><td>Los genes apagados en cada línea, tipo celular o tejido (<a href="#es-contexts">sección 6</a>).</td></tr>
 </table></div>
 <p>Los modelos se convierten una sola vez, fuera de la aplicación, en los ficheros JSON de <code>data/</code>; la aplicación solo necesita esos ficheros.</p>
 <h3>¿Cómo de fiables son los mapas atómicos?</h3>
@@ -1042,7 +1103,7 @@
   <tr><td>isoleucine</td><td>captación</td><td class="num">1,45</td><td class="num">−0,311 … 10,9</td><td class="num">0,000199</td></tr>
   <tr><td>tryptophan</td><td>captación</td><td class="num">0,775</td><td class="num">0,531 … 1,54</td><td class="num">0,000107</td></tr>
 </table></div>
-<p>El tejido no crece y sus tasas son de uno a dos órdenes de magnitud menores que las de células en cultivo. Usa el conjunto con el medio Williams E (<a href="#es-medium">sección 8</a>) y un objetivo hepático: con Human-GEM, la liberación de glucosa llega entonces a 0,0724 mmol/gDW/h y la de urea a 0,0676; el crecimiento es 0. Cuando el objetivo es liberar glucosa o urea, su propia tasa medida se deja aparte (<a href="#es-objectives">sección 6</a>).</p>
+<p>El tejido no crece y sus tasas son de uno a dos órdenes de magnitud menores que las de células en cultivo. Usa el conjunto con el medio Williams E (<a href="#es-medium">sección 9</a>) y un objetivo hepático: con Human-GEM, la liberación de glucosa llega entonces a 0,0724 mmol/gDW/h y la de urea a 0,0676; el crecimiento es 0. Cuando el objetivo es liberar glucosa o urea, su propia tasa medida se deja aparte (<a href="#es-objectives">sección 7</a>).</p>
 <p>Considerados y descartados: células CHO (Ahn y Antoniewicz, <i>Metab. Eng.</i> 2011: células de hámster, artículo sin acceso abierto), intercambio entre órganos de cerdo (Jang et al., <i>Cell Metab.</i> 2019: diferencias arteriovenosas de concentración, no tasas por masa de tejido) y células endoteliales (De Bock et al., <i>Cell</i> 2013: sin tasas absolutas en los datos publicados).</p>
 <h3>ATP de mantenimiento</h3>
 <p>Las células gastan ATP crezcan o no: bombas iónicas, recambio de proteínas, etc. Human-GEM lo deja a cero. Con el conjunto NCI-60 activo, la reacción citosólica de hidrólisis de ATP (<code>MAR03964</code>) debe llevar al menos 1,07 mmol/gDW/h, el valor que Zielinski et al. tomaron de las medidas de Kilburn, Lilly y Webb (<i>J. Cell Sci.</i> 1969) en células LS de ratón. Obliga a la respiración y al recambio del ciclo de Krebs que tienen las células reales. Sin él, un trazador de glucosa marca el fumarato al 0 % en lugar de cerca del 9 % M+2.</p>
@@ -1053,7 +1114,59 @@
   <li>En modo dinámico, el tamaño de los pools intracelulares.</li>
 </ul>
 
-<h2 id="es-fba">6. El análisis de balance de flujos, explicado sin fórmulas</h2>
+<h2 id="es-contexts">6. Tipos celulares: qué enzimas tiene la célula</h2>
+<p>El modelo genérico puede usar todas las enzimas metabólicas del genoma, algo que ninguna célula real hace: en las líneas celulares del Human Protein Atlas no se detecta una mediana del 30 % de los genes del modelo. «Tipo celular (expresión génica)» apaga los genes que no se detectan en la línea celular, el tipo celular o el tejido elegidos, y con ellos las reacciones que sólo ellos catalizan. Por defecto no se apaga nada (el modelo genérico), así que las cifras de las demás secciones siguen valiendo.</p>
+<h3 id="es-contexts-list">Qué se puede elegir</h3>
+<div class="tablebox"><table>
+  <tr><th>Grupo</th><th>Modelo</th><th>Fuente</th><th>Número</th><th>Medida de expresión</th></tr>
+  <tr><td>Consenso del panel NCI-60</td><td>Human-GEM</td><td>Atlas de líneas celulares del HPA</td><td>1 (mediana de 50 líneas)</td><td>nTPM</td></tr>
+  <tr><td>Líneas tumorales</td><td>Human-GEM</td><td>Atlas de líneas celulares del HPA; descripción de Cellosaurus</td><td>1132</td><td>nTPM (RNA-seq de población)</td></tr>
+  <tr><td>Líneas no tumorales</td><td>Human-GEM</td><td>Atlas de líneas celulares del HPA; descripción de Cellosaurus</td><td>74 (HEK293, fibroblastos BJ, líneas inmortalizadas con hTERT, HaCaT, MCF-10A…)</td><td>nTPM (RNA-seq de población)</td></tr>
+  <tr><td>Tipos celulares</td><td>Human-GEM</td><td>Atlas de tipos celulares del HPA</td><td>155</td><td>nCPM (RNA-seq de célula única agrupado por tipo celular)</td></tr>
+  <tr><td>Tejidos</td><td>Human-GEM</td><td>Consenso de tejidos del HPA (HPA y GTEx)</td><td>51</td><td>nTPM</td></tr>
+  <tr><td>Tejidos y tipos celulares de ratón</td><td>Mouse-GEM</td><td>Bgee 15.2</td><td>264 tejidos, 12 tipos celulares</td><td>llamadas presente / ausente</td></tr>
+</table></div>
+<p>Se busca por nombre, tipo de cáncer, órgano de origen o accesión de Cellosaurus; con la búsqueda vacía la lista empieza por los contextos que tienen datos medidos. Las líneas que Cellosaurus marca como problemáticas (mal identificadas, contaminadas o mal clasificadas) se conservan y se muestra su aviso. Cinco contextos tienen flujos de intercambio medidos en el mismo tipo de células (<a href="#es-measured">sección 5</a>): el consenso NCI-60, HEK293, los fibroblastos BJ (fibroblastos de prepucio de recién nacido, como los de Lemons et al.), el tejido hepático y los hepatocitos. El panel ofrece cargarlos. La lista completa está en el <a href="contexts.html">catálogo de tipos celulares</a>.</p>
+<h3>Cómo se hace la lista de genes apagados</h3>
+<ol>
+  <li><b>No detectado.</b> Un gen se apaga cuando está por debajo de 1 nTPM (líneas, tejidos) o 1 nCPM (tipos celulares), el umbral bajo el cual el propio HPA dice que un gen «no se detecta». En ratón, cuando Bgee lo da por ausente. Los genes de Mouse-GEM se emparejan con Bgee por sus identificadores Ensembl (<code>MGI_gene_ID_mapping.tsv</code> de Mouse-GEM). Un gen sin datos sigue encendido. En el consenso NCI-60 el valor de cada gen es su mediana en las 50 líneas del NCI-60 del atlas del HPA, igual que los flujos medidos del NCI-60 son una mediana del panel.</li>
+  <li><b>Reacciones bloqueadas.</b> Una reacción se bloquea cuando su regla GPR es falsa con esos genes apagados: las isoenzimas (<code>or</code>) se compensan entre sí y un complejo (<code>and</code>) necesita todas sus subunidades. Las reacciones sin regla GPR (casi todos los transportes, reacciones espontáneas) nunca se bloquean, ni tampoco los transportes de moléculas que atraviesan las membranas por difusión (agua, O<sub>2</sub>, CO<sub>2</sub>, NH<sub>3</sub>, urea, NO, H<sub>2</sub>S). Human-GEM los asigna a acuaporinas o canales, y bloquearlos, por ejemplo, atraparía en la mitocondria la urea que allí produce la arginasa 2 en células sin AQP9: con los flujos medidos de HEK293, sólo eso reducía el crecimiento de HEK293 a menos de la mitad.</li>
+  <li><b>Tareas metabólicas.</b> Todo contexto debe seguir pudiendo hacer las 57 tareas metabólicas esenciales de Human-GEM 2.1.1 (<code>data/metabolicTasks/metabolicTasks_Essential.txt</code>): obtener ATP de la glucosa, sintetizar nucleótidos, colesterol, fosfolípidos, hemo y cofactores, captar los aminoácidos esenciales, oxidar ácidos grasos y crecer en medio de Ham. Se ejecutan como en la RAVEN toolbox, con todos los intercambios del modelo cerrados y sólo las entradas y salidas de cada tarea abiertas; los dos modelos completos pasan las 57 (Mouse-GEM usa los mismos nombres de metabolitos). Cuando un contexto no puede hacer una tarea, un programa lineal busca la forma más barata de hacerla posible a través de reacciones bloqueadas (cada una cuesta 2 menos la expresión de su gen más expresado relativa al umbral, de modo que se prefieren los genes justo por debajo) y se vuelven a encender los genes que esas reacciones necesitan. Es la forma en que tINIT protege las funciones metabólicas (Agren et al. 2014), aplicada aquí a una lista de genes apagados en lugar de a un modelo reducido.</li>
+  <li><b>Fenotipo medido.</b> Los cinco contextos con flujos medidos deben además reproducirlos, en su medio y dentro de ±20 %: una tarea más.</li>
+</ol>
+<p>El panel lista los genes vueltos a encender y la tarea que necesitaba cada uno. En los 1413 contextos humanos la mediana es de 14 genes (rango 5–152); en los 276 de ratón, 10 (0–72). Algunos son falsos negativos de los datos: <i>POLR2A</i>, la subunidad mayor de la ARN polimerasa II y necesaria en toda célula, está por debajo de 1 nTPM en 1157 de las 1206 líneas del HPA y en 50 de los 51 tejidos, un problema de ese gen en los datos y no una ausencia real; se vuelve a encender en 1228 de los 1413 contextos. Otros dicen más de las tareas que de la célula: «Protein synthesis from AAs» pide albúmina, así que <i>ALB</i> se vuelve a encender en todo contexto que no produce albúmina (81 % de los contextos humanos).</p>
+<h3>Bloquear o sólo encarecer</h3>
+<ul>
+  <li><b>Bloquear</b> (por defecto): las reacciones se cierran en todas las simulaciones, incluida la referencia de un knockout y cada paso de una simulación dinámica.</li>
+  <li><b>Sólo encarecerlas</b>: las reacciones siguen abiertas, pero en la segunda etapa del pFBA su flujo cuenta 11 veces (1 + 10) lo que el de las demás. El valor del objetivo no cambia; entre las soluciones que lo alcanzan se elige la que usa menos enzimas no detectadas. Sólo actúa con pFBA activado.</li>
+</ul>
+<p>Los detalles de una reacción dicen si está bloqueada y cuáles de sus genes no se detectan; los de un gen, si se detecta en el contexto elegido o se volvió a encender. Las descargas recogen el contexto, los genes apagados y rescatados y las reacciones bloqueadas (<code>settings.json</code>, <a href="#es-download">sección 16</a>).</p>
+<h3>Qué cambia: algunas cifras</h3>
+<p>Human-GEM, medio estándar, pFBA, estado estacionario, crecimiento como objetivo salvo que se indique, «Bloquear»:</p>
+<div class="tablebox"><table>
+  <tr><th>Contexto</th><th>Flujos medidos</th><th>Modelo genérico</th><th>Con el contexto</th><th>Reacciones bloqueadas</th></tr>
+    <tr><td>NCI-60</td><td>NCI-60, mediana de 59 líneas (Jain 2012)</td><td class="num">0,0341 h⁻¹</td><td class="num">0,0341 h⁻¹</td><td class="num">1811</td></tr>
+  <tr><td>HEK293</td><td>HEK293, crecimiento exponencial (Dietmair 2012)</td><td class="num">0,0313 h⁻¹</td><td class="num">0,0313 h⁻¹</td><td class="num">1906</td></tr>
+  <tr><td>BJ [Human fibroblast]</td><td>Fibroblastos humanos, proliferando (Lemons 2010)</td><td class="num">0,0370 h⁻¹</td><td class="num">0,0370 h⁻¹</td><td class="num">1791</td></tr>
+  <tr><td>A-549</td><td>Ninguno (solo techos del medio)</td><td class="num">0,0370 h⁻¹</td><td class="num">0,0370 h⁻¹</td><td class="num">1563</td></tr>
+  <tr><td>HEK293</td><td>Ninguno (solo techos del medio)</td><td class="num">0,0370 h⁻¹</td><td class="num">0,0370 h⁻¹</td><td class="num">1906</td></tr>
+  <tr><td>hepatocytes <small>(Salida de glucosa (gluconeogénesis), Williams E)</small></td><td>Tejido hepático humano ex vivo (Grankvist 2024)</td><td class="num">0,0724 mmol/gDW/h</td><td class="num">0,0700 mmol/gDW/h</td><td class="num">855</td></tr>
+  <tr><td>liver <small>(Salida de urea (hepatocito, eliminación de amonio), Williams E)</small></td><td>Ninguno (solo techos del medio)</td><td class="num">0,281 mmol/gDW/h</td><td class="num">0,281 mmol/gDW/h</td><td class="num">408</td></tr>
+
+</table></div>
+<p>En ninguno de estos casos el contexto reduce el crecimiento: las tareas metabólicas mantienen posible la síntesis de biomasa y la red tiene rutas alternativas para la mayoría de los pasos bloqueados. Lo que cambia es qué rutas llevan el flujo; compara los mapas con y sin el contexto (<a href="#es-compare">sección 12</a>) o mira «Qué limita el objetivo» en el resumen, que nombra la reacción bloqueada cuando alguna pasa a limitar.</p>
+<h3>Lo que no te dice</h3>
+<ul>
+  <li>ARNm no es actividad enzimática. Un gen por debajo de 1 nTPM puede dar enzima suficiente para un flujo pequeño, y un gen detectado no dice cuánto flujo puede llevar su enzima: el contexto sólo apaga enzimas, nunca limita un flujo según el nivel de expresión.</li>
+  <li>El umbral es una convención: por debajo, la secuenciación del HPA no detecta el gen, lo que no prueba que falte.</li>
+  <li>Las líneas del HPA se cultivaron en sus propios medios y los tejidos proceden de donantes: la expresión puede ser distinta en el medio que simulas.</li>
+  <li>Las llamadas de ausencia de Bgee dependen de cuántos datos hay de un tejido: los tejidos con pocos experimentos tienen más genes ausentes (de 0,5 % a 42 % de los genes de Mouse-GEM).</li>
+  <li>Las tareas sólo protegen funciones genéricas. Una función propia de una célula (ácidos biliares en hepatocitos, neurotransmisores en neuronas) no está protegida: es posible si sus genes se detectan y si no, no.</li>
+</ul>
+<h3>Datos y licencias</h3>
+<p>Humano: Human Protein Atlas versión 26.0 (líneas celulares: Jin et al. 2023; tipos celulares: Karlsson et al. 2021; tejidos: Uhlén et al. 2015), publicado bajo <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>. Por eso el archivo derivado <code>data/human-gem/contexts.json</code> (genes apagados y rescatados de cada contexto) se distribuye bajo CC BY-SA 4.0, con atribución al Human Protein Atlas. Descripción de las líneas: Cellosaurus 57.0 (Bairoch 2018), CC BY 4.0. Ratón: Bgee 15.2 (Bastian et al. 2021), CC0; <code>data/mouse-gem/contexts.json</code> también es CC0. Los archivos los generan los scripts de <code>tools/contexts/</code> (<code>cellline_meta.py</code>, <code>build_expression.py</code>, <code>build_contexts.mjs</code>, <code>tasks.mjs</code>), que no forman parte de la aplicación publicada.</p>
+
+<h2 id="es-fba">7. El análisis de balance de flujos, explicado sin fórmulas</h2>
 <p>Una célula ejecuta miles de reacciones a la vez. Rara vez conocemos la velocidad de cada una, pero sí sabemos dos cosas firmes: la <b>receta</b> de cada reacción (qué consume y qué produce) y que una célula no puede crear ni destruir materia.</p>
 <p>El análisis de balance de flujos (FBA) se apoya en eso. Imagina la célula como la red de agua de una ciudad:</p>
 <ul>
@@ -1133,7 +1246,7 @@
 </ul>
 <p>Cada objetivo se aplica en el sentido en que la reacción está escrita en el modelo. Para usar uno propio, busca cualquier reacción en el buscador, elige Maximizar o Minimizar y pulsa <b>Guardar</b>: el objetivo queda en la lista con el nombre que elijas (por el ID de la reacción, así que también funciona en el otro modelo si allí existe la reacción). <b>Borrar</b> lo quita. Los objetivos guardados se conservan en el navegador; una sesión descargada guarda el objetivo en uso.</p>
 
-<h2 id="es-modes">7. Estacionario frente a Dinámico</h2>
+<h2 id="es-modes">8. Estacionario frente a Dinámico</h2>
 <div class="tablebox"><table>
   <tr><th></th><th>Estacionario</th><th>Dinámico</th></tr>
   <tr><td>Pregunta</td><td>«Con este medio, ¿qué hace la célula?»</td><td>«¿Qué ocurre en las próximas horas mientras el medio se agota?»</td></tr>
@@ -1163,7 +1276,7 @@
 <div class="note">Un metabolito que las células excretan al medio y más tarde vuelven a captar (lactato, alanina…) se cuenta como no marcado cuando vuelve a entrar.</div>
 <div class="note">El modo dinámico es una aproximación («FBA dinámico»). Se da el mismo tamaño a todos los pools intracelulares, lo que no es cierto en células reales: toma los <em>tiempos</em> de marcaje como orientativos y el <em>orden</em> en que se marcan las cosas como la parte informativa.</div>
 
-<h2 id="es-medium">8. El medio</h2>
+<h2 id="es-medium">9. El medio</h2>
 <p>Un modelo estequiométrico no tiene concentraciones, solo límites de captación. La aplicación convierte cada concentración en una captación máxima con una regla saturable:</p>
 <div class="formula">captación máxima = V<sub>max</sub> · C / (K<sub>m</sub> + C)</div>
 <p>Así, duplicar una concentración baja duplica más o menos lo que la célula puede tomar, mientras que duplicar una ya saturante cambia poco. Pasa el cursor por una casilla de concentración para ver el límite resultante. La célula no tiene por qué usar todo lo permitido: el FBA toma lo que sirve al objetivo.</p>
@@ -1176,7 +1289,7 @@
 </ul>
 <p>En Plasmax y HPLM se omiten los componentes que los modelos no contienen (selenito, manganeso, vanadato, nitrato, p-aminobenzoato, metilacetoacetato, rojo fenol). Los ácidos grasos esenciales y las vitaminas liposolubles, que en los medios reales aporta el suero, se añaden con los valores del medio estándar.</p>
 
-<h2 id="es-tracing">9. Trazado isotópico</h2>
+<h2 id="es-tracing">10. Trazado isotópico</h2>
 <p>Pulsa <b>⚛</b> junto a un componente del medio para abrir el editor de moléculas, haz clic en los átomos que quieras marcar (<sup>13</sup>C, <sup>15</sup>N, <sup>18</sup>O o <sup>34</sup>S) y elige qué fracción de las moléculas lleva la marca.</p>
 <h3>Enriquecimiento posicional</h3>
 <p>Para cada átomo de cada metabolito la aplicación calcula su <b>enriquecimiento</b>: la fracción de moléculas en las que ese átomo es el isótopo pesado. Un átomo hereda el enriquecimiento de los átomos de los que procede, ponderado por el flujo:</p>
@@ -1198,7 +1311,7 @@
 <h3>Dónde acaba la marca</h3>
 <p>Con un trazador, el resumen muestra qué parte de los átomos marcados sale de la célula en cada producto (CO<sub>2</sub>, lactato, biomasa…).</p>
 
-<h2 id="es-ko">10. Knockout y knockdown</h2>
+<h2 id="es-ko">11. Knockout y knockdown</h2>
 <p>Añade un gen o una reacción en la sección «Knockout / knockdown» y fija su actividad residual: 0 % es un knockout; cualquier valor intermedio, un knockdown.</p>
 <ul>
   <li><b>Los genes actúan a través de reglas gen–proteína–reacción.</b> Si una reacción necesita <code>A and B</code> (un complejo), perder cualquiera la detiene. Si necesita <code>A or B</code> (isoenzimas), perder una no cambia nada. La lista muestra, por ejemplo, «2/7»: dos de las siete reacciones que mencionan el gen dependen realmente de él. Un gen tachado no tiene ningún efecto.</li>
@@ -1209,7 +1322,7 @@
 </ul>
 <div class="note">El FBA supone que la célula redirige sus flujos de forma perfecta e instantánea. Un knockout inocuo en el modelo significa «existe una ruta alternativa en la red», no «la célula no lo notará». A la inversa, un knockout que detiene el crecimiento en el modelo señala una reacción sin alternativa.</div>
 
-<h2 id="es-compare">11. Comparar dos situaciones</h2>
+<h2 id="es-compare">12. Comparar dos situaciones</h2>
 <p>El modo comparación pone dos situaciones cualesquiera una junto a otra: dos medios o concentraciones iniciales, un pulso o un cambio de medio, un knockout, otro trazador, o un modelo editado frente al publicado.</p>
 <ol>
   <li>Prepara la primera situación y simúlala. En <b>Comparar</b>, pulsa <b>Guardar la actual como escenario…</b> y ponle nombre (por ejemplo «Control»).</li>
@@ -1230,10 +1343,10 @@
   <li>Dos simulaciones dinámicas se comparan en el instante más cercano. Un escenario estacionario se compara con todos los instantes de una simulación dinámica.</li>
   <li>Si las dos situaciones usan ediciones del modelo distintas, reacciones y metabolitos se emparejan por ID. Los que sólo existen en un lado cuentan como flujo cero en el otro.</li>
   <li>Mientras hay un escenario elegido, sustituye a la referencia automática sin perturbar de un knockout. Deja de comparar para recuperarla.</li>
-  <li>Los escenarios viven en memoria. Para conservarlos, descarga la sesión (<a href="#es-download">sección 15</a>). Al importarla se recalculan todos.</li>
+  <li>Los escenarios viven en memoria. Para conservarlos, descarga la sesión (<a href="#es-download">sección 16</a>). Al importarla se recalculan todos.</li>
 </ul>
 
-<h2 id="es-editing">12. Editar el modelo</h2>
+<h2 id="es-editing">13. Editar el modelo</h2>
 <p>Pulsa <b>✎ Editar modelo</b> en la barra superior. La sección «Ediciones del modelo» lista cada cambio, y los paneles de reacción y de metabolito muestran botones de edición. Puedes:</p>
 <ul>
   <li><b>añadir una reacción</b>, con estequiometría, límites, enzimas (regla GPR) y mapa de átomos;</li>
@@ -1279,7 +1392,7 @@
 <div class="note">Los intercambios que añades quedan fuera de la regla de los flujos medidos según la cual los productos no medidos sólo salen como trazas (<a href="#es-measured">sección 5</a>): los añadiste para usarlos. Si el fenotipo medido debe incluir el producto nuevo, añádelo a «Flujos de intercambio medidos» con su tasa medida.</div>
 <p>Las ediciones se guardan con la sesión o por separado (<code>model_edits.json</code>), y al importarlas se vuelven a aplicar sobre el modelo publicado. <code>model_edits_report.csv</code> enumera cada edición con sus comprobaciones, para una sección de métodos.</p>
 
-<h2 id="es-cascade">13. El orden en cascada</h2>
+<h2 id="es-cascade">14. El orden en cascada</h2>
 <p>Cada metabolito recibe una <b>profundidad</b>: el menor número de pasos de reacción necesarios para alcanzarlo desde los metabolitos del medio actual. Los componentes del medio están en 0; la glucosa dentro de la célula, en 1; la glucosa 6-fosfato, en 2; y así sucesivamente. Los sentidos de las reacciones son los del modelo, no los de los flujos simulados, de modo que el orden no salta al cambiar una concentración, solo al añadir o quitar un componente del medio.</p>
 <ul>
   <li>Los cofactores (ATP, NAD, agua, CoA…) se ignoran; de lo contrario todo estaría a un paso de todo.</li>
@@ -1291,7 +1404,7 @@
   <li>Los ciclos no se pueden dibujar sin algunas flechas hacia arriba; es lo esperado.</li>
 </ul>
 
-<h2 id="es-experiments">14. Experimentos in silico</h2>
+<h2 id="es-experiments">15. Experimentos in silico</h2>
 <p>Cada ejemplo da los pasos y lo que obtuvimos con Human-GEM, el medio estándar, los flujos medidos del NCI-60 y pFBA activado (todo por defecto). Tus números deberían coincidir de cerca. Los nombres de los botones corresponden a la interfaz en español. Con estos valores por defecto la célula crece a 0,0341 h⁻¹, capta 0,742 mmol/gDW/h de glucosa y excreta 1,35 de lactato.</p>
 
 <div class="exp">
@@ -1439,7 +1552,7 @@
   <li><b>Combinar</b>: un trazador más un knockout muestra cómo se redirige la marca.</li>
 </ul>
 
-<h2 id="es-download">15. Descargar resultados</h2>
+<h2 id="es-download">16. Descargar resultados</h2>
 <p>«Descargar» abre una lista con todo lo que puede ofrecer el resultado actual. Marca lo que quieras; obtienes un único <code>.zip</code> con un <code>README.txt</code> que describe cada fichero. Las tablas son CSV (se abren en cualquier hoja de cálculo), las gráficas son SVG (vectoriales, editables) y el mapa es un PNG de lo que hay en pantalla. El contenido de los ficheros está en inglés.</p>
 <div class="tablebox"><table>
   <tr><th>Fichero</th><th>Contenido</th><th>Disponible</th></tr>
@@ -1463,7 +1576,7 @@
 <p>«Importar», en la barra superior, lee un <code>session.json</code>, un <code>model_edits.json</code>, o directamente el <code>.zip</code> de una descarga que contenga alguno de ellos. Una sesión reemplaza los ajustes y las ediciones actuales, cambia de modelo si hace falta y recalcula cada escenario guardado, así que ves la misma comparación que su autor. Las ediciones importadas solas pueden reemplazar a las actuales o añadirse detrás. Todo se guarda por ID, así que una sesión sigue funcionando tras actualizar el modelo. Los ID que ya no existan se omiten, y la barra de estado dice cuántos. Si sólo eliges <code>session.json</code> (o sólo las ediciones), se descarga como JSON sin comprimir.</p>
 <p>En modo dinámico, las tablas por reacción corresponden al instante seleccionado en el control de tiempo.</p>
 
-<h2 id="es-limits">16. Limitaciones</h2>
+<h2 id="es-limits">17. Limitaciones</h2>
 <ul>
   <li><b>Sin cinética ni regulación.</b> Las concentraciones solo fijan límites de captación. No hay niveles de enzima, alosterismo ni señalización.</li>
   <li><b>Una célula genérica.</b> Human-GEM contiene todas las reacciones conocidas en cualquier tejido humano. Un tipo celular concreto expresa un subconjunto; la aplicación todavía no construye modelos específicos de tejido.</li>
@@ -1477,9 +1590,10 @@
   <li><b>Las ediciones del modelo se comprueban, no se curan.</b> Las comprobaciones detectan reacciones imposibles o sin balancear y callejones sin salida, no biología equivocada. Los mapas de átomos automáticos (subestructura común máxima) pueden emparejar mal los átomos; mejor un SMILES mapeado.</li>
   <li><b>Los escenarios se guardan en memoria</b> con sus resultados. Descarga la sesión para conservarlos al cerrar la página.</li>
   <li><b>Mouse-GEM 1.8.0</b> trae un objetivo (<code>MAR00021</code>) con una escala distinta a la de la biomasa humana, así que su crecimiento absoluto sale muy bajo con el medio por defecto. Puedes elegir otro objetivo.</li>
+  <li><b>Los tipos celulares</b> apagan enzimas cuyo ARNm no se detecta, pero no escalan los flujos con la expresión (<a href="#es-contexts">sección 6</a>).</li>
 </ul>
 
-<h2 id="es-glossary">17. Glosario</h2>
+<h2 id="es-glossary">18. Glosario</h2>
 <div class="tablebox"><table>
   <tr><td><b>Flujo</b></td><td>Velocidad de una reacción, en mmol por gramo de peso seco y hora.</td></tr>
   <tr><td><b>Flujo de carbono / nitrógeno</b></td><td>Átomos de carbono o nitrógeno transferibles por hora que un grupo de reacciones produce y otro consume, a través de los metabolitos que comparten; no cuentan los átomos de transportadores reciclados como la CoA (<a href="#es-carbonflow">sección 3</a>).</td></tr>
@@ -1502,7 +1616,7 @@
   <tr><td><b>SMILES</b></td><td>Notación lineal de la estructura de una molécula, por ejemplo <code>CC(O)C(C)=O</code> para la acetoína.</td></tr>
 </table></div>
 
-<h2 id="es-refs">18. Referencias</h2>
+<h2 id="es-refs">19. Referencias</h2>
 <ul>
   <li>Orth JD, Thiele I, Palsson BØ. What is flux balance analysis? <i>Nat. Biotechnol.</i> 2010; 28:245–248. <a href="https://doi.org/10.1038/nbt.1614" target="_blank" rel="noopener">doi:10.1038/nbt.1614</a></li>
   <li>Lewis NE et al. Omic data from evolved <i>E. coli</i> are consistent with computed optimal growth from genome-scale models. <i>Mol. Syst. Biol.</i> 2010; 6:390 (FBA parsimonioso). <a href="https://doi.org/10.1038/msb.2010.47" target="_blank" rel="noopener">doi:10.1038/msb.2010.47</a></li>
@@ -1520,6 +1634,12 @@
   <li>Grankvist N, Jönsson C, Hedin K, Sundqvist N, Sandström P, Björnsson B, Begzati A, Mickols E, Artursson P, Jain M, Cedersund G, Nilsson R. Global <sup>13</sup>C tracing and metabolic flux analysis of intact human liver tissue ex vivo. <i>Nat. Metab.</i> 2024; 6:1963–1975. <a href="https://doi.org/10.1038/s42255-024-01119-3" target="_blank" rel="noopener">doi:10.1038/s42255-024-01119-3</a></li>
   <li>Lemons JMS, Feng XJ, Bennett BD, Legesse-Miller A, Johnson EL, Raitman I, Pollina EA, Rabitz HA, Rabinowitz JD, Coller HA. Quiescent fibroblasts exhibit high metabolic activity. <i>PLoS Biol.</i> 2010; 8:e1000514 (Fig. S1A). <a href="https://doi.org/10.1371/journal.pbio.1000514" target="_blank" rel="noopener">doi:10.1371/journal.pbio.1000514</a></li>
   <li>Wimmer M, Wilmering B, Sasse D. The relation of rat liver wet weight to dry weight. <i>Histochemistry</i> 1985; 83:571–572. <a href="https://doi.org/10.1007/BF00492462" target="_blank" rel="noopener">doi:10.1007/BF00492462</a></li>
+  <li>Uhlén M, Fagerberg L, Hallström BM, et al. Tissue-based map of the human proteome. <i>Science</i> 2015; 347:1260419. <a href="https://doi.org/10.1126/science.1260419" target="_blank" rel="noopener">doi:10.1126/science.1260419</a></li>
+  <li>Karlsson M, Zhang C, Méar L, et al. A single–cell type transcriptomics map of human tissues. <i>Sci. Adv.</i> 2021; 7:eabh2169. <a href="https://doi.org/10.1126/sciadv.abh2169" target="_blank" rel="noopener">doi:10.1126/sciadv.abh2169</a></li>
+  <li>Jin H, Zhang C, Zwahlen M, et al. Systematic transcriptional analysis of human cell lines for gene expression landscape and tumor representation. <i>Nat. Commun.</i> 2023; 14:5417. <a href="https://doi.org/10.1038/s41467-023-41132-w" target="_blank" rel="noopener">doi:10.1038/s41467-023-41132-w</a></li>
+  <li>Bairoch A. The Cellosaurus, a cell-line knowledge resource. <i>J. Biomol. Tech.</i> 2018; 29:25–38. <a href="https://doi.org/10.7171/jbt.18-2902-002" target="_blank" rel="noopener">doi:10.7171/jbt.18-2902-002</a></li>
+  <li>Bastian FB, Roux J, Niknejad A, et al. The Bgee suite: integrated curated expression atlas and comparative transcriptomics in animals. <i>Nucleic Acids Res.</i> 2021; 49:D831–D847. <a href="https://doi.org/10.1093/nar/gkaa793" target="_blank" rel="noopener">doi:10.1093/nar/gkaa793</a></li>
+  <li>Agren R, Mardinoglu A, Asplund A, et al. Identification of anticancer drugs for hepatocellular carcinoma through personalized genome-scale metabolic modeling. <i>Mol. Syst. Biol.</i> 2014; 10:721. <a href="https://doi.org/10.1002/msb.145122" target="_blank" rel="noopener">doi:10.1002/msb.145122</a></li>
   <li>Dolfi SC et al. The metabolic demands of cancer cells are coupled to their size and protein synthesis rates. <i>Cancer Metab.</i> 2013; 1:20 (condiciones de cultivo del NCI-60). <a href="https://doi.org/10.1186/2049-3002-1-20" target="_blank" rel="noopener">doi:10.1186/2049-3002-1-20</a></li>
   <li>Thiele I, Palsson BØ. A protocol for generating a high-quality genome-scale metabolic reconstruction. <i>Nat. Protoc.</i> 2010; 5:93–121 (quality checks for model edits). <a href="https://doi.org/10.1038/nprot.2009.203" target="_blank" rel="noopener">doi:10.1038/nprot.2009.203</a></li>
   <li>Lieven C et al. MEMOTE for standardized genome-scale metabolic model testing. <i>Nat. Biotechnol.</i> 2020; 38:272–276. <a href="https://doi.org/10.1038/s41587-020-0446-y" target="_blank" rel="noopener">doi:10.1038/s41587-020-0446-y</a></li>

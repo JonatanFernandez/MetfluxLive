@@ -61,6 +61,18 @@
         <div id="editList"></div>
         <div id="editIssues"></div>
       </section>
+      <section id="secContext" class="fold" hidden>
+        <h2><span data-i18n="h.context"></span> <button id="clearContext" class="link" data-i18n="ctx.clear" hidden></button> <a class="link" id="ctxBrowse" href="contexts.html" target="_blank" data-i18n="ctx.browse" data-i18n-title="ctx.browseTitle"></a> <a class="link" data-docs="contexts" target="_blank" data-i18n="obj.help"></a></h2>
+        <div class="add">
+          <input id="ctxInput" type="search" data-i18n-ph="ctx.ph" autocomplete="off" spellcheck="false">
+          <div id="ctxResults" class="dropdown" hidden></div>
+        </div>
+        <div id="ctxCurrent"></div>
+        <div class="row medium-bar">
+          <select id="ctxMode" class="grow" data-i18n-title="ctx.modeTitle"><option value="block" data-i18n="ctx.mode.block"></option><option value="penalty" data-i18n="ctx.mode.penalty"></option></select>
+        </div>
+        <p class="hint" id="ctxNote"></p>
+      </section>
       <section id="secMedium" class="fold">
         <h2><span data-i18n="h.medium"></span> <button id="resetMedium" class="link" data-i18n="h.reset" data-i18n-title="h.resetTitle"></button></h2>
         <div class="row medium-bar">
@@ -311,6 +323,8 @@
       </div>
       <h4 data-i18n="methods.tracerH"></h4>
       <p data-i18n="methods.tracer"></p>
+      <h4 data-i18n="methods.contextH"></h4>
+      <p data-i18n-html="methods.context"></p>
       <h4 data-i18n="methods.perturbH"></h4>
       <p data-i18n-html="methods.perturb"></p>
       <footer><span class="spacer"></span><button value="ok" class="primary" data-i18n="h.ok"></button></footer>

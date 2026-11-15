@@ -77,7 +77,7 @@ export function attachSearch(input, listEl, getIndex, onPick, opts = {}) {
     results.forEach((it, i) => {
       const row = document.createElement("div");
       row.className = "sr-row" + (i === active ? " active" : "");
-      const badge = document.createElement("span"); badge.className = `badge b-${it.type}`; badge.textContent = t("search." + it.type);
+      const badge = document.createElement("span"); badge.className = `badge b-${it.badgeClass || it.type}`; badge.textContent = it.badge ?? t("search." + it.type);
       const txt = document.createElement("div"); txt.className = "sr-text";
       const title = document.createElement("div"); title.className = "sr-title"; title.textContent = it.title;
       const subtitle = document.createElement("div"); subtitle.className = "sr-sub"; subtitle.textContent = it.sub;

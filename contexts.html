@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MetfluxLive · Cell types</title>
+  <script>try { if (localStorage.getItem("metflux.theme") === "light") document.documentElement.dataset.theme = "light"; } catch { /* storage unavailable */ }</script>
+  <style>
+    :root { --bg: #0b1020; --panel: #111830; --panel2: #162040; --line: #243055; --text: #e8eefc; --muted: #93a2c6; --accent: #4cc9f0; --hot: #ffbe3c; }
+    :root[data-theme="light"] { --bg: #eceff5; --panel: #f7f8fb; --panel2: #e6ebf3; --line: #d0d7e4; --text: #283044; --muted: #67718a; --accent: #2b7ca3; --hot: #b26f0e; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 Inter, "Segoe UI", system-ui, -apple-system, sans-serif; }
+    header { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+    header h1 { font-size: 17px; margin: 0 8px 0 0; } header h1 b { color: var(--accent); }
+    a { color: var(--accent); }
+    select, input { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; color: var(--text); font: inherit; }
+    input { min-width: 260px; }
+    .count { color: var(--muted); }
+    main { padding: 14px 20px 40px; }
+    p.note { color: var(--muted); max-width: 90ch; margin: 0 0 12px; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { position: sticky; top: 53px; background: var(--panel); cursor: pointer; user-select: none; white-space: nowrap; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.sub { color: var(--muted); }
+    .warn { color: var(--hot); }
+    tr:hover td { background: var(--panel); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Metflux<b>Live</b> · <span data-i18n="cat.title"></span></h1>
+    <select id="model"></select>
+    <select id="group"></select>
+    <input id="q" type="search" autocomplete="off" spellcheck="false" data-i18n-ph="cat.filter">
+    <span class="count" id="count"></span>
+    <span style="flex:1"></span>
+    <a id="docs" data-i18n="cat.docs"></a>
+    <a href="index.html" data-i18n="cat.back"></a>
+  </header>
+  <main>
+    <p class="note" data-i18n-html="cat.note"></p>
+    <table><thead><tr id="head"></tr></thead><tbody id="rows"></tbody></table>
+  </main>
+  <script type="module">
+    import { t, initLang, applyDom, docsLang } from "./js/i18n.js";
+    import { CONTEXT_GROUPS } from "./js/core/contexts.js";
+    initLang(); applyDom();
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    $("docs").href = `docs.html?lang=${docsLang()}#${docsLang()}-contexts`;
+    const params = new URLSearchParams(location.search);
+    const models = await (await fetch("data/models.json")).json();
+    for (const m of models) $("model").add(new Option(`${m.name} ${m.version}`, m.slug));
+    $("model").value = params.get("model") && models.some((m) => m.slug === params.get("model")) ? params.get("model") : models[0].slug;
+    $("group").add(new Option(t("cat.all"), ""));
+    for (const g of CONTEXT_GROUPS) $("group").add(new Option(t("ctx.group." + g), g));
+    const COLS = [["group", "cat.th.group"], ["name", "cat.th.name"], ["desc", "cat.th.desc"], ["src", "cat.th.src"], ["off", "cat.th.off", 1], ["blocked", "cat.th.blocked", 1], ["rescued", "cat.th.rescued", 1], ["pairs", "cat.th.pairs"], ["use", ""]];
+    let rows = [], sortKey = "group", sortDir = 1;
+    $("head").innerHTML = COLS.map(([k, l]) => `<th data-k="${k}">${l ? esc(t(l)) : ""}</th>`).join("");
+    $("head").onclick = (ev) => { const k = ev.target.dataset.k; if (!k || k === "use") return; sortDir = sortKey === k ? -sortDir : 1; sortKey = k; render(); };
+    async function load() {
+      const slug = $("model").value;
+      const d = await fetch(`data/${slug}/contexts.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      const order = new Map(CONTEXT_GROUPS.map((g, i) => [g, i]));
+      rows = (d?.contexts || []).map((c) => {
+        const i = c.info || {};
+        const desc = c.id === "nci60" ? t("ctx.nci60Sub", { n: (i.lines || []).length }) : [i.disease || (c.group === "lineOther" ? i.category : ""), i.site, i.note].filter(Boolean).join(" · ");
+        const off = c.off ? [...atob(c.off)].reduce((s, ch) => { let x = ch.charCodeAt(0), k = 0; while (x) { k += x & 1; x >>= 1; } return s + k; }, 0) : 0;
+        return { c, group: order.get(c.group) ?? 9, name: c.name, desc, src: t("ctx.src." + c.src), off, blocked: c.nBlocked ?? 0, rescued: c.rescued.length,
+          pairs: (c.pairs || []).map((p) => t("meas.name." + p)).join("; "), hay: norm([c.name, desc, i.category, i.cellosaurus, i.entity, t("ctx.group." + c.group)].join(" | ")), slug };
+      });
+      render();
+    }
+    function render() {
+      const q = norm($("q").value).trim().split(/\s+/).filter(Boolean), g = $("group").value;
+      const vis = rows.filter((r) => (!g || r.c.group === g) && q.every((w) => r.hay.includes(w)));
+      vis.sort((a, b) => sortDir * (typeof a[sortKey] === "number" ? a[sortKey] - b[sortKey] || a.name.localeCompare(b.name) : String(a[sortKey]).localeCompare(String(b[sortKey]))));
+      $("count").textContent = t("cat.count", { n: vis.length, total: rows.length });
+      $("rows").innerHTML = vis.map((r) => {
+        const i = r.c.info || {};
+        const link = i.cellosaurus ? ` <a href="https://www.cellosaurus.org/${encodeURIComponent(i.cellosaurus)}" target="_blank" rel="noopener">${esc(i.cellosaurus)}</a>` : i.entity ? ` <span class="sub">${esc(i.entity)}</span>` : "";
+        return `<tr><td>${esc(t("ctx.group." + r.c.group))}</td><td><b>${esc(r.name)}</b>${link}${i.problematic ? `<div class="warn" title="${esc(i.problematic)}">⚠ ${esc(i.problematic.split(".")[0])}</div>` : ""}</td>
+          <td class="sub">${esc(r.desc)}</td><td class="sub">${esc(r.src)}</td><td class="num">${r.off}</td><td class="num">${r.blocked}</td><td class="num">${r.rescued}</td>
+          <td class="sub">${esc(r.pairs)}</td><td><a href="index.html?model=${encodeURIComponent(r.slug)}&context=${encodeURIComponent(r.c.id)}">${esc(t("cat.use"))}</a></td></tr>`;
+      }).join("");
+    }
+    $("model").onchange = load; $("group").onchange = render; $("q").oninput = render;
+    if (params.get("group")) $("group").value = params.get("group");
+    load();
+  </script>
+</body>
+</html>
