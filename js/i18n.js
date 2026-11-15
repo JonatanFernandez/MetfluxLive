@@ -868,7 +868,7 @@ const enQty = {
   "obj.note.user": "Objective saved by you (kept in this browser).",
   "obj.note.custom": "A reaction picked in the search box below. <b>Save</b> keeps it in the list.",
   "obj.group.general": "Growth, energy and stress", "obj.group.liver": "Liver and lipid metabolism", "obj.group.neuro": "Neurons and endocrine cells", "obj.group.other": "Other cell types",
-  "obj.measHint": "This is the function of a specialised cell: the measured rates loaded (NCI-60, proliferating tumour cells) do not fit it. Set Measured exchange fluxes to \"None\".",
+  "obj.measHint": "This is the function of a specialised cell, and the measured rates loaded come from proliferating cells: set Measured exchange fluxes to \"None\", or to a matching set (human liver for the liver functions).",
   "obj.name.urea": "Urea output (hepatocyte, ammonia disposal)", "obj.name.glucose": "Glucose output (gluconeogenesis)", "obj.name.bhb": "Ketone body output (β-hydroxybutyrate)",
   "obj.name.bile": "Bile acid output (glycocholate)", "obj.name.cholesterol": "Cholesterol output (synthesis)", "obj.name.palmitate": "De novo lipogenesis (palmitate)",
   "obj.name.glutamate": "Glutamate release (glutamatergic neuron)", "obj.name.gaba": "GABA release (GABAergic neuron)", "obj.name.dopamine": "Dopamine release (dopaminergic neuron)",
@@ -928,7 +928,7 @@ const esQty = {
   "obj.note.user": "Objetivo guardado por ti (se conserva en este navegador).",
   "obj.note.custom": "Una reacción elegida en el buscador de abajo. <b>Guardar</b> la añade a la lista.",
   "obj.group.general": "Crecimiento, energía y estrés", "obj.group.liver": "Hígado y metabolismo lipídico", "obj.group.neuro": "Neuronas y células endocrinas", "obj.group.other": "Otros tipos celulares",
-  "obj.measHint": "Es la función de una célula especializada: las tasas medidas cargadas (NCI-60, células tumorales que proliferan) no le corresponden. Pon los flujos de intercambio medidos en «Ninguno».",
+  "obj.measHint": "Es la función de una célula especializada y las tasas medidas cargadas son de células que proliferan: pon los flujos de intercambio medidos en «Ninguno» o en un conjunto acorde (hígado humano para las funciones hepáticas).",
   "obj.name.urea": "Salida de urea (hepatocito, eliminación de amonio)", "obj.name.glucose": "Salida de glucosa (gluconeogénesis)", "obj.name.bhb": "Salida de cuerpos cetónicos (β-hidroxibutirato)",
   "obj.name.bile": "Salida de ácidos biliares (glicocolato)", "obj.name.cholesterol": "Salida de colesterol (síntesis)", "obj.name.palmitate": "Lipogénesis de novo (palmitato)",
   "obj.name.glutamate": "Liberación de glutamato (neurona glutamatérgica)", "obj.name.gaba": "Liberación de GABA (neurona GABAérgica)", "obj.name.dopamine": "Liberación de dopamina (neurona dopaminérgica)",
@@ -1001,6 +1001,30 @@ Object.assign(en, {
   "cmp.swapTitle": "Swap the two scenarios"
 });
 
+Object.assign(en, {
+  "meas.name.hek293": "HEK293, exponential growth (Dietmair 2012)",
+  "meas.name.fibroP": "Human fibroblasts, proliferating (Lemons 2010)",
+  "meas.name.fibroQ": "Human fibroblasts, quiescent (Lemons 2010)",
+  "meas.name.liver": "Human liver tissue ex vivo (Grankvist 2024)",
+  "meas.note.hek293": "23 exchanges (glucose, lactate, O₂, NH₄⁺ and amino acids) of HEK293 cells (human embryonic kidney: immortalised, not from a tumour) in exponential growth, measured per gram dry weight. With them the model predicts 0.031 h⁻¹ of growth; the cells grew at 0.028 h⁻¹. <a href=\"docs.html#{lang}-measured\" target=\"_blank\" rel=\"noopener\">Docs › Measured values</a>.",
+  "meas.note.fibroP": "Glucose, lactate, glutamine and glutamate of primary human dermal fibroblasts while proliferating (DMEM, 25 mM glucose). Only 4 exchanges: FBA chooses the rest. Read from a figure and converted with the protein content of the model's biomass. <a href=\"docs.html#{lang}-measured\" target=\"_blank\" rel=\"noopener\">Docs › Measured values</a>.",
+  "meas.note.fibroQ": "The same fibroblasts made quiescent by 14 days of contact inhibition: glucose uptake halves, lactate barely changes. They do not grow: use an objective such as Maximum ATP production. <a href=\"docs.html#{lang}-measured\" target=\"_blank\" rel=\"noopener\">Docs › Measured values</a>.",
+  "meas.note.liver": "17 exchanges of precision-cut human liver slices from 5 fasted donors in Williams E: release of glucose, lactate, urea and glutamate, uptake of amino acids (median of the donors). The rates are low, as for a non-growing tissue: use them with a liver objective and the Williams E medium. <a href=\"docs.html#{lang}-measured\" target=\"_blank\" rel=\"noopener\">Docs › Measured values</a>.",
+  "medium.name.williamsE": "Williams E (liver slices, Grankvist 2024)",
+  "medium.note.williamsE": "Serum-free Williams E as used for human liver slices by Grankvist et al. 2024 (fasted-state nutrients, no insulin), from their Supplementary Table 2. Menadione, manganese and nitrate are not in the models and are left out."
+});
+Object.assign(es, {
+  "meas.name.hek293": "HEK293, crecimiento exponencial (Dietmair 2012)",
+  "meas.name.fibroP": "Fibroblastos humanos, proliferando (Lemons 2010)",
+  "meas.name.fibroQ": "Fibroblastos humanos, quiescentes (Lemons 2010)",
+  "meas.name.liver": "Tejido hepático humano ex vivo (Grankvist 2024)",
+  "meas.note.hek293": "23 intercambios (glucosa, lactato, O₂, NH₄⁺ y aminoácidos) de células HEK293 (riñón embrionario humano: inmortalizadas, no tumorales) en crecimiento exponencial, medidos por gramo de peso seco. Con ellos el modelo predice 0,031 h⁻¹ de crecimiento; las células crecieron a 0,028 h⁻¹. <a href=\"docs.html#{lang}-measured\" target=\"_blank\" rel=\"noopener\">Docs › Valores medidos</a>.",
+  "meas.note.fibroP": "Glucosa, lactato, glutamina y glutamato de fibroblastos dérmicos humanos primarios mientras proliferan (DMEM, glucosa 25 mM). Solo 4 intercambios: el FBA elige el resto. Leídos de una figura y convertidos con el contenido de proteína de la biomasa del modelo. <a href=\"docs.html#{lang}-measured\" target=\"_blank\" rel=\"noopener\">Docs › Valores medidos</a>.",
+  "meas.note.fibroQ": "Los mismos fibroblastos, quiescentes tras 14 días de inhibición por contacto: la captación de glucosa baja a la mitad y el lactato apenas cambia. No crecen: usa un objetivo como Máxima producción de ATP. <a href=\"docs.html#{lang}-measured\" target=\"_blank\" rel=\"noopener\">Docs › Valores medidos</a>.",
+  "meas.note.liver": "17 intercambios de cortes de hígado humano de 5 donantes en ayunas, en Williams E: liberación de glucosa, lactato, urea y glutamato y captación de aminoácidos (mediana de los donantes). Las tasas son bajas, como corresponde a un tejido que no crece: úsalas con un objetivo hepático y el medio Williams E. <a href=\"docs.html#{lang}-measured\" target=\"_blank\" rel=\"noopener\">Docs › Valores medidos</a>.",
+  "medium.name.williamsE": "Williams E (cortes de hígado, Grankvist 2024)",
+  "medium.note.williamsE": "Williams E sin suero, como el usado para cortes de hígado humano por Grankvist et al. 2024 (nutrientes de ayuno, sin insulina), según su tabla suplementaria 2. Menadiona, manganeso y nitrato no están en los modelos y se omiten."
+});
 export const DICT = { es, en, pt, it, fr, de, el };
 export const LANGS = [["en", "English"], ["es", "Español"], ["pt", "Português"], ["it", "Italiano"], ["fr", "Français"], ["de", "Deutsch"], ["el", "Ελληνικά"]];
 // languages the documentation (docs.html + docs/<code>.html) is written in; any other opens it in English

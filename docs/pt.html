@@ -118,8 +118,9 @@
   <tr><td>Mouse-GEM 1.8.0</td><td><a href="https://github.com/SysBioChalmers/Mouse-GEM" target="_blank" rel="noopener">SysBioChalmers/Mouse-GEM</a>; Wang et al., <i>PNAS</i> 2021</td><td>A rede do camundongo. Partilha identificadores com o Human-GEM, por isso as estruturas são reutilizadas.</td></tr>
   <tr><td>Mapas átomo a átomo</td><td>Calculados para esta aplicação com <a href="https://github.com/rxn4chemistry/rxnmapper" target="_blank" rel="noopener">RXNMapper</a> (Schwaller et al., <i>Sci. Adv.</i> 2021) e RDKit, mais correções curadas à mão para o metabolismo central</td><td>Seguir átomos individuais através de cada reação.</td></tr>
   <tr><td>Plasmax e HPLM</td><td>Tabela S1 de <a href="https://pubmed.ncbi.nlm.nih.gov/30613774/" target="_blank" rel="noopener">Vande Voorde et al., <i>Sci. Adv.</i> 2019</a>; HPLM originalmente de Cantor et al., <i>Cell</i> 2017</td><td>Meios fisiológicos.</td></tr>
+  <tr><td>Williams E</td><td>Tabela Suplementar 2 de Grankvist et al., <i>Nat. Metab.</i> 2024</td><td>O meio das fatias de fígado humano (<a href="#pt-medium">seção 8</a>).</td></tr>
   <tr><td>Meio padrão</td><td>Segue aproximadamente o DMEM / Ham's F-12</td><td>Meio por padrão.</td></tr>
-  <tr><td>Fluxos de troca medidos</td><td>Jain et al., <i>Science</i> 2012 (linhagens NCI-60), valores por linhagem da Tabela S1 Q de Aurich et al., <i>PLoS Comput. Biol.</i> 2017</td><td>A captação e secreção por padrão de glicose, lactato, glutamina e mais 15 metabólitos (<a href="#pt-measured">seção 5</a>).</td></tr>
+  <tr><td>Fluxos de troca medidos</td><td>Jain et al., <i>Science</i> 2012 (linhagens NCI-60), valores por linhagem da Tabela S1 Q de Aurich et al., <i>PLoS Comput. Biol.</i> 2017; outros conjuntos: Dietmair et al., <i>PLoS ONE</i> 2012 (HEK293), Lemons et al., <i>PLoS Biol.</i> 2010 (fibroblastos), Grankvist et al., <i>Nat. Metab.</i> 2024 (fígado humano)</td><td>A captação e secreção por padrão de glicose, lactato, glutamina e mais 15 metabólitos (<a href="#pt-measured">seção 5</a>).</td></tr>
   <tr><td>Manutenção de ATP</td><td>Kilburn, Lilly &amp; Webb, <i>J. Cell Sci.</i> 1969, valor tal como usado por Zielinski et al., <i>Sci. Rep.</i> 2017</td><td>O ATP que a célula gasta quer cresça ou não.</td></tr>
   <tr><td>Cinética de captação (V<sub>max</sub>, K<sub>m</sub>)</td><td>Ordens de grandeza para células de mamífero em cultura, fixadas à mão</td><td>Captação máxima dos componentes do meio cuja troca não foi medida (vitaminas, cistina, histidina…), e de todos eles quando os fluxos medidos estão desligados. <b>Não são valores medidos.</b></td></tr>
   <tr><td>Solver linear</td><td><a href="https://highs.dev" target="_blank" rel="noopener">HiGHS</a>, compilado para WebAssembly</td><td>Resolver o problema de balanço de fluxos.</td></tr>
@@ -174,6 +175,69 @@
   <li><b>Quando não podem ser cumpridos.</b> Se um fluxo medido se torna impossível (você remove a glicose do meio, um nutriente se esgota no modo dinâmico, um knockout bloqueia a produção de lactato…), os fluxos medidos são relaxados: as captações conservam só o seu máximo e as secreções ficam livres. A barra de estado e o resumo o indicam.</li>
   <li>O <b>Mouse-GEM</b> usa os mesmos valores. Foram medidos em células humanas.</li>
 </ul>
+<h3 id="pt-measured-other">Outros conjuntos medidos: células não tumorais</h3>
+<p>As linhagens NCI-60 são células de câncer. «Fluxos de troca medidos» oferece também quatro conjuntos medidos em células e tecido humanos não tumorais. Seguem as mesmas regras do conjunto NCI-60 (margem de ±20 %, produtos orgânicos não medidos só em traços, relaxamento quando não podem ser cumpridos); só mudam a unidade da fonte e a sua conversão para mmol/gDW/h. Os intervalos das tabelas são a variação dada por cada fonte, como referência: o app aplica a sua própria margem.</p>
+<h3>HEK293 (Dietmair et al. 2012)</h3>
+<p>Dietmair et al. (<i>PLoS ONE</i> 2012, Tabela 2) mediram as trocas da linhagem HEK293 parental (células de rim embrionário humano imortalizadas com DNA de adenovírus, não provenientes de um tumor) em crescimento exponencial em meio FreeStyle 293, por grama de peso seco (514 pg de massa seca por célula), incluindo a captação de oxigênio. Os valores são a média ± erro padrão de 3 culturas. A alanina (11 ± 17 µmol/gDW/h) não tem sentido claro e fica de fora. Não se adiciona manutenção de ATP: com a captação de oxigênio medida, a respiração já é fixada pelos dados. <b>Verificação:</b> com este conjunto, o meio Padrão e o crescimento como objetivo, o Human-GEM cresce a 0,0313 h⁻¹; as células cresceram a 0,028 h⁻¹.</p>
+<div class="tablebox"><table>
+  <tr><th>Metabólito</th><th>Sentido</th><th>Média ± EP (µmol/gDW/h)</th><th>Usado (mmol/gDW/h)</th></tr>
+  <tr><td>glicose</td><td>captação</td><td class="num">528 ± 63</td><td class="num">0,528</td></tr>
+  <tr><td>L-lactato</td><td>secreção</td><td class="num">695 ± 92</td><td class="num">0,695</td></tr>
+  <tr><td>O2</td><td>captação</td><td class="num">335 ± 29</td><td class="num">0,335</td></tr>
+  <tr><td>NH4+</td><td>secreção</td><td class="num">17 ± 3</td><td class="num">0,0170</td></tr>
+  <tr><td>glutamina</td><td>captação</td><td class="num">29 ± 17</td><td class="num">0,0290</td></tr>
+  <tr><td>serina</td><td>captação</td><td class="num">37 ± 6</td><td class="num">0,0370</td></tr>
+  <tr><td>leucina</td><td>captação</td><td class="num">19 ± 4</td><td class="num">0,0190</td></tr>
+  <tr><td>arginina</td><td>captação</td><td class="num">16 ± 3</td><td class="num">0,0160</td></tr>
+  <tr><td>valina</td><td>captação</td><td class="num">14 ± 3</td><td class="num">0,0140</td></tr>
+  <tr><td>isoleucina</td><td>captação</td><td class="num">13 ± 3</td><td class="num">0,0130</td></tr>
+  <tr><td>lisina</td><td>captação</td><td class="num">12 ± 2</td><td class="num">0,0120</td></tr>
+  <tr><td>treonina</td><td>captação</td><td class="num">8,4 ± 1,6</td><td class="num">0,00840</td></tr>
+  <tr><td>aspartato</td><td>captação</td><td class="num">6,3 ± 1,6</td><td class="num">0,00630</td></tr>
+  <tr><td>fenilalanina</td><td>captação</td><td class="num">5,8 ± 1,0</td><td class="num">0,00580</td></tr>
+  <tr><td>metionina</td><td>captação</td><td class="num">4,9 ± 1,1</td><td class="num">0,00490</td></tr>
+  <tr><td>tirosina</td><td>captação</td><td class="num">4,6 ± 0,7</td><td class="num">0,00460</td></tr>
+  <tr><td>asparagina</td><td>captação</td><td class="num">4,1 ± 1,0</td><td class="num">0,00410</td></tr>
+  <tr><td>histidina</td><td>captação</td><td class="num">3,2 ± 0,5</td><td class="num">0,00320</td></tr>
+  <tr><td>triptofano</td><td>captação</td><td class="num">1,5 ± 0,3</td><td class="num">0,00150</td></tr>
+  <tr><td>glutamato</td><td>secreção</td><td class="num">9,6 ± 1,4</td><td class="num">0,00960</td></tr>
+  <tr><td>ornitina</td><td>secreção</td><td class="num">9,0 ± 1,5</td><td class="num">0,00900</td></tr>
+  <tr><td>glicina</td><td>secreção</td><td class="num">6,2 ± 1,1</td><td class="num">0,00620</td></tr>
+  <tr><td>prolina</td><td>secreção</td><td class="num">3,8 ± 0,4</td><td class="num">0,00380</td></tr>
+</table></div>
+<h3>Fibroblastos humanos, em proliferação e quiescentes (Lemons et al. 2010)</h3>
+<p>Lemons et al. (<i>PLoS Biol.</i> 2010, Fig. S1A) compararam fibroblastos dérmicos primários de prepúcio de recém-nascido em proliferação e após 14 dias de inibição por contato (quiescentes), em DMEM com glicose 25 mM, glutamina 4 mM e soro dialisado a 7,5 %. Só foram medidos glicose, lactato, glutamina e glutamato, então o FBA ainda escolhe as outras trocas. Os valores foram lidos do gráfico de barras (incerteza de leitura de cerca de ±0,05); o ± é o erro padrão publicado. São por µg de proteína e convertem-se com 0,59 g de proteína por gDW, o conteúdo proteico da reação de biomassa do Human-GEM (5,34 mmol de resíduos de aminoácido por gDW × 111 g/mol por resíduo): mmol/gDW/h = nmol/µg proteína/h × 0,59. Aplica-se a manutenção de ATP (1,07 mmol/gDW/h, abaixo). Em proliferação, com crescimento como objetivo e o meio Padrão: 0,0370 h⁻¹. As quiescentes não crescem: escolha um objetivo como «Produção máxima de ATP» (13,9 mmol/gDW/h).</p>
+<div class="tablebox"><table>
+  <tr><th>Metabólito</th><th>Sentido</th><th>Em proliferação (nmol/µg proteína/h)</th><th>Quiescentes</th><th>Usado, P / Q (mmol/gDW/h)</th></tr>
+  <tr><td>glicose</td><td>captação</td><td class="num">2,92 ± 0,15</td><td class="num">1,41 ± 0,06</td><td class="num">1,72 / 0,832</td></tr>
+  <tr><td>L-lactato</td><td>secreção</td><td class="num">1,85 ± 0,04</td><td class="num">1,40 ± 0,05</td><td class="num">1,09 / 0,826</td></tr>
+  <tr><td>glutamina</td><td>captação</td><td class="num">0,59 ± 0,03</td><td class="num">0,21 ± 0,02</td><td class="num">0,348 / 0,124</td></tr>
+  <tr><td>glutamato</td><td>secreção</td><td class="num">0,08 ± 0,01</td><td class="num">0,05 ± 0,01</td><td class="num">0,0472 / 0,0295</td></tr>
+</table></div>
+<h3>Tecido hepático humano ex vivo (Grankvist et al. 2024)</h3>
+<p>Grankvist et al. (<i>Nat. Metab.</i> 2024) mantiveram fatias de precisão de fígado de 5 doadores durante 24 h em Williams E sem soro com nutrientes de jejum e mediram o que o tecido captava e liberava (Dados Suplementares 3 e dados-fonte das Figs. 1i, 4a e da Fig. 4i de dados estendidos). O app toma a mediana dos doadores (ureia: das 15 fatias) e mantém as 17 trocas com o mesmo sentido em pelo menos 4 dos 5 doadores; alanina, glicina, serina, valina e histidina mudam de sentido e ficam de fora. O intervalo da tabela é o dos doadores, por isso pode cruzar o zero (um valor negativo indica o sentido oposto). As taxas por g de fígado úmido por dia convertem-se com uma razão peso úmido/seco de 3,3, medida em fígado de rato (Wimmer, Wilmering e Sasse 1985): mmol/gDW/h = µmol/g/dia × 3,3 / 24 / 1000. Não se adiciona manutenção de ATP.</p>
+<div class="tablebox"><table>
+  <tr><th>Metabólito</th><th>Sentido</th><th>Mediana (µmol/g liver/day)</th><th>Intervalo dos doadores</th><th>Usado (mmol/gDW/h)</th></tr>
+  <tr><td>glicose</td><td>secreção</td><td class="num">30,4</td><td class="num">−5,62 … 75,3</td><td class="num">0,00417</td></tr>
+  <tr><td>L-lactato</td><td>secreção</td><td class="num">116</td><td class="num">61,9 … 160</td><td class="num">0,0159</td></tr>
+  <tr><td>ureia</td><td>secreção</td><td class="num">87,5</td><td class="num">40,9 … 202</td><td class="num">0,0120</td></tr>
+  <tr><td>glutamina</td><td>captação</td><td class="num">42,5</td><td class="num">13,9 … 47,0</td><td class="num">0,00584</td></tr>
+  <tr><td>glutamato</td><td>secreção</td><td class="num">22,6</td><td class="num">18,0 … 31,6</td><td class="num">0,00311</td></tr>
+  <tr><td>arginina</td><td>captação</td><td class="num">12,5</td><td class="num">8,08 … 22,9</td><td class="num">0,00172</td></tr>
+  <tr><td>treonina</td><td>captação</td><td class="num">5,81</td><td class="num">0,863 … 16,0</td><td class="num">0,000799</td></tr>
+  <tr><td>aspartato</td><td>captação</td><td class="num">5,13</td><td class="num">1,94 … 9,01</td><td class="num">0,000705</td></tr>
+  <tr><td>leucina</td><td>captação</td><td class="num">4,37</td><td class="num">1,93 … 24,3</td><td class="num">0,000601</td></tr>
+  <tr><td>lisina</td><td>captação</td><td class="num">4,19</td><td class="num">−7,67 … 15,0</td><td class="num">0,000577</td></tr>
+  <tr><td>asparagina</td><td>captação</td><td class="num">2,69</td><td class="num">1,03 … 4,90</td><td class="num">0,000370</td></tr>
+  <tr><td>tirosina</td><td>captação</td><td class="num">2,71</td><td class="num">−0,780 … 7,03</td><td class="num">0,000372</td></tr>
+  <tr><td>fenilalanina</td><td>captação</td><td class="num">2,57</td><td class="num">2,03 … 5,44</td><td class="num">0,000353</td></tr>
+  <tr><td>metionina</td><td>captação</td><td class="num">2,17</td><td class="num">1,34 … 3,34</td><td class="num">0,000299</td></tr>
+  <tr><td>prolina</td><td>captação</td><td class="num">1,70</td><td class="num">−2,40 … 4,56</td><td class="num">0,000233</td></tr>
+  <tr><td>isoleucina</td><td>captação</td><td class="num">1,45</td><td class="num">−0,311 … 10,9</td><td class="num">0,000199</td></tr>
+  <tr><td>triptofano</td><td>captação</td><td class="num">0,775</td><td class="num">0,531 … 1,54</td><td class="num">0,000107</td></tr>
+</table></div>
+<p>O tecido não cresce e as suas taxas são uma a duas ordens de grandeza menores que as de células em cultura. Use o conjunto com o meio Williams E (<a href="#pt-medium">seção 8</a>) e um objetivo hepático: com o Human-GEM, a liberação de glicose chega então a 0,0724 mmol/gDW/h e a de ureia a 0,0676; o crescimento é 0. Quando o objetivo é liberar glicose ou ureia, a sua própria taxa medida é deixada de lado (<a href="#pt-objectives">seção 6</a>).</p>
+<p>Considerados e descartados: células CHO (Ahn e Antoniewicz, <i>Metab. Eng.</i> 2011: células de hamster, artigo sem acesso aberto), trocas entre órgãos de porco (Jang et al., <i>Cell Metab.</i> 2019: diferenças arteriovenosas de concentração, não taxas por massa de tecido) e células endoteliais (De Bock et al., <i>Cell</i> 2013: sem taxas absolutas nos dados publicados).</p>
 <h3>Manutenção de ATP</h3>
 <p>As células gastam ATP quer cresçam quer não: bombas iônicas, renovação de proteínas etc. O Human-GEM deixa isso em zero. Com o conjunto NCI-60 ativo, a reação de hidrólise de ATP citosólico (<code>MAR03964</code>) deve levar pelo menos 1,07 mmol/gDW/h, o valor que Zielinski et al. tomaram das medições de Kilburn, Lilly &amp; Webb (<i>J. Cell Sci.</i> 1969) em células LS de camundongo. Isso força a respiração e o giro do ciclo de Krebs que as células reais têm. Sem isso, um traçador de glicose marca o fumarato a 0 % em vez de cerca de 9 % M+2.</p>
 <h3>O que continua sendo assumido</h3>
@@ -253,7 +317,7 @@
   <dt>Síntese de heme (precursor eritroide)</dt><dd>Maximiza a liberação de heme (MAR09107): a via de síntese do heme (glicina + succinil-CoA, ferro), a principal tarefa metabólica dos precursores eritroides.</dd>
   <dt>Saída de creatina</dt><dd>Maximiza a liberação de creatina (MAR09290), produzida a partir de arginina, glicina e metionina no rim e no fígado.</dd>
 </dl>
-<div class="note"><b>Fluxos medidos e funções celulares.</b> As taxas medidas carregadas por padrão (NCI-60) são de células tumorais em proliferação e fixam a elas as trocas de glicose, lactato, glutamina e outras. Não descrevem um hepatócito nem um neurônio, e além disso limitam a traços os subprodutos não medidos, o que pode cortar artificialmente uma função (o cortisol cai de 0,095 para 0,001 porque um subproduto da esteroidogênese só pode sair em traços). Quando se escolhe uma função celular com os fluxos medidos ativos, a nota do objetivo pede que sejam definidos como «Nenhum». Crescimento, ATP e glutationa podem ser usados com eles.</div>
+<div class="note"><b>Fluxos medidos e funções celulares.</b> As taxas medidas carregadas por padrão (NCI-60) são de células tumorais em proliferação e fixam a elas as trocas de glicose, lactato, glutamina e outras. Não descrevem um hepatócito nem um neurônio, e além disso limitam a traços os subprodutos não medidos, o que pode cortar artificialmente uma função (o cortisol cai de 0,095 para 0,001 porque um subproduto da esteroidogênese só pode sair em traços). Quando se escolhe uma função celular com os fluxos medidos ativos, a nota do objetivo pede que sejam definidos como «Nenhum». Crescimento, ATP e glutationa podem ser usados com eles. Para as funções hepáticas você pode usar, em vez disso, o conjunto de fígado humano (<a href="#pt-measured">seção 5</a>).</div>
 <p><b>Objetivos considerados e descartados</b>, porque o FBA não dá com eles uma resposta com sentido nestes modelos:</p>
 <ul>
   <li><b>Glutationa sintetase</b> (<code>MAR04326</code>): 6,5 mmol/gDW/h de GSH que a γ-glutamil aminopeptidase (<code>MAR04175</code>) volta a quebrar imediatamente, um ciclo fútil que só queima ATP. Em seu lugar usa-se a liberação líquida de GSH (acima).</li>
@@ -299,7 +363,7 @@
 <p>Assim, dobrar uma concentração baixa quase dobra o que a célula pode captar, enquanto dobrar uma já saturante muda pouco. Passe o cursor sobre uma caixa de concentração para ver o limite resultante. A célula não precisa usar todo o permitido: o FBA toma o que serve ao objetivo.</p>
 <p>Com os fluxos de troca medidos ativos (por padrão), uma captação medida substitui esta regra: a célula capta o que foi medido, desde que o metabólito esteja no meio. Esses componentes levam a marca ⊙ na lista. A regra continua a limitar todo o resto.</p>
 <ul>
-  <li><b>Meios predefinidos</b>: Padrão (rico, tipo DMEM/F-12), Plasmax e HPLM (concentrações fisiológicas).</li>
+  <li><b>Meios predefinidos</b>: Padrão (rico, tipo DMEM/F-12), Plasmax e HPLM (concentrações fisiológicas), e Williams E (sem soro, o meio das fatias de fígado humano de Grankvist et al. 2024, segundo a sua Tabela Suplementar 2; menadiona, manganês e nitrato, ausentes dos modelos, ficam de fora).</li>
   <li><b>Os seus</b>: edite, adicione ou remova componentes e depois use «salvar…» para guardar o meio com um nome neste navegador.</li>
   <li><b>Componentes ilimitados</b>: água, prótons, fosfato e os sais principais nunca são limitantes.</li>
   <li><b>Injeções</b>: você pode adicionar um metabólito que não é extracelular (por exemplo citrato citosólico). Ele é então fornecido diretamente dentro desse compartimento — um experimento que só um modelo permite.</li>
@@ -646,6 +710,10 @@
   <li>Aurich MK, Fleming RMT, Thiele I. A systems approach reveals distinct metabolic strategies among the NCI-60 cancer cell lines. <i>PLoS Comput. Biol.</i> 2017; 13:e1005698 (per-line values, S1 Table Q). <a href="https://doi.org/10.1371/journal.pcbi.1005698" target="_blank" rel="noopener">doi:10.1371/journal.pcbi.1005698</a></li>
   <li>Zielinski DC et al. Systems biology analysis of drivers underlying hallmarks of cancer cell metabolism. <i>Sci. Rep.</i> 2017; 7:41241 (cell mass, ATP maintenance). <a href="https://doi.org/10.1038/srep41241" target="_blank" rel="noopener">doi:10.1038/srep41241</a></li>
   <li>Kilburn DG, Lilly MD, Webb FC. The energetics of mammalian cell growth. <i>J. Cell Sci.</i> 1969; 4:645–654 (ATP maintenance). <a href="https://doi.org/10.1242/jcs.4.3.645" target="_blank" rel="noopener">doi:10.1242/jcs.4.3.645</a></li>
+  <li>Dietmair S, Hodson MP, Quek LE, Timmins NE, Gray P, Nielsen LK. A multi-omics analysis of recombinant protein production in Hek293 cells. <i>PLoS ONE</i> 2012; 7:e43394 (Table 2). <a href="https://doi.org/10.1371/journal.pone.0043394" target="_blank" rel="noopener">doi:10.1371/journal.pone.0043394</a></li>
+  <li>Grankvist N, Jönsson C, Hedin K, Sundqvist N, Sandström P, Björnsson B, Begzati A, Mickols E, Artursson P, Jain M, Cedersund G, Nilsson R. Global <sup>13</sup>C tracing and metabolic flux analysis of intact human liver tissue ex vivo. <i>Nat. Metab.</i> 2024; 6:1963–1975. <a href="https://doi.org/10.1038/s42255-024-01119-3" target="_blank" rel="noopener">doi:10.1038/s42255-024-01119-3</a></li>
+  <li>Lemons JMS, Feng XJ, Bennett BD, Legesse-Miller A, Johnson EL, Raitman I, Pollina EA, Rabitz HA, Rabinowitz JD, Coller HA. Quiescent fibroblasts exhibit high metabolic activity. <i>PLoS Biol.</i> 2010; 8:e1000514 (Fig. S1A). <a href="https://doi.org/10.1371/journal.pbio.1000514" target="_blank" rel="noopener">doi:10.1371/journal.pbio.1000514</a></li>
+  <li>Wimmer M, Wilmering B, Sasse D. The relation of rat liver wet weight to dry weight. <i>Histochemistry</i> 1985; 83:571–572. <a href="https://doi.org/10.1007/BF00492462" target="_blank" rel="noopener">doi:10.1007/BF00492462</a></li>
   <li>Dolfi SC et al. The metabolic demands of cancer cells are coupled to their size and protein synthesis rates. <i>Cancer Metab.</i> 2013; 1:20 (NCI-60 culture conditions). <a href="https://doi.org/10.1186/2049-3002-1-20" target="_blank" rel="noopener">doi:10.1186/2049-3002-1-20</a></li>
   <li>Thiele I, Palsson BØ. A protocol for generating a high-quality genome-scale metabolic reconstruction. <i>Nat. Protoc.</i> 2010; 5:93–121 (quality checks for model edits). <a href="https://doi.org/10.1038/nprot.2009.203" target="_blank" rel="noopener">doi:10.1038/nprot.2009.203</a></li>
   <li>Lieven C et al. MEMOTE for standardized genome-scale metabolic model testing. <i>Nat. Biotechnol.</i> 2020; 38:272–276. <a href="https://doi.org/10.1038/s41587-020-0446-y" target="_blank" rel="noopener">doi:10.1038/s41587-020-0446-y</a></li>

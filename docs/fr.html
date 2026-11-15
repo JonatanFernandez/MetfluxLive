@@ -118,8 +118,9 @@
   <tr><td>Mouse-GEM 1.8.0</td><td><a href="https://github.com/SysBioChalmers/Mouse-GEM" target="_blank" rel="noopener">SysBioChalmers/Mouse-GEM</a> ; Wang et al., <i>PNAS</i> 2021</td><td>Le réseau de la souris. Il partage ses identifiants avec Human-GEM, les structures sont donc réutilisées.</td></tr>
   <tr><td>Cartes atome à atome</td><td>Calculées pour cette application avec <a href="https://github.com/rxn4chemistry/rxnmapper" target="_blank" rel="noopener">RXNMapper</a> (Schwaller et al., <i>Sci. Adv.</i> 2021) et RDKit, plus des corrections faites à la main pour le métabolisme central</td><td>Suivre chaque atome à travers chaque réaction.</td></tr>
   <tr><td>Plasmax et HPLM</td><td>Tableau S1 de <a href="https://pubmed.ncbi.nlm.nih.gov/30613774/" target="_blank" rel="noopener">Vande Voorde et al., <i>Sci. Adv.</i> 2019</a> ; HPLM provient à l'origine de Cantor et al., <i>Cell</i> 2017</td><td>Milieux physiologiques.</td></tr>
+  <tr><td>Williams E</td><td>Tableau supplémentaire 2 de Grankvist et al., <i>Nat. Metab.</i> 2024</td><td>Le milieu des tranches de foie humain (<a href="#fr-medium">section 8</a>).</td></tr>
   <tr><td>Milieu standard</td><td>Suit approximativement le DMEM / Ham's F-12</td><td>Milieu par défaut.</td></tr>
-  <tr><td>Flux d'échange mesurés</td><td>Jain et al., <i>Science</i> 2012 (lignées NCI-60), valeurs par lignée du tableau S1 Q d'Aurich et al., <i>PLoS Comput. Biol.</i> 2017</td><td>L'absorption et la sécrétion par défaut du glucose, du lactate, de la glutamine et de 15 autres métabolites (<a href="#fr-measured">section 5</a>).</td></tr>
+  <tr><td>Flux d'échange mesurés</td><td>Jain et al., <i>Science</i> 2012 (lignées NCI-60), valeurs par lignée du tableau S1 Q d'Aurich et al., <i>PLoS Comput. Biol.</i> 2017 ; autres jeux : Dietmair et al., <i>PLoS ONE</i> 2012 (HEK293), Lemons et al., <i>PLoS Biol.</i> 2010 (fibroblastes), Grankvist et al., <i>Nat. Metab.</i> 2024 (foie humain)</td><td>L'absorption et la sécrétion par défaut du glucose, du lactate, de la glutamine et de 15 autres métabolites (<a href="#fr-measured">section 5</a>).</td></tr>
   <tr><td>Maintenance de l'ATP</td><td>Kilburn, Lilly &amp; Webb, <i>J. Cell Sci.</i> 1969, valeur telle qu'utilisée par Zielinski et al., <i>Sci. Rep.</i> 2017</td><td>L'ATP que la cellule dépense, qu'elle croisse ou non.</td></tr>
   <tr><td>Cinétique d'absorption (V<sub>max</sub>, K<sub>m</sub>)</td><td>Ordres de grandeur pour des cellules de mammifère en culture, fixés à la main</td><td>Absorption maximale des composants du milieu dont l'échange n'a pas été mesuré (vitamines, cystine, histidine…), et de tous quand les flux mesurés sont désactivés. <b>Ce ne sont pas des valeurs mesurées.</b></td></tr>
   <tr><td>Solveur linéaire</td><td><a href="https://highs.dev" target="_blank" rel="noopener">HiGHS</a>, compilé en WebAssembly</td><td>Résoudre le problème de bilan des flux.</td></tr>
@@ -174,6 +175,69 @@
   <li><b>Quand ils ne peuvent pas être respectés.</b> Si un flux mesuré devient impossible (vous retirez le glucose du milieu, un nutriment s'épuise en mode dynamique, un knockout bloque la production de lactate…), les flux mesurés sont relâchés : les absorptions ne gardent que leur maximum et les sécrétions deviennent libres. La barre d'état et le résumé l'indiquent.</li>
   <li><b>Mouse-GEM</b> utilise les mêmes valeurs. Elles ont été mesurées dans des cellules humaines.</li>
 </ul>
+<h3 id="fr-measured-other">Autres jeux mesurés : cellules non tumorales</h3>
+<p>Les lignées NCI-60 sont des cellules cancéreuses. « Flux d'échange mesurés » propose aussi quatre jeux mesurés dans des cellules et un tissu humains non tumoraux. Ils suivent les mêmes règles que le jeu NCI-60 (marge de ±20 %, produits organiques non mesurés seulement à l'état de traces, relâchement quand ils ne peuvent être respectés) ; seules l'unité de la source et sa conversion en mmol/gDW/h changent. Les plages des tableaux sont la variation rapportée par chaque source, à titre indicatif : l'application applique sa propre marge.</p>
+<h3>HEK293 (Dietmair et al. 2012)</h3>
+<p>Dietmair et al. (<i>PLoS ONE</i> 2012, tableau 2) ont mesuré les échanges de la lignée HEK293 parentale (cellules de rein embryonnaire humain immortalisées par de l'ADN d'adénovirus, non issues d'une tumeur) en croissance exponentielle dans le milieu FreeStyle 293, par gramme de poids sec (514 pg de masse sèche par cellule), consommation d'oxygène comprise. Les valeurs sont la moyenne ± erreur standard de 3 cultures. L'alanine (11 ± 17 µmol/gDW/h) n'a pas de sens net et est exclue. La maintenance d'ATP n'est pas ajoutée : la consommation d'oxygène étant mesurée, la respiration est déjà fixée par les données. <b>Vérification :</b> avec ce jeu, le milieu Standard et la croissance comme objectif, Human-GEM croît à 0,0313 h⁻¹ ; les cellules croissaient à 0,028 h⁻¹.</p>
+<div class="tablebox"><table>
+  <tr><th>Métabolite</th><th>Sens</th><th>Moyenne ± ES (µmol/gDW/h)</th><th>Utilisé (mmol/gDW/h)</th></tr>
+  <tr><td>glucose</td><td>absorption</td><td class="num">528 ± 63</td><td class="num">0,528</td></tr>
+  <tr><td>L-lactate</td><td>sécrétion</td><td class="num">695 ± 92</td><td class="num">0,695</td></tr>
+  <tr><td>O2</td><td>absorption</td><td class="num">335 ± 29</td><td class="num">0,335</td></tr>
+  <tr><td>NH4+</td><td>sécrétion</td><td class="num">17 ± 3</td><td class="num">0,0170</td></tr>
+  <tr><td>glutamine</td><td>absorption</td><td class="num">29 ± 17</td><td class="num">0,0290</td></tr>
+  <tr><td>sérine</td><td>absorption</td><td class="num">37 ± 6</td><td class="num">0,0370</td></tr>
+  <tr><td>leucine</td><td>absorption</td><td class="num">19 ± 4</td><td class="num">0,0190</td></tr>
+  <tr><td>arginine</td><td>absorption</td><td class="num">16 ± 3</td><td class="num">0,0160</td></tr>
+  <tr><td>valine</td><td>absorption</td><td class="num">14 ± 3</td><td class="num">0,0140</td></tr>
+  <tr><td>isoleucine</td><td>absorption</td><td class="num">13 ± 3</td><td class="num">0,0130</td></tr>
+  <tr><td>lysine</td><td>absorption</td><td class="num">12 ± 2</td><td class="num">0,0120</td></tr>
+  <tr><td>thréonine</td><td>absorption</td><td class="num">8,4 ± 1,6</td><td class="num">0,00840</td></tr>
+  <tr><td>aspartate</td><td>absorption</td><td class="num">6,3 ± 1,6</td><td class="num">0,00630</td></tr>
+  <tr><td>phénylalanine</td><td>absorption</td><td class="num">5,8 ± 1,0</td><td class="num">0,00580</td></tr>
+  <tr><td>méthionine</td><td>absorption</td><td class="num">4,9 ± 1,1</td><td class="num">0,00490</td></tr>
+  <tr><td>tyrosine</td><td>absorption</td><td class="num">4,6 ± 0,7</td><td class="num">0,00460</td></tr>
+  <tr><td>asparagine</td><td>absorption</td><td class="num">4,1 ± 1,0</td><td class="num">0,00410</td></tr>
+  <tr><td>histidine</td><td>absorption</td><td class="num">3,2 ± 0,5</td><td class="num">0,00320</td></tr>
+  <tr><td>tryptophane</td><td>absorption</td><td class="num">1,5 ± 0,3</td><td class="num">0,00150</td></tr>
+  <tr><td>glutamate</td><td>sécrétion</td><td class="num">9,6 ± 1,4</td><td class="num">0,00960</td></tr>
+  <tr><td>ornithine</td><td>sécrétion</td><td class="num">9,0 ± 1,5</td><td class="num">0,00900</td></tr>
+  <tr><td>glycine</td><td>sécrétion</td><td class="num">6,2 ± 1,1</td><td class="num">0,00620</td></tr>
+  <tr><td>proline</td><td>sécrétion</td><td class="num">3,8 ± 0,4</td><td class="num">0,00380</td></tr>
+</table></div>
+<h3>Fibroblastes humains, en prolifération et quiescents (Lemons et al. 2010)</h3>
+<p>Lemons et al. (<i>PLoS Biol.</i> 2010, fig. S1A) ont comparé des fibroblastes dermiques primaires de prépuce de nouveau-né en prolifération et après 14 jours d'inhibition de contact (quiescents), en DMEM avec 25 mM de glucose, 4 mM de glutamine et 7,5 % de sérum dialysé. Seuls le glucose, le lactate, la glutamine et le glutamate ont été mesurés : la FBA choisit encore les autres échanges. Les valeurs ont été lues sur le diagramme en barres (incertitude de lecture d'environ ±0,05) ; le ± est l'erreur standard publiée. Elles sont par µg de protéines et sont converties avec 0,59 g de protéines par gDW, la teneur en protéines de la réaction de biomasse de Human-GEM (5,34 mmol de résidus d'acides aminés par gDW × 111 g/mol par résidu) : mmol/gDW/h = nmol/µg protéines/h × 0,59. La maintenance d'ATP (1,07 mmol/gDW/h, ci-dessous) est appliquée. En prolifération, avec la croissance comme objectif et le milieu Standard : 0,0370 h⁻¹. Les cellules quiescentes ne croissent pas : choisissez un objectif comme « Production maximale d'ATP » (13,9 mmol/gDW/h).</p>
+<div class="tablebox"><table>
+  <tr><th>Métabolite</th><th>Sens</th><th>En prolifération (nmol/µg protéines/h)</th><th>Quiescents</th><th>Utilisé, P / Q (mmol/gDW/h)</th></tr>
+  <tr><td>glucose</td><td>absorption</td><td class="num">2,92 ± 0,15</td><td class="num">1,41 ± 0,06</td><td class="num">1,72 / 0,832</td></tr>
+  <tr><td>L-lactate</td><td>sécrétion</td><td class="num">1,85 ± 0,04</td><td class="num">1,40 ± 0,05</td><td class="num">1,09 / 0,826</td></tr>
+  <tr><td>glutamine</td><td>absorption</td><td class="num">0,59 ± 0,03</td><td class="num">0,21 ± 0,02</td><td class="num">0,348 / 0,124</td></tr>
+  <tr><td>glutamate</td><td>sécrétion</td><td class="num">0,08 ± 0,01</td><td class="num">0,05 ± 0,01</td><td class="num">0,0472 / 0,0295</td></tr>
+</table></div>
+<h3>Tissu hépatique humain ex vivo (Grankvist et al. 2024)</h3>
+<p>Grankvist et al. (<i>Nat. Metab.</i> 2024) ont maintenu des tranches de foie de précision de 5 donneurs pendant 24 h dans du Williams E sans sérum aux nutriments de jeûne et mesuré ce que le tissu absorbait et libérait (Supplementary Data 3 et données sources des fig. 1i, 4a et de l'Extended Data Fig. 4i). L'application prend la médiane des donneurs (urée : des 15 tranches) et garde les 17 échanges de même sens chez au moins 4 des 5 donneurs ; alanine, glycine, sérine, valine et histidine changent de sens et sont exclues. La plage du tableau est celle des donneurs, elle peut donc franchir zéro (une valeur négative indique le sens opposé). Les taux par g de foie frais et par jour sont convertis avec un rapport poids frais/sec de 3,3, mesuré dans le foie de rat (Wimmer, Wilmering et Sasse 1985) : mmol/gDW/h = µmol/g/jour × 3,3 / 24 / 1000. La maintenance d'ATP n'est pas ajoutée.</p>
+<div class="tablebox"><table>
+  <tr><th>Métabolite</th><th>Sens</th><th>Médiane (µmol/g liver/day)</th><th>Plage des donneurs</th><th>Utilisé (mmol/gDW/h)</th></tr>
+  <tr><td>glucose</td><td>sécrétion</td><td class="num">30,4</td><td class="num">−5,62 … 75,3</td><td class="num">0,00417</td></tr>
+  <tr><td>L-lactate</td><td>sécrétion</td><td class="num">116</td><td class="num">61,9 … 160</td><td class="num">0,0159</td></tr>
+  <tr><td>urée</td><td>sécrétion</td><td class="num">87,5</td><td class="num">40,9 … 202</td><td class="num">0,0120</td></tr>
+  <tr><td>glutamine</td><td>absorption</td><td class="num">42,5</td><td class="num">13,9 … 47,0</td><td class="num">0,00584</td></tr>
+  <tr><td>glutamate</td><td>sécrétion</td><td class="num">22,6</td><td class="num">18,0 … 31,6</td><td class="num">0,00311</td></tr>
+  <tr><td>arginine</td><td>absorption</td><td class="num">12,5</td><td class="num">8,08 … 22,9</td><td class="num">0,00172</td></tr>
+  <tr><td>thréonine</td><td>absorption</td><td class="num">5,81</td><td class="num">0,863 … 16,0</td><td class="num">0,000799</td></tr>
+  <tr><td>aspartate</td><td>absorption</td><td class="num">5,13</td><td class="num">1,94 … 9,01</td><td class="num">0,000705</td></tr>
+  <tr><td>leucine</td><td>absorption</td><td class="num">4,37</td><td class="num">1,93 … 24,3</td><td class="num">0,000601</td></tr>
+  <tr><td>lysine</td><td>absorption</td><td class="num">4,19</td><td class="num">−7,67 … 15,0</td><td class="num">0,000577</td></tr>
+  <tr><td>asparagine</td><td>absorption</td><td class="num">2,69</td><td class="num">1,03 … 4,90</td><td class="num">0,000370</td></tr>
+  <tr><td>tyrosine</td><td>absorption</td><td class="num">2,71</td><td class="num">−0,780 … 7,03</td><td class="num">0,000372</td></tr>
+  <tr><td>phénylalanine</td><td>absorption</td><td class="num">2,57</td><td class="num">2,03 … 5,44</td><td class="num">0,000353</td></tr>
+  <tr><td>méthionine</td><td>absorption</td><td class="num">2,17</td><td class="num">1,34 … 3,34</td><td class="num">0,000299</td></tr>
+  <tr><td>proline</td><td>absorption</td><td class="num">1,70</td><td class="num">−2,40 … 4,56</td><td class="num">0,000233</td></tr>
+  <tr><td>isoleucine</td><td>absorption</td><td class="num">1,45</td><td class="num">−0,311 … 10,9</td><td class="num">0,000199</td></tr>
+  <tr><td>tryptophane</td><td>absorption</td><td class="num">0,775</td><td class="num">0,531 … 1,54</td><td class="num">0,000107</td></tr>
+</table></div>
+<p>Le tissu ne croît pas et ses taux sont inférieurs d'un à deux ordres de grandeur à ceux des cellules en culture. Utilisez ce jeu avec le milieu Williams E (<a href="#fr-medium">section 8</a>) et un objectif hépatique : avec Human-GEM, la libération de glucose atteint alors 0,0724 mmol/gDW/h et celle d'urée 0,0676 ; la croissance est nulle. Quand l'objectif est la libération de glucose ou d'urée, son propre taux mesuré est mis de côté (<a href="#fr-objectives">section 6</a>).</p>
+<p>Envisagés puis écartés : cellules CHO (Ahn et Antoniewicz, <i>Metab. Eng.</i> 2011 : cellules de hamster, article non librement accessible), échanges entre organes de porc (Jang et al., <i>Cell Metab.</i> 2019 : différences artério-veineuses de concentration, et non des taux par masse de tissu) et cellules endothéliales (De Bock et al., <i>Cell</i> 2013 : pas de taux absolus dans les données publiées).</p>
 <h3>Maintenance de l'ATP</h3>
 <p>Les cellules dépensent de l'ATP qu'elles croissent ou non : pompes ioniques, renouvellement des protéines, etc. Human-GEM laisse cela à zéro. Avec le jeu NCI-60 actif, la réaction d'hydrolyse de l'ATP cytosolique (<code>MAR03964</code>) doit porter au moins 1,07 mmol/gDW/h, la valeur que Zielinski et al. ont tirée des mesures de Kilburn, Lilly &amp; Webb (<i>J. Cell Sci.</i> 1969) sur des cellules LS de souris. Cela impose la respiration et le renouvellement du cycle de Krebs qu'ont les cellules réelles. Sans cela, un traceur de glucose marque le fumarate à 0 % au lieu d'environ 9 % M+2.</p>
 <h3>Ce qui reste supposé</h3>
@@ -253,7 +317,7 @@
   <dt>Synthèse de l'hème (précurseur érythroïde)</dt><dd>Maximise la libération d'hème (MAR09107) : la voie de synthèse de l'hème (glycine + succinyl-CoA, fer), la principale tâche métabolique des précurseurs érythroïdes.</dd>
   <dt>Sortie de créatine</dt><dd>Maximise la libération de créatine (MAR09290), fabriquée à partir d'arginine, de glycine et de méthionine dans le rein et le foie.</dd>
 </dl>
-<div class="note"><b>Flux mesurés et fonctions cellulaires.</b> Les taux mesurés chargés par défaut (NCI-60) appartiennent à des cellules tumorales en prolifération et y fixent les échanges de glucose, de lactate, de glutamine et d'autres. Ils ne décrivent ni un hépatocyte ni un neurone, et limitent en outre les sous-produits non mesurés à l'état de traces, ce qui peut plafonner artificiellement une fonction (le cortisol tombe de 0,095 à 0,001 parce qu'un sous-produit de la stéroïdogenèse ne peut sortir qu'en traces). Quand une fonction cellulaire est choisie avec les flux mesurés actifs, la note de l'objectif demande de les régler sur « Aucun ». La croissance, l'ATP et le glutathion peuvent être utilisés avec eux.</div>
+<div class="note"><b>Flux mesurés et fonctions cellulaires.</b> Les taux mesurés chargés par défaut (NCI-60) appartiennent à des cellules tumorales en prolifération et y fixent les échanges de glucose, de lactate, de glutamine et d'autres. Ils ne décrivent ni un hépatocyte ni un neurone, et limitent en outre les sous-produits non mesurés à l'état de traces, ce qui peut plafonner artificiellement une fonction (le cortisol tombe de 0,095 à 0,001 parce qu'un sous-produit de la stéroïdogenèse ne peut sortir qu'en traces). Quand une fonction cellulaire est choisie avec les flux mesurés actifs, la note de l'objectif demande de les régler sur « Aucun ». La croissance, l'ATP et le glutathion peuvent être utilisés avec eux. Pour les fonctions hépatiques, vous pouvez plutôt utiliser le jeu du foie humain (<a href="#fr-measured">section 5</a>).</div>
 <p><b>Objectifs envisagés puis écartés</b>, car la FBA ne donne pas de réponse sensée pour eux dans ces modèles :</p>
 <ul>
   <li><b>Glutathion synthétase</b> (<code>MAR04326</code>) : 6,5 mmol/gDW/h de GSH que la γ-glutamyl aminopeptidase (<code>MAR04175</code>) recoupe aussitôt, un cycle futile qui ne fait que brûler de l'ATP. On utilise à la place la libération nette de GSH (ci-dessus).</li>
@@ -299,7 +363,7 @@
 <p>Ainsi, doubler une concentration faible double à peu près ce que la cellule peut prendre, alors que doubler une concentration déjà saturante change peu. Survolez une case de concentration pour voir la limite obtenue. La cellule n'est pas obligée d'utiliser tout ce qui lui est permis : la FBA prend ce qui sert l'objectif.</p>
 <p>Avec les flux d'échange mesurés actifs (par défaut), une absorption mesurée remplace cette règle : la cellule absorbe ce qui a été mesuré, pourvu que le métabolite soit dans le milieu. Ces composants portent la marque ⊙ dans la liste. La règle continue de limiter tout le reste.</p>
 <ul>
-  <li><b>Milieux prédéfinis</b> : Standard (riche, type DMEM/F-12), Plasmax et HPLM (concentrations physiologiques).</li>
+  <li><b>Milieux prédéfinis</b> : Standard (riche, type DMEM/F-12), Plasmax et HPLM (concentrations physiologiques), et Williams E (sans sérum, le milieu des tranches de foie humain de Grankvist et al. 2024, d'après leur tableau supplémentaire 2 ; la ménadione, le manganèse et le nitrate, absents des modèles, sont exclus).</li>
   <li><b>Les vôtres</b> : modifiez, ajoutez ou retirez des composants, puis « enregistrer… » pour garder le milieu sous un nom dans ce navigateur.</li>
   <li><b>Composants illimités</b> : l'eau, les protons, le phosphate et les sels majeurs ne sont jamais limitants.</li>
   <li><b>Injections</b> : vous pouvez ajouter un métabolite non extracellulaire (par exemple du citrate cytosolique). Il est alors fourni directement dans ce compartiment — une expérience que seul un modèle permet.</li>
@@ -646,6 +710,10 @@
   <li>Aurich MK, Fleming RMT, Thiele I. A systems approach reveals distinct metabolic strategies among the NCI-60 cancer cell lines. <i>PLoS Comput. Biol.</i> 2017; 13:e1005698 (per-line values, S1 Table Q). <a href="https://doi.org/10.1371/journal.pcbi.1005698" target="_blank" rel="noopener">doi:10.1371/journal.pcbi.1005698</a></li>
   <li>Zielinski DC et al. Systems biology analysis of drivers underlying hallmarks of cancer cell metabolism. <i>Sci. Rep.</i> 2017; 7:41241 (cell mass, ATP maintenance). <a href="https://doi.org/10.1038/srep41241" target="_blank" rel="noopener">doi:10.1038/srep41241</a></li>
   <li>Kilburn DG, Lilly MD, Webb FC. The energetics of mammalian cell growth. <i>J. Cell Sci.</i> 1969; 4:645–654 (ATP maintenance). <a href="https://doi.org/10.1242/jcs.4.3.645" target="_blank" rel="noopener">doi:10.1242/jcs.4.3.645</a></li>
+  <li>Dietmair S, Hodson MP, Quek LE, Timmins NE, Gray P, Nielsen LK. A multi-omics analysis of recombinant protein production in Hek293 cells. <i>PLoS ONE</i> 2012; 7:e43394 (Table 2). <a href="https://doi.org/10.1371/journal.pone.0043394" target="_blank" rel="noopener">doi:10.1371/journal.pone.0043394</a></li>
+  <li>Grankvist N, Jönsson C, Hedin K, Sundqvist N, Sandström P, Björnsson B, Begzati A, Mickols E, Artursson P, Jain M, Cedersund G, Nilsson R. Global <sup>13</sup>C tracing and metabolic flux analysis of intact human liver tissue ex vivo. <i>Nat. Metab.</i> 2024; 6:1963–1975. <a href="https://doi.org/10.1038/s42255-024-01119-3" target="_blank" rel="noopener">doi:10.1038/s42255-024-01119-3</a></li>
+  <li>Lemons JMS, Feng XJ, Bennett BD, Legesse-Miller A, Johnson EL, Raitman I, Pollina EA, Rabitz HA, Rabinowitz JD, Coller HA. Quiescent fibroblasts exhibit high metabolic activity. <i>PLoS Biol.</i> 2010; 8:e1000514 (Fig. S1A). <a href="https://doi.org/10.1371/journal.pbio.1000514" target="_blank" rel="noopener">doi:10.1371/journal.pbio.1000514</a></li>
+  <li>Wimmer M, Wilmering B, Sasse D. The relation of rat liver wet weight to dry weight. <i>Histochemistry</i> 1985; 83:571–572. <a href="https://doi.org/10.1007/BF00492462" target="_blank" rel="noopener">doi:10.1007/BF00492462</a></li>
   <li>Dolfi SC et al. The metabolic demands of cancer cells are coupled to their size and protein synthesis rates. <i>Cancer Metab.</i> 2013; 1:20 (NCI-60 culture conditions). <a href="https://doi.org/10.1186/2049-3002-1-20" target="_blank" rel="noopener">doi:10.1186/2049-3002-1-20</a></li>
   <li>Thiele I, Palsson BØ. A protocol for generating a high-quality genome-scale metabolic reconstruction. <i>Nat. Protoc.</i> 2010; 5:93–121 (quality checks for model edits). <a href="https://doi.org/10.1038/nprot.2009.203" target="_blank" rel="noopener">doi:10.1038/nprot.2009.203</a></li>
   <li>Lieven C et al. MEMOTE for standardized genome-scale metabolic model testing. <i>Nat. Biotechnol.</i> 2020; 38:272–276. <a href="https://doi.org/10.1038/s41587-020-0446-y" target="_blank" rel="noopener">doi:10.1038/s41587-020-0446-y</a></li>

@@ -88,11 +88,33 @@ function plasmaLike(col) {
   return rows;
 }
 
+// Williams E as made by Grankvist et al., Nat Metab 6:1963 (2024), Supplementary Table 2 (fasted, serum-free),
+// for their human liver slices. Concentrations in mM. Not represented in the models and left out: menadione,
+// manganese, nitrate (ferric nitrate enters as Fe3+). Ergocalciferol is "vitamin D2", cobalamin "aquacob(III)alamin".
+const WILLIAMS_E = [
+  ["glucose", 5.5], ["glutamine", 2.0], ["alanine", 1.01], ["glycine", 0.667], ["leucine", 0.573], ["cysteine", 0.4966],
+  ["lysine", 0.478], ["valine", 0.427], ["isoleucine", 0.382], ["glutamate", 0.3398], ["threonine", 0.336],
+  ["arginine", 0.287], ["proline", 0.261], ["pyruvate", 0.227], ["aspartate", 0.226], ["tyrosine", 0.194],
+  ["phenylalanine", 0.152], ["asparagine", 0.1332], ["methionine", 0.101], ["histidine", 0.0968], ["serine", 0.0952],
+  ["tryptophan", 0.049], ["inositol", 0.0111], ["ascorbate", 0.01136], ["choline", 0.01074], ["nicotinamide", 0.0082],
+  ["pyridoxine", 0.0049], ["pantothenate", 0.0042], ["thiamin", 0.00297], ["folate", 0.00227], ["biotin", 0.00205],
+  ["retinol", 0.000305], ["riboflavin", 0.000266], ["vitamin D2", 0.000252], ["GSH", 0.000163],
+  ["aquacob(III)alamin", 0.00015], ["linoleate", 0.000102], ["alpha-tocopherol", 0.000018],
+];
+function williamsE() {
+  const std = new Map(DEFAULT_MEDIUM.map((d) => [d[0], d]));
+  const rows = WILLIAMS_E.map(([n, c]) => [n, c, ...(KINETICS[n] || KIN_FALLBACK)]);
+  rows.splice(2, 0, std.get("O2"));
+  for (const n of INORGANIC) rows.push([n, null]);
+  return rows;
+}
+
 /** Built-in media. Display names and notes are in js/i18n.js under medium.name.<id> / medium.note.<id>. */
 export const MEDIA = [
   { id: "default", rows: DEFAULT_MEDIUM },
   { id: "plasmax", rows: plasmaLike(1) },
   { id: "hplm", rows: plasmaLike(2) },
+  { id: "williamsE", rows: williamsE() },
 ];
 
 export const UNLIMITED = 1000;

@@ -34,12 +34,16 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
   genes/enzymes and pathways.
 - **Culture medium** — the selector at the top of "Medium and sources" switches between a standard
   DMEM/F-12-like medium, **Plasmax** and **HPLM** (physiological media; concentrations from Table S1 of
-  [Vande Voorde et al. 2019](https://pubmed.ncbi.nlm.nih.gov/30613774/)). "save…" stores the current medium
+  [Vande Voorde et al. 2019](https://pubmed.ncbi.nlm.nih.gov/30613774/)), and **Williams E** as used for
+  human liver slices ([Grankvist et al. 2024](https://doi.org/10.1038/s42255-024-01119-3)). "save…" stores the current medium
   with your changes under a name (in the browser's localStorage, shared by both models); "reset" discards
   the changes. The sections of the left panel collapse by clicking their title.
 - **Measured exchange fluxes** — by default the uptake and secretion of glucose, lactate, glutamine and
   15 more metabolites are pinned (±20 %) to the median of 59 NCI-60 tumour cell lines (Jain et al. 2012),
   together with a measured ATP maintenance cost; unmeasured organic products may only leave in traces.
+  Four more sets come from cells that are not tumours: HEK293 ([Dietmair et al. 2012](https://doi.org/10.1371/journal.pone.0043394)),
+  primary human fibroblasts proliferating and quiescent ([Lemons et al. 2010](https://doi.org/10.1371/journal.pbio.1000514))
+  and human liver slices ex vivo ([Grankvist et al. 2024](https://doi.org/10.1038/s42255-024-01119-3)).
   Choose "None" to let FBA choose freely. Values, conversion and sources: Docs › Measured values.
 - **Medium and sources** — concentration (mM) of each metabolite. Extracellular ones limit their uptake
   (`Vmax·C/(Km+C)`); any other metabolite is injected into its compartment. In steady-state mode the
@@ -88,7 +92,7 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
 index.html, css/, js/        application (no build dependencies)
 js/core/                     FBA/pFBA (fba.js), medium (medium.js), isotope tracing (tracer.js), GPR rules (gpr.js), worker
 js/core/isotopologues.js     isotopologue distributions (Monte-Carlo over atom maps)
-js/core/measured.js          measured exchange fluxes (NCI-60) and ATP maintenance
+js/core/measured.js          measured exchange fluxes (NCI-60, HEK293, fibroblasts, liver) and ATP maintenance
 js/core/edits.js, chem.js    model edits (apply, validate, layout) and chemistry (SMILES, atom maps via RDKit)
 js/ui/editor.js, compare.js  model editor dialogs; scenarios and comparison
 js/celllayout.js, js/cascade.js, js/i18n.js   cell and cascade layouts; EN/ES texts
@@ -175,7 +179,7 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # show the atom
 - Plasmax and HPLM: components the models do not represent (selenite, manganese, vanadate, nitrate,
   p-aminobenzoate, methyl acetoacetate, phenol red) are left out; the fatty acids and fat-soluble vitamins
   that serum provides are added at the standard medium's values, and the uptake kinetics of the extra
-  metabolites are generic.
+  metabolites are generic. Williams E: menadione, manganese and nitrate are left out.
 - Dynamic mode assumes a uniform intracellular pool size: labelling times are indicative only.
 - Isotopologue distributions are a 2,000-molecule sample at isotopic steady state (about ±1 percentage point),
   without natural abundance. In dynamic mode their timing depends on the assumed pool size.
@@ -219,12 +223,16 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
   genes/enzimas y rutas.
 - **Medio de cultivo** — el selector al principio de «Medio y fuentes» cambia entre un medio estándar tipo
   DMEM/F-12, **Plasmax** y **HPLM** (medios fisiológicos; concentraciones de la Tabla S1 de
-  [Vande Voorde et al. 2019](https://pubmed.ncbi.nlm.nih.gov/30613774/)). «guardar…» almacena el medio actual
+  [Vande Voorde et al. 2019](https://pubmed.ncbi.nlm.nih.gov/30613774/)) y **Williams E**, el usado para
+  cortes de hígado humano ([Grankvist et al. 2024](https://doi.org/10.1038/s42255-024-01119-3)). «guardar…» almacena el medio actual
   con tus cambios bajo un nombre (en el localStorage del navegador, común a ambos modelos); «restaurar»
   descarta los cambios. Las secciones del panel izquierdo se pliegan haciendo clic en su título.
 - **Flujos de intercambio medidos** — por defecto, la captación y excreción de glucosa, lactato, glutamina y
   otros 15 metabolitos se fijan (±20 %) a la mediana de 59 líneas tumorales del NCI-60 (Jain et al. 2012),
   junto con un gasto de ATP de mantenimiento medido; los productos orgánicos no medidos solo salen en trazas.
+  Hay cuatro conjuntos más de células no tumorales: HEK293 ([Dietmair et al. 2012](https://doi.org/10.1371/journal.pone.0043394)),
+  fibroblastos humanos primarios proliferando y quiescentes ([Lemons et al. 2010](https://doi.org/10.1371/journal.pbio.1000514))
+  y cortes de hígado humano ex vivo ([Grankvist et al. 2024](https://doi.org/10.1038/s42255-024-01119-3)).
   Elige «Ninguno» para que el FBA elija libremente. Valores, conversión y fuentes: Docs › Valores medidos.
 - **Medio y fuentes** — concentración (mM) de cada metabolito. Los extracelulares limitan su captación
   (`Vmax·C/(Km+C)`); cualquier otro metabolito se inyecta en su compartimento. En modo estacionario
@@ -277,7 +285,7 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
 index.html, css/, js/        aplicación (sin dependencias de compilación)
 js/core/                     FBA/pFBA (fba.js), medio (medium.js), trazado isotópico (tracer.js), reglas GPR (gpr.js), worker
 js/core/isotopologues.js     distribuciones de isotopólogos (Monte Carlo sobre los mapas atómicos)
-js/core/measured.js          flujos de intercambio medidos (NCI-60) y ATP de mantenimiento
+js/core/measured.js          flujos de intercambio medidos (NCI-60, HEK293, fibroblastos, hígado) y ATP de mantenimiento
 js/core/edits.js, chem.js    ediciones del modelo (aplicar, validar, disposición) y química (SMILES, mapas de átomos con RDKit)
 js/ui/editor.js, compare.js  diálogos del editor del modelo; escenarios y comparación
 js/celllayout.js, js/cascade.js, js/i18n.js   disposición celular y en cascada; textos EN/ES
@@ -364,7 +372,7 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # ver el mapa a
 - Plasmax y HPLM: se omiten los componentes que los modelos no representan (selenito, manganeso, vanadato,
   nitrato, p-aminobenzoato, metilacetoacetato, rojo fenol); los ácidos grasos y vitaminas liposolubles que
   aporta el suero se añaden con los valores del medio estándar, y la cinética de captación de los
-  metabolitos adicionales es genérica.
+  metabolitos adicionales es genérica. Williams E: se omiten menadiona, manganeso y nitrato.
 - El modo dinámico supone un tamaño de pool intracelular uniforme: los tiempos de marcaje son orientativos.
 - Las distribuciones de isotopólogos son una muestra de 2000 moléculas en estado estacionario isotópico
   (±1 punto porcentual aprox.), sin abundancia natural. En modo dinámico sus tiempos dependen del tamaño de
