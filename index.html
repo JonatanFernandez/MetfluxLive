@@ -102,17 +102,6 @@
         </div>
         <div id="measuredList"></div>
       </section>
-      <section id="secPerturb" class="fold">
-        <h2><span data-i18n="h.perturb"></span> <button id="clearPerturb" class="link" data-i18n="h.clearPerturb" hidden></button></h2>
-        <p class="hint" data-i18n="h.perturbHint"></p>
-        <div class="add">
-          <input id="addPerturb" type="search" data-i18n-ph="h.addPerturb" autocomplete="off" spellcheck="false">
-          <div id="perturbResults" class="dropdown" hidden></div>
-        </div>
-        <div id="perturbList"></div>
-        <div class="row"><button id="geneScreen" class="link" data-i18n="scr.button" data-i18n-title="scr.title"></button> <a class="link" data-docs="screen" target="_blank" data-i18n="obj.help"></a></div>
-        <div id="screenOut"></div>
-      </section>
       <section id="secObjective" class="fold">
         <h2><span data-i18n="h.objective"></span> <a class="link" data-docs="objectives" target="_blank" data-i18n="obj.help"></a></h2>
         <div class="row medium-bar">
@@ -130,6 +119,18 @@
         </div>
         <div id="objCurrent" class="chip"></div>
         <label class="check"><input id="pfba" type="checkbox" checked> <span data-i18n="h.pfba"></span></label>
+      </section>
+      <section id="secPerturb" class="fold">
+        <h2><span data-i18n="h.perturb"></span> <button id="clearPerturb" class="link" data-i18n="h.clearPerturb" hidden></button></h2>
+        <p class="hint" data-i18n="h.perturbHint"></p>
+        <div class="add">
+          <input id="addPerturb" type="search" data-i18n-ph="h.addPerturb" autocomplete="off" spellcheck="false">
+          <div id="perturbResults" class="dropdown" hidden></div>
+        </div>
+        <div id="perturbList"></div>
+        <details id="ctxExplore" hidden><summary></summary><div id="ctxExploreBox"></div></details>
+        <div class="row"><button id="geneScreen" class="link" data-i18n="scr.button" data-i18n-title="scr.title"></button> <a class="link" data-docs="screen" target="_blank" data-i18n="obj.help"></a></div>
+        <div id="screenOut"></div>
       </section>
       <section id="secCompare" class="fold">
         <h2><span data-i18n="h.compare"></span> <button id="stopCompare" class="link" data-i18n="cmp.stop" hidden></button></h2>

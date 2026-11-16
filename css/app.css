@@ -363,3 +363,12 @@ dialog.editor input[type=number] { width: 100%; text-align: left; }
 .ctx-src { color: var(--muted); font-size: 11px; }
 #ctxNote .warn { color: var(--hot); }
 .note.ctxnote { border-left-color: var(--hot); }
+
+/* essential-gene screen: one line per gene, groups collapsible with their own scroll */
+.scr-group { margin: 6px 0; }
+.scr-group summary { cursor: pointer; font-weight: 600; font-size: 12.5px; }
+.scr-list { max-height: 220px; overflow: auto; margin-top: 4px; border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+.scr-row { display: grid; grid-template-columns: minmax(0, 1fr) 14px auto 44px 22px; gap: 6px; align-items: center; font-size: 12.5px; padding: 2px 0; }
+.scr-row > .linkish { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scr-row .val { text-align: right; font-variant-numeric: tabular-nums; }
+.scr-row button { padding: 0; }

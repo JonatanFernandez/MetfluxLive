@@ -25,6 +25,8 @@
     td.sub { color: var(--muted); }
     .warn { color: var(--hot); }
     tr:hover td { background: var(--panel); }
+    button.exp { background: none; border: 0; color: var(--accent); cursor: pointer; font-size: 13px; padding: 0 4px; }
+    tr.detail > td { background: var(--panel); padding: 6px 12px 12px; }
   </style>
 </head>
 <body>
@@ -44,7 +46,11 @@
   </main>
   <script type="module">
     import { t, initLang, applyDom, docsLang } from "./js/i18n.js";
-    import { CONTEXT_GROUPS } from "./js/core/contexts.js";
+    import { CONTEXT_GROUPS, offGenes, blockedReactions } from "./js/core/contexts.js";
+    import { renderCtxTable, CTT_CSS } from "./js/ui/ctxtable.js";
+    { const st = document.createElement("style"); st.textContent = CTT_CSS; document.head.appendChild(st); }
+    const modelCache = new Map();
+    const getModel = (slug) => { if (!modelCache.has(slug)) modelCache.set(slug, fetch(`data/${slug}/model.json`).then((r) => r.json())); return modelCache.get(slug); };
     initLang(); applyDom();
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -56,10 +62,10 @@
     $("model").value = params.get("model") && models.some((m) => m.slug === params.get("model")) ? params.get("model") : models[0].slug;
     $("group").add(new Option(t("cat.all"), ""));
     for (const g of CONTEXT_GROUPS) $("group").add(new Option(t("ctx.group." + g), g));
-    const COLS = [["group", "cat.th.group"], ["name", "cat.th.name"], ["desc", "cat.th.desc"], ["src", "cat.th.src"], ["off", "cat.th.off", 1], ["blocked", "cat.th.blocked", 1], ["rescued", "cat.th.rescued", 1], ["pairs", "cat.th.pairs"], ["use", ""]];
+    const COLS = [["open", ""], ["group", "cat.th.group"], ["name", "cat.th.name"], ["desc", "cat.th.desc"], ["src", "cat.th.src"], ["off", "cat.th.off", 1], ["blocked", "cat.th.blocked", 1], ["rescued", "cat.th.rescued", 1], ["pairs", "cat.th.pairs"], ["use", ""]];
     let rows = [], sortKey = "group", sortDir = 1;
     $("head").innerHTML = COLS.map(([k, l]) => `<th data-k="${k}">${l ? esc(t(l)) : ""}</th>`).join("");
-    $("head").onclick = (ev) => { const k = ev.target.dataset.k; if (!k || k === "use") return; sortDir = sortKey === k ? -sortDir : 1; sortKey = k; render(); };
+    $("head").onclick = (ev) => { const k = ev.target.dataset.k; if (!k || k === "use" || k === "open") return; sortDir = sortKey === k ? -sortDir : 1; sortKey = k; render(); };
     async function load() {
       const slug = $("model").value;
       const d = await fetch(`data/${slug}/contexts.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -81,11 +87,24 @@
       $("rows").innerHTML = vis.map((r) => {
         const i = r.c.info || {};
         const link = i.cellosaurus ? ` <a href="https://www.cellosaurus.org/${encodeURIComponent(i.cellosaurus)}" target="_blank" rel="noopener">${esc(i.cellosaurus)}</a>` : i.entity ? ` <span class="sub">${esc(i.entity)}</span>` : "";
-        return `<tr><td>${esc(t("ctx.group." + r.c.group))}</td><td><b>${esc(r.name)}</b>${link}${i.problematic ? `<div class="warn" title="${esc(i.problematic)}">⚠ ${esc(i.problematic.split(".")[0])}</div>` : ""}</td>
+        return `<tr data-id="${esc(r.c.id)}"><td><button class="exp" title="${esc(t("cat.expand"))}">▸</button></td><td>${esc(t("ctx.group." + r.c.group))}</td><td><b>${esc(r.name)}</b>${link}${i.problematic ? `<div class="warn" title="${esc(i.problematic)}">⚠ ${esc(i.problematic.split(".")[0])}</div>` : ""}</td>
           <td class="sub">${esc(r.desc)}</td><td class="sub">${esc(r.src)}</td><td class="num">${r.off}</td><td class="num">${r.blocked}</td><td class="num">${r.rescued}</td>
           <td class="sub">${esc(r.pairs)}</td><td><a href="index.html?model=${encodeURIComponent(r.slug)}&context=${encodeURIComponent(r.c.id)}">${esc(t("cat.use"))}</a></td></tr>`;
       }).join("");
     }
+    $("rows").onclick = async (ev) => {
+      const b = ev.target.closest("button.exp");
+      if (!b) return;
+      const tr = b.closest("tr"), next = tr.nextElementSibling;
+      if (next?.classList.contains("detail")) { next.remove(); b.textContent = "▸"; return; }
+      b.textContent = "▾";
+      const row = document.createElement("tr"); row.className = "detail";
+      row.innerHTML = `<td colspan="${COLS.length}"><p class="note">${esc(t("ctt.loading"))}</p></td>`;
+      tr.after(row);
+      const r = rows.find((x) => x.c.id === tr.dataset.id), model = await getModel(r.slug);
+      const off = offGenes(r.c, model.genes), blocked = blockedReactions(model, off);
+      renderCtxTable(row.firstElementChild, model, off, blocked, { name: r.name });
+    };
     $("model").onchange = load; $("group").onchange = render; $("q").oninput = render;
     if (params.get("group")) $("group").value = params.get("group");
     load();

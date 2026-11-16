@@ -340,7 +340,7 @@
   <li><b>Block</b> (default): the reactions are closed in every run, including the reference of a knockout and every step of a dynamic run.</li>
   <li><b>Only make them costlier</b>: the reactions stay open, but in the second stage of pFBA their flux counts 11 times (1 + 10) as much as that of other reactions. The value of the objective does not change; among the solutions that reach it, the one that uses fewer non-detected enzymes is chosen. It only acts with pFBA on.</li>
 </ul>
-<p>The details of a reaction say when it is blocked and which of its genes are not detected; the details of a gene say whether it is detected in the chosen context or was switched back on. The downloads record the context, the genes switched off and rescued and the reactions blocked (<code>settings.json</code>, <a href="#en-download">section 16</a>).</p>
+<p>The details of a reaction say when it is blocked and which of its genes are not detected; the details of a gene say whether it is detected in the chosen context or was switched back on. The downloads record the context, the genes switched off and rescued and the reactions blocked (<code>settings.json</code>, <a href="#en-download">section 16</a>). To explore a context as a whole, open "What … switches off" under the knockout list, or ▸ in a row of the <a href="contexts.html">catalogue</a>: a table of the blocked reactions (pathway and genes not detected) and of the genes switched off (reactions they block and their pathways), with a filter, sortable columns and CSV export.</p>
 <h3>What it changes: some numbers</h3>
 <p>Human-GEM, standard medium, pFBA, steady state, growth as objective unless stated, "Block":</p>
 <div class="tablebox"><table>
@@ -1152,7 +1152,7 @@
   <li><b>Bloquear</b> (por defecto): las reacciones se cierran en todas las simulaciones, incluida la referencia de un knockout y cada paso de una simulación dinámica.</li>
   <li><b>Sólo encarecerlas</b>: las reacciones siguen abiertas, pero en la segunda etapa del pFBA su flujo cuenta 11 veces (1 + 10) lo que el de las demás. El valor del objetivo no cambia; entre las soluciones que lo alcanzan se elige la que usa menos enzimas no detectadas. Sólo actúa con pFBA activado.</li>
 </ul>
-<p>Los detalles de una reacción dicen si está bloqueada y cuáles de sus genes no se detectan; los de un gen, si se detecta en el contexto elegido o se volvió a encender. Las descargas recogen el contexto, los genes apagados y rescatados y las reacciones bloqueadas (<code>settings.json</code>, <a href="#es-download">sección 16</a>).</p>
+<p>Los detalles de una reacción dicen si está bloqueada y cuáles de sus genes no se detectan; los de un gen, si se detecta en el contexto elegido o se volvió a encender. Las descargas recogen el contexto, los genes apagados y rescatados y las reacciones bloqueadas (<code>settings.json</code>, <a href="#es-download">sección 16</a>). Para explorar un contexto en conjunto, abre «Qué apaga …» bajo la lista de knockouts, o ▸ en una fila del <a href="contexts.html">catálogo</a>: una tabla de las reacciones bloqueadas (ruta y genes no detectados) y de los genes apagados (reacciones que bloquean y sus rutas), con filtro, columnas ordenables y exportación CSV.</p>
 <h3>Qué cambia: algunas cifras</h3>
 <p>Human-GEM, medio estándar, pFBA, estado estacionario, crecimiento como objetivo salvo que se indique, «Bloquear»:</p>
 <div class="tablebox"><table>

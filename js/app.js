@@ -18,6 +18,7 @@ import { t, initLang, setLang, getLang, docsLang, applyDom, LANGS } from "./i18n
 import { applyEdits, editedLayout, editsFile, readEditsFile, modelLookups, EDIT_FORMAT } from "./core/edits.js";
 import { createEditor } from "./ui/editor.js";
 import { createCompare } from "./ui/compare.js";
+import { renderCtxTable, CTT_CSS } from "./ui/ctxtable.js";
 import { QUANTITIES, ATOM_Q, carrierBases, excludedPools, carrierShare, transferableAtoms, cofactorWeights, groupEnergy, dgRunning } from "./core/flows.js";
 
 const SESSION_FORMAT = "metfluxlive-session";
@@ -953,7 +954,19 @@ function setContext(id, mode = "block", rerun = true) {
   if (rerun) { renderContext(); renderDetails(); changed(); }
 }
 
+/** Collapsible table, in the knockout section, of the genes and reactions the cell type switches off. */
+function renderCtxExplore() {
+  const det = $("ctxExplore"), ctx = currentContext();
+  det.hidden = !ctx || !S.ctxBlock;
+  if (det.hidden) { det.open = false; return; }
+  const off = offGenes(ctx, S.base.model.genes);
+  det.querySelector("summary").textContent = t("ctt.summary", { off: off.size, rx: S.ctxBlock.length, ctx: ctx.name });
+  if (!det.open) { $("ctxExploreBox").textContent = ""; return; }
+  renderCtxTable($("ctxExploreBox"), S.model, off, S.ctxBlock, { name: ctx.name, onRxn: (j) => gotoReaction(j), onGene: (sym) => { S.sel = { type: "gene", sym }; renderDetails(); } });
+}
+
 function renderContext() {
+  renderCtxExplore();
   const sec = $("secContext");
   sec.hidden = !S.ctxData;
   if (!S.ctxData) return;
@@ -1513,12 +1526,13 @@ async function geneScreen() {
   const ess = rows.filter((r) => r.x < 0.01), red = rows.filter((r) => r.x >= 0.01 && r.x < 0.95);
   const row = (r) => {
     const names = Array.from(r.rxns, (j) => S.model.rxns[j].n).join("\n"), resc = rescued.get(r.g);
-    return `<div class="bar-row"><span class="nm"><span class="linkish" data-gene="${esc(r.g)}">${esc(r.g)}</span>${resc ? ` <span class="warn" title="${esc(t("scr.rescuedTitle", { task: resc }))}">↺</span>` : ""}${r.relaxed ? " *" : ""} <small class="meta" title="${esc(names)}">${t("scr.nRxns", { n: r.rxns.length })}</small></span><span class="val">${Math.round(100 * r.x)} %</span><button class="link" data-ko="${esc(r.g)}" title="${esc(t("scr.addTitle"))}">✂</button></div>`;
+    return `<div class="scr-row"><span class="linkish" data-gene="${esc(r.g)}">${esc(r.g)}</span>${resc ? `<span class="warn" title="${esc(t("scr.rescuedTitle", { task: resc }))}">↺</span>` : "<span></span>"}<small class="meta" title="${esc(names)}">${t("scr.nRxns", { n: r.rxns.length })}${r.relaxed ? " *" : ""}</small><span class="val">${Math.round(100 * r.x)} %</span><button class="link" data-ko="${esc(r.g)}" title="${esc(t("scr.addTitle"))}">✂</button></div>`;
   };
   const none = rows.filter((r) => r.x >= 0.95).map((r) => r.g).concat(free).sort();
   out.innerHTML = `<div class="note">${t("scr.summary", { n: rows.length + free.length, lp: res.length, s: ((performance.now() - t0) / 1000).toFixed(0), ess: ess.length, red: red.length, ctx: esc(ctx?.name || t("ctx.none")) })}${res.length < list.length ? " " + t("scr.stopped") : ""}</div>`
-    + (ess.length ? `<h4>${t("scr.ess")}</h4>${ess.map(row).join("")}` : "") + (red.length ? `<h4>${t("scr.red")}</h4>${red.map(row).join("")}` : "")
-    + (none.length ? `<details><summary>${t("scr.none", { n: none.length })}</summary><p class="meta">${none.map(esc).join(", ")}</p></details>` : "")
+    + (ess.length ? `<details class="scr-group" open><summary>${t("scr.ess")} (${ess.length})</summary><div class="scr-list">${ess.map(row).join("")}</div></details>` : "")
+    + (red.length ? `<details class="scr-group"><summary>${t("scr.red")} (${red.length})</summary><div class="scr-list">${red.map(row).join("")}</div></details>` : "")
+    + (none.length ? `<details class="scr-group"><summary>${t("scr.none", { n: none.length })}</summary><div class="scr-list"><p class="meta">${none.map(esc).join(", ")}</p></div></details>` : "")
     + (rows.some((r) => rescued.has(r.g)) ? `<p class="meta">${t("scr.rescuedNote")}</p>` : "")
     + (rows.some((r) => r.relaxed) ? `<p class="meta">${t("scr.relaxedNote")}</p>` : "");
   out.querySelectorAll("[data-ko]").forEach((b) => { b.onclick = () => addPerturb("gene", b.dataset.ko); });
@@ -2151,6 +2165,8 @@ function bindUi() {
   $("mediumSel").onchange = (ev) => loadMedium(ev.target.value);
   $("saveMedium").onclick = saveMedium;
   $("deleteMedium").onclick = deleteMedium;
+  { const st = document.createElement("style"); st.textContent = CTT_CSS; document.head.appendChild(st); }
+  $("ctxExplore").ontoggle = () => { if ($("ctxExplore").open) renderCtxExplore(); };
   $("geneScreen").onclick = () => (S.screening ? (S.screening.stop = true) : geneScreen());
   $("clearPerturb").onclick = () => { S.perturb = []; renderPerturb(); renderMeasured(); changed(); };
   $("measuredSel").onchange = (ev) => { loadMeasured(ev.target.value); renderObjective(); renderContext(); };
