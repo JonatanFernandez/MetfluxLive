@@ -383,6 +383,10 @@
 </ul>
 <p>Jedes Ziel wird in der Richtung angewendet, in der die Reaktion im Modell geschrieben ist. Um ein eigenes zu verwenden, suchen Sie eine beliebige Reaktion, wählen Maximieren oder Minimieren und drücken <b>Speichern</b>: Das Ziel bleibt unter einem Namen Ihrer Wahl in der Liste (nach Reaktions-ID, es funktioniert also auch im anderen Modell, wenn die Reaktion dort existiert). <b>Löschen</b> entfernt es. Gespeicherte Ziele bleiben im Browser; eine heruntergeladene Sitzung enthält das verwendete Ziel.</p>
 
+<h3 id="de-mousebiomass">Wachstum in Mouse-GEM</h3>
+<p><b>Warum.</b> Mouse-GEM 1.8.0 hat <code>MAR00021</code> als Ziel. Diese Reaktion nimmt genau eine Einheit von jeder von 33 Vorstufen (Aminosäuren, Cholesterin, Lipidpools, DNA, RNA, Cofaktoren…), ohne zu gewichten, wie viel davon ein Gramm Zelle enthält, daher ist ihr Wert keine Wachstumsrate: etwa 0,00016 im Standardmedium gegenüber 0,0370 h⁻¹ bei Human-GEM, und die Flüsse, die sie erzwingt, entsprechen nicht der Zusammensetzung einer Zelle.</p>
+<p><b>Wie es gelöst ist.</b> Mouse-GEM enthält auch <code>MAR13082</code>, die generische Zellbiomassereaktion von Human-GEM, mit genau derselben Stöchiometrie (5,34 mmol Proteinpool, 0,22 Lipidpool, Pools aus DNA, RNA, Glykogen, Metaboliten und Cofaktoren und 45 ATP pro Gramm Trockengewicht), aber geschlossen (Grenzen 0/0). Das vordefinierte Ziel <b>Wachstum (generische Zellbiomasse, MAR13082)</b>, das nur für Mouse-GEM angeboten wird, nutzt sie: Solange sie das Ziel ist, öffnet der Simulator ihre Obergrenze auf 1000, und nur dann. Am veröffentlichten Modell wird nichts umgeschrieben: <code>MAR00021</code> bleibt das Standardziel, und bei jedem anderen Ziel ist <code>MAR13082</code> wieder geschlossen. Damit wächst Mouse-GEM im Standardmedium mit 0,0370 h⁻¹ und mit den gemessenen NCI-60-Flüssen mit 0,0341 h⁻¹, wie Human-GEM. Die Zusammensetzung ist die einer generischen menschlichen Zelle; eine mausspezifische enthält das Modell nicht.</p>
+
 <h2 id="de-modes">8. Fließgleichgewicht oder Dynamisch</h2>
 <div class="tablebox"><table>
   <tr><th></th><th>Fließgleichgewicht</th><th>Dynamisch</th></tr>
@@ -730,7 +734,7 @@
   <li><b>Der dynamische Modus</b> nimmt eine einzige Poolgröße für alle intrazellulären Metaboliten an. Markierungszeiten und damit die Isotopologkurven im Zeitverlauf skalieren mit dieser Zahl: Ihre Reihenfolge und Form sind aussagekräftig, ihre Uhr nicht.</li>
   <li><b>Modelländerungen werden geprüft, nicht kuratiert.</b> Die Prüfungen erkennen unmögliche oder unausgeglichene Reaktionen und Sackgassen, keine falsche Biologie. Automatische Atomzuordnungen (größte gemeinsame Teilstruktur) können falsche Atome paaren; bevorzugen Sie ein zugeordnetes SMILES.</li>
   <li><b>Szenarien liegen mit ihren Ergebnissen im Arbeitsspeicher.</b> Laden Sie die Sitzung herunter, um sie nach dem Schließen der Seite zu behalten.</li>
-  <li><b>Mouse-GEM 1.8.0</b> wird mit einem Ziel (<code>MAR00021</code>) auf einer anderen Skala als die menschliche Biomassereaktion ausgeliefert, daher ist sein absolutes Wachstum mit dem Standardmedium sehr gering. Sie können ein anderes Ziel wählen.</li>
+  <li><b>Mouse-GEM 1.8.0</b> hat ein Ziel (<code>MAR00021</code>), dessen Wert keine Wachstumsrate ist; für Wachstum in h⁻¹ das Ziel „Wachstum (generische Zellbiomasse, MAR13082)“ verwenden (<a href="#de-mousebiomass">Abschnitt 7</a>).</li>
   <li><b>Zelltypen</b> schalten Enzyme ab, deren mRNA nicht nachgewiesen ist, skalieren die Flüsse aber nicht mit der Expression (<a href="#de-contexts">Abschnitt 6</a>).</li>
 </ul>
 

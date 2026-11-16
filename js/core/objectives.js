@@ -17,6 +17,10 @@
 
 export const OBJECTIVES = [
   { id: "biomass", group: "general", rxn: null, max: true },
+  // Mouse-GEM only: its own objective (MAR00021) takes one unit of each of 33 precursors, so its value is not a
+  // growth rate. MAR13082, the generic cell biomass reaction it inherits from Human-GEM (same composition per gDW),
+  // is closed in the published Mouse-GEM; the simulator opens it only while it is the objective (OPEN_AS_OBJECTIVE).
+  { id: "biomassGeneric", group: "general", rxn: "MAR13082", max: true, notDefault: true },
   { id: "atp", group: "general", rxn: "MAR03964", max: true }, // ATP + H2O -> ADP + Pi + H+ (cytosolic ATP hydrolysis)
   { id: "gsh", group: "general", rxn: "MAR09351", max: true }, // GSH release: net glutathione synthesis
   { id: "urea", group: "liver", rxn: "MAR09438", max: true, cellType: true }, // urea cycle, ammonia disposal
@@ -35,9 +39,13 @@ export const OBJECTIVES = [
 ];
 export const OBJECTIVE_GROUPS = ["general", "liver", "neuro", "other"];
 
+/** Reactions closed in a published model (lb = ub = 0) that are opened (0 .. 1000) only while they are the objective. */
+export const OPEN_AS_OBJECTIVE = new Set(["MAR13082"]);
+
 /** Reaction index of a built-in objective in a model, or -1 when the model lacks it. */
 export function objectiveIndex(model, index, o) {
   if (o.rxn === null) return index.biomassRxn;
   const j = model.rxns.findIndex((r) => r.id === o.rxn);
+  if (o.notDefault && j === index.biomassRxn) return -1; // already the model's own objective (Human-GEM)
   return j >= 0 && !model.rxns[j].removed ? j : -1;
 }

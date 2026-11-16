@@ -1564,7 +1564,7 @@ function summaryHtml() {
   }
   let h = `<div class="kind">${t("sum.title")}${S.result.frames.length > 1 ? " · t = " + fmtTime(f.t) : ""}</div><h3>${esc($("modelSelect").selectedOptions[0]?.text || model.meta.id || "")}</h3><div class="meta">${esc(model.meta.name || "")}</div>
     <div class="cards">
-      <div class="card"><div class="lbl">${t(obj.obj ? "sum.growth" : "sum.objective")}</div><div class="big">${fmtFlux(f.objective)}<small>${obj.obj ? "h⁻¹" : "mmol/gDW/h"}</small></div>${vs}</div>
+      <div class="card"><div class="lbl">${t(obj.obj || obj.id === "MAR13082" ? "sum.growth" : "sum.objective")}</div><div class="big">${fmtFlux(f.objective)}<small>${obj.obj || obj.id === "MAR13082" ? "h⁻¹" : "mmol/gDW/h"}</small></div>${vs}</div>
       <div class="card"><div class="lbl">${t("sum.active")}</div><div class="big">${active}<small>${t("sum.of", { n: model.rxns.length })}</small></div></div>
       ${f.biomass ? `<div class="card"><div class="lbl">${t("sum.biomass")}</div><div class="big">${f.biomass.toFixed(2)}<small>gDW/L</small></div></div>` : ""}
     </div>`;

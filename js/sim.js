@@ -3,6 +3,7 @@ import { packNetwork } from "./core/fba.js";
 import { applyMedium, findExchanges, uptakeCapacity, UNLIMITED } from "./core/medium.js";
 import { TRACE_SECRETION, FREE_SECRETION, atpMaintenanceRxn } from "./core/measured.js";
 import { CONTEXT_PENALTY } from "./core/contexts.js";
+import { OPEN_AS_OBJECTIVE } from "./core/objectives.js";
 import { Tracer } from "./core/tracer.js";
 import { t } from "./i18n.js";
 
@@ -117,6 +118,9 @@ export class Simulator {
         if (e.dir < 0) lb[e.rxn] = Math.max(lb[e.rxn], -lim); else ub[e.rxn] = Math.min(ub[e.rxn], lim);
       }
     }
+    // a reaction closed in the published model but usable as objective (Mouse-GEM's MAR13082): open while it is the objective
+    const or = this.model.rxns[cfg.objective];
+    if (or && !or.removed && OPEN_AS_OBJECTIVE.has(or.id) && lb[cfg.objective] === 0 && ub[cfg.objective] === 0) ub[cfg.objective] = 1000;
     const measured = cfg.measured?.items?.length || cfg.measured?.ngam > 0 ? cfg.measured : null;
     // a perturbed cell keeps the measured phenotype of the reference; only if that becomes impossible are the
     // measured fluxes relaxed (below), as in any other case

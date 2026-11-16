@@ -219,8 +219,9 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # show the atom
   the knockdown limits are taken from the first time point of the reference.
 - Cell types only switch off enzymes whose mRNA is not detected (a cut-off, not proof of absence); they do
   not scale fluxes with expression, and the expression was measured in each line's own medium or in vivo.
-- Mouse-GEM 1.8.0 ships `MAR00021` as its objective, whose scale differs from the Human-GEM biomass:
-  absolute growth comes out very low with the default medium. Another objective can be chosen in the app.
+- Mouse-GEM 1.8.0 ships `MAR00021` as its objective, which is not a growth rate (about 0.00016). The built-in
+  objective "Growth (generic cell biomass, MAR13082)" uses Human-GEM's biomass reaction, present but closed in
+  Mouse-GEM and opened only while it is the objective: 0.0370 h⁻¹ in the standard medium, as Human-GEM.
 
 ---
 
@@ -445,5 +446,6 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # ver el mapa a
   límites de knockdown se toman del primer instante de la referencia.
 - Los tipos celulares sólo apagan enzimas cuyo ARNm no se detecta (un umbral, no una prueba de ausencia);
   no escalan los flujos con la expresión, y la expresión se midió en el medio propio de cada línea o in vivo.
-- Mouse-GEM 1.8.0 trae como objetivo `MAR00021`, cuya escala difiere de la biomasa de Human-GEM: el
-  crecimiento absoluto sale muy bajo con el medio por defecto. Se puede elegir otro objetivo en la app.
+- Mouse-GEM 1.8.0 trae como objetivo `MAR00021`, cuyo valor no es una tasa de crecimiento (unos 0,00016). El
+  objetivo predefinido «Crecimiento (biomasa celular genérica, MAR13082)» usa la reacción de biomasa de Human-GEM,
+  presente pero cerrada en Mouse-GEM y abierta sólo mientras es el objetivo: 0,0370 h⁻¹ en el medio estándar, como Human-GEM.

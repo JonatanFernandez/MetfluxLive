@@ -383,6 +383,10 @@
 </ul>
 <p>Chaque objectif s'applique dans le sens où la réaction est écrite dans le modèle. Pour utiliser le vôtre, cherchez n'importe quelle réaction, choisissez Maximiser ou Minimiser et appuyez sur <b>Enregistrer</b> : l'objectif reste dans la liste sous le nom de votre choix (par ID de réaction, il fonctionne donc aussi dans l'autre modèle si la réaction y existe). <b>Supprimer</b> le retire. Les objectifs enregistrés sont conservés dans le navigateur ; une session téléchargée conserve l'objectif en cours.</p>
 
+<h3 id="fr-mousebiomass">Croissance dans Mouse-GEM</h3>
+<p><b>Pourquoi.</b> Mouse-GEM 1.8.0 a pour objectif <code>MAR00021</code>. Cette réaction prend exactement une unité de chacun de 33 précurseurs (acides aminés, cholestérol, réserves lipidiques, ADN, ARN, cofacteurs…), sans pondérer la quantité de chacun dans un gramme de cellule, si bien que sa valeur n'est pas un taux de croissance : environ 0,00016 dans le milieu standard, contre 0,0370 h⁻¹ pour Human-GEM, et les flux qu'elle implique ne correspondent pas à la composition d'une cellule.</p>
+<p><b>Comment c'est résolu.</b> Mouse-GEM contient aussi <code>MAR13082</code>, la réaction de biomasse cellulaire générique de Human-GEM, avec exactement la même stœchiométrie (5,34 mmol de réserve protéique, 0,22 de lipides, réserves d'ADN, ARN, glycogène, métabolites et cofacteurs et 45 ATP par gramme de poids sec), mais fermée (bornes 0/0). L'objectif prédéfini <b>Croissance (biomasse cellulaire générique, MAR13082)</b>, proposé seulement pour Mouse-GEM, l'utilise : tant qu'elle est l'objectif, le simulateur ouvre sa borne supérieure à 1000, et seulement alors. Rien du modèle publié n'est réécrit : <code>MAR00021</code> reste l'objectif par défaut, et en choisissant un autre objectif <code>MAR13082</code> redevient fermée. Avec elle, Mouse-GEM croît à 0,0370 h⁻¹ dans le milieu standard et à 0,0341 h⁻¹ avec les flux mesurés NCI-60, comme Human-GEM. La composition est celle d'une cellule humaine générique ; le modèle n'a pas de composition propre à la souris.</p>
+
 <h2 id="fr-modes">8. État stationnaire ou Dynamique</h2>
 <div class="tablebox"><table>
   <tr><th></th><th>État stationnaire</th><th>Dynamique</th></tr>
@@ -730,7 +734,7 @@
   <li><b>Le mode dynamique</b> suppose une seule taille de pool pour tous les métabolites intracellulaires. Les temps de marquage, et donc les courbes d'isotopologues dans le temps, varient avec ce nombre : leur ordre et leur forme sont informatifs, leur horloge ne l'est pas.</li>
   <li><b>Les modifications du modèle sont vérifiées, pas curées.</b> Les contrôles détectent les réactions impossibles ou déséquilibrées et les impasses, pas une biologie erronée. Les cartes atomiques automatiques (plus grande sous-structure commune) peuvent apparier de mauvais atomes ; préférez un SMILES cartographié.</li>
   <li><b>Les scénarios sont gardés en mémoire</b> avec leurs résultats. Téléchargez la session pour les conserver après avoir fermé la page.</li>
-  <li><b>Mouse-GEM 1.8.0</b> est livré avec un objectif (<code>MAR00021</code>) à une échelle différente de la réaction de biomasse humaine, si bien que sa croissance absolue est très faible avec le milieu par défaut. Vous pouvez choisir un autre objectif.</li>
+  <li><b>Mouse-GEM 1.8.0</b> a un objectif (<code>MAR00021</code>) dont la valeur n'est pas un taux de croissance ; utilisez l'objectif « Croissance (biomasse cellulaire générique, MAR13082) » pour une croissance en h⁻¹ (<a href="#fr-mousebiomass">section 7</a>).</li>
   <li><b>Les types cellulaires</b> éteignent les enzymes dont l'ARNm n'est pas détecté, mais n'ajustent pas les flux à l'expression (<a href="#fr-contexts">section 6</a>).</li>
 </ul>
 

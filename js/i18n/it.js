@@ -472,4 +472,6 @@ export default {
   "scr.rescuedTitle": "Non rilevato in questo tipo cellulare; riacceso per il compito «{task}»",
   "scr.rescuedNote": "↺ gene non rilevato nel tipo cellulare e riacceso perché serve a un compito metabolico: la sua essenzialità deriva da quel compito, non da dati sulla cellula.",
   "scr.none": "Analizzati senza effetto sull'obiettivo ({n})",
+  "obj.name.biomassGeneric": "Crescita (biomassa cellulare generica, MAR13082)",
+  "obj.note.biomassGeneric": "Massimizza MAR13082, la reazione di biomassa cellulare generica che Mouse-GEM eredita da Human-GEM: la stessa composizione per grammo di peso secco (riserve di proteine, lipidi, DNA, RNA, glicogeno, metaboliti e cofattori, 45 ATP per gDW). L'obiettivo proprio di Mouse-GEM (MAR00021) prende un'unità di ciascuno di 33 precursori, quindi il suo valore non è un tasso di crescita (circa 0,00016). MAR13082 è chiusa nel modello pubblicato e viene aperta solo mentre è l'obiettivo. Crescita in h⁻¹, confrontabile con Human-GEM; la composizione è quella di una cellula umana generica.",
 };

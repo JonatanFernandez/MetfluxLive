@@ -472,4 +472,6 @@ export default {
   "scr.rescuedTitle": "In diesem Zelltyp nicht nachgewiesen; für die Aufgabe „{task}“ wieder eingeschaltet",
   "scr.rescuedNote": "↺ Gen, das im Zelltyp nicht nachgewiesen und wieder eingeschaltet wurde, weil eine Stoffwechselaufgabe es braucht: Seine Essenzialität stammt aus dieser Aufgabe, nicht aus Daten über die Zelle.",
   "scr.none": "Ohne Wirkung auf das Ziel gescreent ({n})",
+  "obj.name.biomassGeneric": "Wachstum (generische Zellbiomasse, MAR13082)",
+  "obj.note.biomassGeneric": "Maximiert MAR13082, die generische Zellbiomassereaktion, die Mouse-GEM von Human-GEM erbt: dieselbe Zusammensetzung pro Gramm Trockengewicht (Pools aus Protein, Lipiden, DNA, RNA, Glykogen, Metaboliten und Cofaktoren, 45 ATP pro gDW). Das eigene Ziel von Mouse-GEM (MAR00021) nimmt je eine Einheit von 33 Vorstufen, daher ist sein Wert keine Wachstumsrate (etwa 0,00016). MAR13082 ist im veröffentlichten Modell geschlossen und wird nur geöffnet, solange sie das Ziel ist. Wachstum in h⁻¹, vergleichbar mit Human-GEM; die Zusammensetzung ist die einer generischen menschlichen Zelle.",
 };
