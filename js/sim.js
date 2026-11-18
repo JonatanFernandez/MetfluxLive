@@ -3,7 +3,7 @@ import { packNetwork } from "./core/fba.js";
 import { applyMedium, findExchanges, uptakeCapacity, UNLIMITED } from "./core/medium.js";
 import { TRACE_SECRETION, FREE_SECRETION, atpMaintenanceRxn } from "./core/measured.js";
 import { CONTEXT_PENALTY } from "./core/contexts.js";
-import { OPEN_AS_OBJECTIVE } from "./core/objectives.js";
+import { OPEN_AS_OBJECTIVE, isGrowthRxn } from "./core/objectives.js";
 import { Tracer } from "./core/tracer.js";
 import { t } from "./i18n.js";
 
@@ -388,7 +388,7 @@ export class Simulator {
       for (let i = 0; i < per; i++) times.push(i === per - 1 ? cuts[g + 1] : a + t0 * Math.pow(len / t0, i / (per - 1)));
     }
 
-    const isBiomassObj = !!model.rxns[cfg.objective].obj;
+    const isBiomassObj = isGrowthRxn(model.rxns[cfg.objective]);
     // a measured uptake replaces the kinetic ceiling of the medium (see _applyMeasured)
     const measUp = new Map();
     if (cfg.measured?.items) for (const x of cfg.measured.items) if (x.rate > 0) measUp.set(x.met, x.rate * (1 + (cfg.measured.tol ?? 0.2)));

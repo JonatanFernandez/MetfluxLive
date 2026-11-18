@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
   <title>MetfluxLive · Cell types</title>
   <script>try { const d = document.documentElement; if (localStorage.getItem("metflux.theme") === "light") d.dataset.theme = "light"; const L = JSON.parse(localStorage.getItem("metflux.look") || "{}") || {}, s = d.dataset.theme === "light" ? L.surfaceLight : L.surfaceDark; if (s && s !== "default") d.dataset.palette = s; if (L.accent && L.accent !== "default") d.dataset.accent = L.accent; } catch { /* storage unavailable */ }</script>
   <link rel="stylesheet" href="css/palettes.css">
@@ -34,6 +36,34 @@
     .hbtn { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: 5px 12px; cursor: pointer; font: inherit; }
     .warn { color: var(--hot); }
     tr.detail > td { background: var(--panel); padding: 6px 12px 12px; }
+    /* phone: each cell type is a card; the column headers become sort buttons */
+    @media (max-width: 760px) {
+      header { padding: 8px 10px; gap: 6px 8px; }
+      header h1 { flex: 1 1 100%; font-size: 15px; }
+      header > span[style] { display: none; }
+      #q { flex: 1 1 100%; order: 5; min-width: 0; font-size: 16px; }
+      select, input { font-size: 16px; }
+      main { padding: 10px 10px 40px; }
+      .cmp-row label { display: flex; gap: 6px; align-items: center; flex: 1 1 100%; }
+      .cmp-row input { min-width: 0; flex: 1; }
+      table, tbody, thead { display: block; }
+      thead tr { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+      thead th { position: static; border: 1px solid var(--line); border-radius: 14px; padding: 4px 10px; font-size: 12.5px; background: var(--panel2); }
+      thead th:empty { display: none; }
+      #rows > tr:not(.detail) { display: grid; grid-template-columns: 30px 1fr 1fr 1fr auto; gap: 2px 8px; padding: 10px 4px; border-bottom: 1px solid var(--line);
+        grid-template-areas: "exp name name name use" ". desc desc desc desc" ". grp grp src src" ". off blk res res" ". pairs pairs pairs pairs"; }
+      #rows > tr > td { border: 0; padding: 0; }
+      #rows > tr:not(.detail) > td:nth-child(1) { grid-area: exp; } #rows > tr > td:nth-child(2) { grid-area: grp; color: var(--muted); font-size: 12px; }
+      #rows > tr > td:nth-child(3) { grid-area: name; } #rows > tr > td:nth-child(4) { grid-area: desc; }
+      #rows > tr > td:nth-child(5) { grid-area: src; font-size: 12px; } #rows > tr > td:nth-child(6) { grid-area: off; }
+      #rows > tr > td:nth-child(7) { grid-area: blk; } #rows > tr > td:nth-child(8) { grid-area: res; }
+      #rows > tr > td:nth-child(9) { grid-area: pairs; font-size: 12px; } #rows > tr:not(.detail) > td:nth-child(10) { grid-area: use; }
+      #rows td.num { text-align: left; font-size: 12.5px; }
+      #rows td[data-l]::before { content: attr(data-l) " "; color: var(--muted); font-size: 11.5px; }
+      #rows button.exp { font-size: 16px; padding: 2px 6px; }
+      #rows > tr.detail { display: block; } #rows > tr.detail > td { display: block; overflow-x: auto; padding: 8px; }
+      tr:hover td { background: none; }
+    }
   </style>
 </head>
 <body>
@@ -109,7 +139,7 @@
         const i = r.c.info || {};
         const link = i.cellosaurus ? ` <a href="https://www.cellosaurus.org/${encodeURIComponent(i.cellosaurus)}" target="_blank" rel="noopener">${esc(i.cellosaurus)}</a>` : i.entity ? ` <span class="sub">${esc(i.entity)}</span>` : "";
         return `<tr data-id="${esc(r.c.id)}"><td><button class="exp" title="${esc(t("cat.expand"))}">▸</button></td><td>${esc(t("ctx.group." + r.c.group))}</td><td><b>${esc(r.name)}</b>${link}${i.problematic ? `<div class="warn" title="${esc(i.problematic)}">⚠ ${esc(i.problematic.split(".")[0])}</div>` : ""}</td>
-          <td class="sub">${esc(r.desc)}</td><td class="sub">${esc(r.src)}</td><td class="num">${r.off}</td><td class="num">${r.blocked}</td><td class="num">${r.rescued}</td>
+          <td class="sub">${esc(r.desc)}</td><td class="sub">${esc(r.src)}</td><td class="num" data-l="${esc(t("cat.th.off"))}">${r.off}</td><td class="num" data-l="${esc(t("cat.th.blocked"))}">${r.blocked}</td><td class="num" data-l="${esc(t("cat.th.rescued"))}">${r.rescued}</td>
           <td class="sub">${esc(r.pairs)}</td><td><a href="index.html?model=${encodeURIComponent(r.slug)}&context=${encodeURIComponent(r.c.id)}">${esc(t("cat.use"))}</a></td></tr>`;
       }).join("");
     }
@@ -148,7 +178,7 @@
     $("tourBtn").onclick = () => startTour(CAT_TOUR);
     $("model").onchange = load; $("group").onchange = render; $("q").oninput = render;
     if (params.get("group")) $("group").value = params.get("group");
-    const CAT_TOUR = [{ id: "cat.welcome" }, { id: "cat.model", sel: "#model" }, { id: "cat.filter", sel: "#q" }, { id: "cat.table", sel: "table" }, { id: "cat.expand", sel: "#rows button.exp" }, { id: "cat.use", sel: "#rows td:last-child a" }, { id: "cat.compare", sel: "#cmpBox" }, { id: "cat.sim", sel: "#cmpGo" }, { id: "cat.end" }];
+    const CAT_TOUR = [{ id: "cat.welcome" }, { id: "cat.model", sel: "#model" }, { id: "cat.filter", sel: "#q" }, { id: "cat.table", sel: "table" }, { id: "cat.expand", sel: "#rows button.exp" }, { id: "cat.use", sel: "#rows td:last-child a" }, { id: "cat.compare", sel: "#cmpBox" }, { id: "cat.sim", sel: "#cmpGo" }, { id: "cat.again", sel: "#tourBtn" }, { id: "cat.end" }];
     await load();
     try { if (!localStorage.getItem("metflux.catTourSeen")) { localStorage.setItem("metflux.catTourSeen", "1"); startTour(CAT_TOUR); } } catch { /* no storage */ }
   </script>

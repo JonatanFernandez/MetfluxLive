@@ -10,5 +10,11 @@
   "name": "Mouse-GEM",
   "version": "1.8.0",
   "description": ""
+ },
+ {
+  "slug": "rat-gem",
+  "name": "Rat-GEM",
+  "version": "1.8.0",
+  "description": ""
  }
 ]

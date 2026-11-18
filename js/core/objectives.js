@@ -42,6 +42,9 @@ export const OBJECTIVE_GROUPS = ["general", "liver", "neuro", "other"];
 /** Reactions closed in a published model (lb = ub = 0) that are opened (0 .. 1000) only while they are the objective. */
 export const OPEN_AS_OBJECTIVE = new Set(["MAR13082"]);
 
+/** A growth reaction: its flux is a growth rate in h⁻¹ (the model's own biomass objective, or MAR13082). */
+export const isGrowthRxn = (r) => !!r && (!!r.obj || r.id === "MAR13082");
+
 /** Reaction index of a built-in objective in a model, or -1 when the model lacks it. */
 export function objectiveIndex(model, index, o) {
   if (o.rxn === null) return index.biomassRxn;

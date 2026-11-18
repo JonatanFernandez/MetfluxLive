@@ -30,6 +30,10 @@ export class ModelIndex {
     this.isExchangeSub = Uint8Array.from(low, (s) => (s.includes("exchange") ? 1 : 0));
     this.biomassRxn = rxns.findIndex((r) => r.obj);
     if (this.biomassRxn < 0) this.biomassRxn = rxns.findIndex((r) => /biomass/i.test(r.n));
+    // Mouse-GEM and Rat-GEM: their own objective (MAR00021) is not a growth rate; growth is the generic cell biomass
+    // reaction they inherit from Human-GEM (closed in the published model, opened while it is the objective)
+    const generic = rxns.findIndex((r) => r.id === "MAR13082" && !r.removed);
+    if (generic >= 0) this.biomassRxn = generic;
     this.rxnIndex = new Map(rxns.map((r, j) => [r.id, j]));
     // compartment roles, recognised by name so that other GEMs work too
     this.compRole = {}; this.roleComp = {};

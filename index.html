@@ -2,11 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
   <title>MetfluxLive</title>
   <script>try { const d = document.documentElement; if (localStorage.getItem("metflux.theme") === "light") d.dataset.theme = "light"; const L = JSON.parse(localStorage.getItem("metflux.look") || "{}") || {}, s = d.dataset.theme === "light" ? L.surfaceLight : L.surfaceDark; if (s && s !== "default") d.dataset.palette = s; if (L.accent && L.accent !== "default") d.dataset.accent = L.accent; } catch { /* storage unavailable */ }</script>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/palettes.css">
+  <link rel="stylesheet" href="css/mobile.css">
 </head>
 <body>
   <header id="topbar">

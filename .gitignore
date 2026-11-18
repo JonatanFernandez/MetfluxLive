@@ -12,3 +12,4 @@ __pycache__/
 # source models (downloaded by hand, converted into data/<slug>/*.json)
 Human-GEM-*.zip
 Mouse-GEM-*.zip
+Rat-GEM-*.zip

@@ -352,6 +352,19 @@ dialog.editor input[type=number] { width: 100%; text-align: left; }
 #topbar.compact4 #autoBtn span { display: none; }
 #topbar.compact3 .tb-center { gap: 6px; }
 #topbar.compact4 .tb-center, #topbar.compact4 .tb-side { gap: 6px; }
+#topbar.compact5 { gap: 8px; padding: 8px 10px; }
+#topbar.compact5 #methodsBtn { display: none; }
+#topbar.compact5 .tb-side.right > .iconized, #topbar.compact5 #themeBtn, #topbar.compact5 #lookBtn { padding: 5px 7px; min-width: 0; }
+#topbar.compact6 #modelSelect { max-width: 92px; }
+#topbar.compact6 #langSel { max-width: 56px; }
+/* a narrow map: the view options go to a second row under back/forward and the path */
+#stage { container-type: inline-size; }
+@container (max-width: 820px) {
+  #navBar { max-width: calc(100% - 24px - var(--ovr, 0px)); }
+  #viewOpts { top: 46px; left: 12px; right: calc(12px + var(--ovr, 0px)); max-width: none; justify-content: flex-start; }
+}
+/* below 1100 px the right panel floats over the map: keep the map bars clear of it */
+@media (max-width: 1100px) { main:has(#details:not(:empty)) #stage { --ovr: 320px; } }
 /* status line: amber while computing, green when the result is ready */
 #status.busy { background: #f2b53a; border-color: #f2b53a; color: #241a00; font-weight: 600; }
 #status.done { background: #3fae6c; border-color: #3fae6c; color: #062312; }

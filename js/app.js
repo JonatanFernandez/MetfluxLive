@@ -7,7 +7,7 @@ import { loadContexts, offGenes, blockedReactions, offGenesOf, ContextIndex, tas
 import { ModelIndex, fmtFlux, fmtTime, escapeHtml as esc } from "./modelindex.js";
 import { MapView, COMP_COLORS, enrichColor, deltaColor, energyColor, setMapTheme } from "./ui/mapview.js";
 import { loadLook, applyLook, openLookDialog } from "./ui/look.js";
-import { OBJECTIVES, OBJECTIVE_GROUPS, objectiveIndex } from "./core/objectives.js";
+import { OBJECTIVES, OBJECTIVE_GROUPS, objectiveIndex, isGrowthRxn } from "./core/objectives.js";
 import { SearchIndex, attachSearch } from "./ui/search.js";
 import { renderMolecule, tracerName } from "./ui/molecule.js";
 import { buildCellLayout } from "./celllayout.js";
@@ -20,7 +20,8 @@ import { applyEdits, editedLayout, editsFile, readEditsFile, modelLookups, EDIT_
 import { createEditor } from "./ui/editor.js";
 import { createCompare } from "./ui/compare.js";
 import { renderCtxTable, CTT_CSS } from "./ui/ctxtable.js";
-import { startTour } from "./ui/tour.js";
+import { startTour, TOUR_STEPS, TOUR_STEPS_MOBILE } from "./ui/tour.js";
+import { initMobile, isMobile, showSheet, hideSheet } from "./ui/mobile.js";
 import { createDesign } from "./ui/design.js";
 import { loadTracers, tracerLabel } from "./core/tracerlib.js";
 import { QUANTITIES, ATOM_Q, COFACTOR_Q, REDOX_PAIRS, carrierBases, excludedPools, carrierShare, transferableAtoms, cofactorWeights, groupEnergy, dgRunning } from "./core/flows.js";
@@ -50,7 +51,7 @@ async function boot() {
   for (const [code] of LANGS) ls.add(new Option(code.toUpperCase(), code));
   ls.value = getLang();
   bindFolds(); bindResizers();
-  applyDom(); fitHeader();
+  applyDom(); initMobile({ onLayout: () => fitHeader() }); fitHeader();
   let fitTimer = null;
   window.addEventListener("resize", () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitHeader, 120); });
   $("docsBtn").href = "docs.html?lang=" + docsLang();
@@ -86,7 +87,13 @@ async function boot() {
   // first visit in this browser: open the walkthrough once (closing it early also counts)
   let seen = true;
   try { seen = !!localStorage.getItem("metflux.tourSeen"); if (!seen) localStorage.setItem("metflux.tourSeen", "1"); } catch { /* no storage: never auto-open */ }
-  if (!seen && !ctxA) startTour();
+  if (!seen && !ctxA) tour();
+}
+
+/** The walkthrough of the layout on screen (desktop or phone). */
+function tour() {
+  if (isMobile()) startTour(TOUR_STEPS_MOBILE, { sheet: (s) => (s ? showSheet(s, s === "mMore") : hideSheet()) });
+  else startTour(TOUR_STEPS);
 }
 
 async function loadModel(slug, opts = {}) {
@@ -660,7 +667,12 @@ function openCtxMenu(node, x, y) {
   menu.hidden = false;
   const w = menu.offsetWidth, h = menu.offsetHeight;
   menu.style.left = Math.min(x, innerWidth - w - 8) + "px"; menu.style.top = Math.min(y, innerHeight - h - 8) + "px";
-  menu.onclick = (ev) => { const b = ev.target.closest("[data-i]"); if (!b) return; menu.hidden = true; items[+b.dataset.i][1](); };
+  menu.onclick = (ev) => {
+    const b = ev.target.closest("[data-i]"); if (!b) return;
+    const [k, fn] = items[+b.dataset.i];
+    menu.hidden = true; fn();
+    if (isMobile() && /^cm\.(details|fva|phase)$/.test(k)) showSheet("right");
+  };
   menu.querySelector("button")?.focus();
 }
 
@@ -737,6 +749,7 @@ function onSearchPick(it) {
   else if (it.type === "rxn") gotoReaction(it.ref);
   else if (it.type === "met") gotoBase(it.ref);
   else if (it.type === "gene") gotoGene(it.ref);
+  if (isMobile()) { $("search").blur(); if (it.type === "sub") hideSheet(); else showSheet("right"); }
 }
 
 function onMapSelect(node) {
@@ -749,6 +762,7 @@ function onMapSelect(node) {
   else S.sel = map.scene.cell ? { type: "grp", g: node.ref } : { type: "sub", ss: node.ref };
   applyGhosts();
   renderDetails();
+  if (isMobile()) { if (node) showSheet("right"); else hideSheet(); }
 }
 
 function onMapOpen(node) {
@@ -1955,7 +1969,7 @@ async function phasePlane(m) {
   let path = "", pen = false; // gaps where there is no solution
   for (const p of pts) { if (p.status !== "optimal") { pen = false; continue; } path += `${pen ? "L" : "M"}${X(p.x).toFixed(1)},${Y(p.objective).toFixed(1)}`; pen = true; }
   const shades = reg.map((r, i) => `<rect x="${X(r.x0)}" y="${P.t}" width="${Math.max(1, X(r.x1) - X(r.x0))}" height="${H - P.t - P.b}" fill="var(--panel2)" opacity="${i % 2 ? 0.9 : 0}"><title>${esc(r.l)}</title></rect>`).join("");
-  const unit = S.model.rxns[S.cfg.objective].obj || S.model.rxns[S.cfg.objective].id === "MAR13082" ? "h⁻¹" : "mmol/gDW/h";
+  const unit = isGrowthRxn(S.model.rxns[S.cfg.objective]) ? "h⁻¹" : "mmol/gDW/h";
   const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(t("pp.button"))}" style="font-size:10px">
     ${shades}<line x1="${P.l}" y1="${H - P.b}" x2="${W - P.r}" y2="${H - P.b}" stroke="var(--line)"/><line x1="${P.l}" y1="${P.t}" x2="${P.l}" y2="${H - P.b}" stroke="var(--line)"/>
     <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2"/>
@@ -2062,7 +2076,7 @@ function cofactorHtml(f) {
 /** A few plain sentences about the result, built from the same numbers as the panels below. */
 function plainSummaryHtml(f) {
   const { model } = S, out = [], obj = model.rxns[S.cfg.objective];
-  const growth = obj.obj || obj.id === "MAR13082";
+  const growth = isGrowthRxn(obj);
   const val = growth ? t("ps.growth", { x: fmtFlux(f.objective) }) : t("ps.objective", { n: esc(obj.n), x: fmtFlux(f.objective) });
   out.push(f.limits?.length ? val + " " + t("ps.limit", { l: esc(limitLabel(f.limits[0], f)) }) : val);
   const ex = (name) => { for (const [mi, e] of S.sim.exchanges) if (model.bases[model.mets[mi].b].n === name) return f.v[e.rxn] * e.dir; return 0; };
@@ -2142,7 +2156,7 @@ function summaryHtml() {
   }
   let h = `<div class="kind">${t("sum.title")}${S.result.frames.length > 1 ? " · t = " + fmtTime(f.t) : ""}</div><h3>${esc($("modelSelect").selectedOptions[0]?.text || model.meta.id || "")}</h3><div class="meta">${esc(model.meta.name || "")}</div>
     <div class="cards">
-      <div class="card"><div class="lbl">${t(obj.obj || obj.id === "MAR13082" ? "sum.growth" : "sum.objective")}</div><div class="big">${fmtFlux(f.objective)}<small><a class="unitlink" target="_blank" href="docs.html?lang=${docsLang()}#${docsLang()}-units" title="${esc(t(obj.obj || obj.id === "MAR13082" ? "unit.growthTip" : "unit.fluxTip"))}">${obj.obj || obj.id === "MAR13082" ? "h⁻¹" : "mmol/gDW/h"}</a></small></div>${vs}</div>
+      <div class="card"><div class="lbl">${t(isGrowthRxn(obj) ? "sum.growth" : "sum.objective")}</div><div class="big">${fmtFlux(f.objective)}<small><a class="unitlink" target="_blank" href="docs.html?lang=${docsLang()}#${docsLang()}-units" title="${esc(t(isGrowthRxn(obj) ? "unit.growthTip" : "unit.fluxTip"))}">${isGrowthRxn(obj) ? "h⁻¹" : "mmol/gDW/h"}</a></small></div>${vs}</div>
       <div class="card"><div class="lbl">${t("sum.active")}</div><div class="big">${active}<small>${t("sum.of", { n: model.rxns.length })}</small></div></div>
       ${f.biomass ? `<div class="card"><div class="lbl">${t("sum.biomass")}</div><div class="big">${f.biomass.toFixed(2)}<small>gDW/L</small></div></div>` : ""}
     </div>`;
@@ -2747,24 +2761,24 @@ function bindResizers() {
 // When the three groups of the top bar do not fit (narrow window, or a language with long words), the
 // right-hand buttons are reduced to their icon (full label kept as tooltip and accessible name), then the
 // brand text is hidden.
-const HEADER_ICONS = { tourBtn: "➜", editBtn: "✎", importBtn: "⤒", exportBtn: "⤓" };
+const HEADER_ICONS = { tourBtn: "➜", docsBtn: "§", editBtn: "✎", importBtn: "⤒", exportBtn: "⤓" };
 function fitHeader() {
   const tb = $("topbar");
   // a right-aligned row that does not fit spills to the left, where scrollWidth does not see it: add up the widths
   const need = (c) => { const k = [...c.children].filter((x) => x.offsetParent !== null); return k.reduce((w, x) => w + x.offsetWidth, 0) + (parseFloat(getComputedStyle(c).columnGap) || 0) * Math.max(0, k.length - 1); };
   const over = () => [...tb.children].some((c) => c.scrollWidth > c.clientWidth || need(c) > c.clientWidth + 1);
-  tb.classList.remove("compact1", "compact2", "compact3", "compact4");
+  tb.classList.remove("compact1", "compact2", "compact3", "compact4", "compact5", "compact6");
   for (const id of Object.keys(HEADER_ICONS)) {
     const b = $(id);
     if (b.dataset.full) { b.textContent = b.dataset.full; delete b.dataset.full; b.classList.remove("iconized"); b.removeAttribute("aria-label"); }
   }
-  if (!over()) return;
+  if (isMobile() || !over()) return; // phone layout: the buttons live in the More sheet
   tb.classList.add("compact1");
   for (const [id, icon] of Object.entries(HEADER_ICONS)) {
     const b = $(id);
     b.dataset.full = b.textContent; b.setAttribute("aria-label", b.textContent); b.textContent = icon; b.classList.add("iconized");
   }
-  for (const c of ["compact2", "compact3", "compact4"]) { if (!over()) break; tb.classList.add(c); }
+  for (const c of ["compact2", "compact3", "compact4", "compact5", "compact6"]) { if (!over()) break; tb.classList.add(c); }
 }
 
 function changeLanguage(lang) {
@@ -2806,7 +2820,7 @@ function bindUi() {
   $("modelSelect").onchange = (ev) => loadModel(ev.target.value);
   $("langSel").onchange = (ev) => changeLanguage(ev.target.value);
   $("runBtn").onclick = run;
-  $("tourBtn").onclick = startTour;
+  $("tourBtn").onclick = () => tour();
   $("navBack").onclick = () => navGo(-1); $("navFwd").onclick = () => navGo(1);
   window.addEventListener("keydown", (ev) => {
     if (ev.altKey && (ev.key === "ArrowLeft" || ev.key === "ArrowRight")) { ev.preventDefault(); navGo(ev.key === "ArrowLeft" ? -1 : 1); }

@@ -7,7 +7,7 @@
 ## English
 
 Local viewer for metabolic fluxes and isotope tracing on genome-scale metabolic models
-(Human-GEM 2.1.1 and Mouse-GEM 1.8.0 included, already preprocessed). Everything runs in the browser.
+(Human-GEM 2.1.1, Mouse-GEM 1.8.0 and Rat-GEM 1.8.0 included, already preprocessed). Everything runs in the browser.
 
 ### Open
 
@@ -55,6 +55,9 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
   metabolite, a map centred on any metabolite or reaction (right-click menu, or "adaptive" on click), and an
   Appearance dialog (backgrounds, accent, flux colour, colour scales, colour-blind safe compartments).
   Docs › The interface; units are explained in Docs › Glossary › Units.
+- **Phones** — on a narrow screen the map fills the screen and a bottom bar opens Setup, Results and More
+  as sliding panels; pinch to zoom, double tap to open a pathway, long press for the node menu. Can be added
+  to the home screen (web app manifest) and opened full screen.
 - **Tracers and experiment design** — 40 commercial tracers (Cambridge Isotope Laboratories catalogue numbers,
   grouped by use, with references) can label a nutrient with one click; "Design a tracer experiment" ranks
   tracers and measurable metabolites to tell saved scenarios apart or to resolve one flux. Natural abundance
@@ -141,16 +144,16 @@ Python is used only for preprocessing, never at run time.
 
 Preprocessing converts a repository in [standard-GEM](https://github.com/MetabolicAtlas/standard-GEM)
 format (`model/*.yml` + `model/*.tsv`) into the JSON files the app reads. The source zips are not in this
-repository: download `Human-GEM-2.1.1.zip` and `Mouse-GEM-1.8.0.zip` from the
-[Human-GEM](https://github.com/SysBioChalmers/Human-GEM) and
-[Mouse-GEM](https://github.com/SysBioChalmers/Mouse-GEM) releases and put them in the project root.
+repository: download `Human-GEM-2.1.1.zip`, `Mouse-GEM-1.8.0.zip` and `Rat-GEM-1.8.0.zip` from the
+[Human-GEM](https://github.com/SysBioChalmers/Human-GEM),
+[Mouse-GEM](https://github.com/SysBioChalmers/Mouse-GEM) and [Rat-GEM](https://github.com/SysBioChalmers/Rat-GEM) releases and put them in the project root.
 
 ```bash
 python3 -m venv --without-pip tools/.venv
 python3 -m pip --python tools/.venv/bin/python install rdkit pyyaml igraph rxnmapper \
     torch --extra-index-url https://download.pytorch.org/whl/cpu
 
-tools/build_all.sh                      # Human-GEM + Mouse-GEM
+tools/build_all.sh                      # Human-GEM, Mouse-GEM, Rat-GEM
 
 # another model (zip or folder):
 tools/.venv/bin/python tools/build_model.py   Other-GEM.zip other-gem [--structures-from human-gem]
@@ -160,7 +163,7 @@ tools/.venv/bin/python tools/write_manifest.py
 ```
 
 `--structures-from` reuses the SMILES of another model that is already built when the new one lacks them
-(the case of Mouse-GEM, which shares identifiers with Human-GEM).
+(the case of Mouse-GEM and Rat-GEM, which shares identifiers with Human-GEM).
 
 Free energies of reaction (`data/<slug>/thermo.json`, optional) come from
 [eQuilibrator](https://equilibrator.weizmann.ac.il/) run locally, in a separate environment because of its
@@ -235,16 +238,16 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # show the atom
   the knockdown limits are taken from the first time point of the reference.
 - Cell types only switch off enzymes whose mRNA is not detected (a cut-off, not proof of absence); they do
   not scale fluxes with expression, and the expression was measured in each line's own medium or in vivo.
-- Mouse-GEM 1.8.0 ships `MAR00021` as its objective, which is not a growth rate (about 0.00016). The built-in
-  objective "Growth (generic cell biomass, MAR13082)" uses Human-GEM's biomass reaction, present but closed in
-  Mouse-GEM and opened only while it is the objective: 0.0370 h⁻¹ in the standard medium, as Human-GEM.
+- Mouse-GEM 1.8.0 and Rat-GEM 1.8.0 ship `MAR00021` as their objective, which is not a growth rate (about 0.00016). The default
+  objective, "Growth (generic biomass)", is therefore MAR13082, Human-GEM's biomass reaction, present but closed in
+  both models and opened only while it is the objective: 0.0370 h⁻¹ in the standard medium, as Human-GEM.
 
 ---
 
 ## Español
 
 Visualizador local de flujos metabólicos y trazado isotópico sobre modelos metabólicos de escala
-genómica (Human-GEM 2.1.1 y Mouse-GEM 1.8.0 incluidos, ya preprocesados). Todo se ejecuta en el navegador.
+genómica (Human-GEM 2.1.1, Mouse-GEM 1.8.0 y Rat-GEM 1.8.0 incluidos, ya preprocesados). Todo se ejecuta en el navegador.
 
 ### Abrir
 
@@ -293,6 +296,9 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
   metabolito seleccionado, mapa centrado en cualquier metabolito o reacción (menú del clic derecho, o
   «adaptable» al hacer clic) y un diálogo de Apariencia (fondos, acento, color del flujo, escalas de color,
   compartimentos aptos para daltonismo). Docs › La interfaz; las unidades en Docs › Glosario › Unidades.
+- **Móviles** — en una pantalla estrecha el mapa ocupa toda la pantalla y una barra inferior abre Ajustes,
+  Resultados y Más como paneles deslizantes; pellizco para zoom, doble toque para abrir una ruta, pulsación
+  larga para el menú del nodo. Se puede añadir a la pantalla de inicio (manifiesto web) y abrir a pantalla completa.
 - **Trazadores y diseño de experimentos** — 40 trazadores comerciales (números de catálogo de Cambridge Isotope
   Laboratories, agrupados por uso, con referencias) marcan un nutriente con un clic; «Diseñar un experimento con
   trazadores» ordena trazadores y metabolitos medibles para distinguir escenarios guardados o resolver un flujo.
@@ -383,16 +389,16 @@ Python solo se usa en el preprocesado, nunca en ejecución.
 
 El preprocesado convierte un repositorio en formato [standard-GEM](https://github.com/MetabolicAtlas/standard-GEM)
 (`model/*.yml` + `model/*.tsv`) en los JSON que lee la app. Los zip de origen no están en este
-repositorio: descarga `Human-GEM-2.1.1.zip` y `Mouse-GEM-1.8.0.zip` de las publicaciones de
+repositorio: descarga `Human-GEM-2.1.1.zip`, `Mouse-GEM-1.8.0.zip` y `Rat-GEM-1.8.0.zip` de las publicaciones de
 [Human-GEM](https://github.com/SysBioChalmers/Human-GEM) y
-[Mouse-GEM](https://github.com/SysBioChalmers/Mouse-GEM) y ponlos en la raíz del proyecto.
+[Mouse-GEM](https://github.com/SysBioChalmers/Mouse-GEM) y [Rat-GEM](https://github.com/SysBioChalmers/Rat-GEM) y ponlos en la raíz del proyecto.
 
 ```bash
 python3 -m venv --without-pip tools/.venv
 python3 -m pip --python tools/.venv/bin/python install rdkit pyyaml igraph rxnmapper \
     torch --extra-index-url https://download.pytorch.org/whl/cpu
 
-tools/build_all.sh                      # Human-GEM + Mouse-GEM
+tools/build_all.sh                      # Human-GEM, Mouse-GEM, Rat-GEM
 
 # otro modelo (zip o carpeta):
 tools/.venv/bin/python tools/build_model.py   Otro-GEM.zip otro-gem [--structures-from human-gem]
@@ -402,7 +408,7 @@ tools/.venv/bin/python tools/write_manifest.py
 ```
 
 `--structures-from` reutiliza los SMILES de otro modelo ya construido cuando el nuevo no los trae
-(caso de Mouse-GEM, que comparte identificadores con Human-GEM).
+(caso de Mouse-GEM y Rat-GEM, que comparte identificadores con Human-GEM).
 
 La energía libre de reacción (`data/<slug>/thermo.json`, opcional) sale de
 [eQuilibrator](https://equilibrator.weizmann.ac.il/) ejecutado en local, en un entorno aparte por sus
@@ -478,6 +484,6 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # ver el mapa a
   límites de knockdown se toman del primer instante de la referencia.
 - Los tipos celulares sólo apagan enzimas cuyo ARNm no se detecta (un umbral, no una prueba de ausencia);
   no escalan los flujos con la expresión, y la expresión se midió en el medio propio de cada línea o in vivo.
-- Mouse-GEM 1.8.0 trae como objetivo `MAR00021`, cuyo valor no es una tasa de crecimiento (unos 0,00016). El
-  objetivo predefinido «Crecimiento (biomasa celular genérica, MAR13082)» usa la reacción de biomasa de Human-GEM,
-  presente pero cerrada en Mouse-GEM y abierta sólo mientras es el objetivo: 0,0370 h⁻¹ en el medio estándar, como Human-GEM.
+- Mouse-GEM 1.8.0 y Rat-GEM 1.8.0 traen como objetivo `MAR00021`, cuyo valor no es una tasa de crecimiento (unos 0,00016). Por eso el
+  objetivo por defecto, «Crecimiento (biomasa genérica)», es MAR13082, la reacción de biomasa de Human-GEM,
+  presente pero cerrada en ambos modelos y abierta sólo mientras es el objetivo: 0,0370 h⁻¹ en el medio estándar, como Human-GEM.

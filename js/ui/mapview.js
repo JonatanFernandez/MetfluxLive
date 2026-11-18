@@ -300,34 +300,89 @@ export class MapView {
       const after = this.toWorld(mx, my);
       this.cam.x += before.x - after.x; this.cam.y += before.y - after.y;
     }, { passive: false });
+    // pointers: mouse, pen and touch. One finger pans, two fingers pinch-zoom, a long press opens the context menu,
+    // a double tap opens (as a double click does)
+    const pts = new Map();
+    let pinch = null, press = null, lastTap = null, touchUp = 0;
+    const local = (ev) => { const r = c.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+    const cancelPress = () => { if (press) { clearTimeout(press); press = null; } };
     c.addEventListener("pointerdown", (ev) => {
       c.setPointerCapture(ev.pointerId);
-      drag = { x: ev.clientX, y: ev.clientY, cx: this.cam.x, cy: this.cam.y, moved: false };
+      pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY, touch: ev.pointerType !== "mouse" });
       this.camTarget = null;
+      if (pts.size === 2) { // second finger: pinch from here on
+        cancelPress(); drag = null;
+        const [p, q] = [...pts.values()], r = c.getBoundingClientRect();
+        const mx = (p.x + q.x) / 2 - r.left, my = (p.y + q.y) / 2 - r.top;
+        pinch = { d: Math.hypot(p.x - q.x, p.y - q.y) || 1, z: this.cam.z, w: this.toWorld(mx, my) };
+        return;
+      }
+      if (pts.size > 2) return;
+      drag = { x: ev.clientX, y: ev.clientY, cx: this.cam.x, cy: this.cam.y, moved: false, touch: ev.pointerType !== "mouse" };
+      if (drag.touch && this.hooks.onContext) {
+        const [mx, my] = local(ev), cx = ev.clientX, cy = ev.clientY;
+        press = setTimeout(() => {
+          press = null;
+          if (!drag || drag.moved) return;
+          const h = this._hit(mx, my, true);
+          if (h < 0) return;
+          drag.used = true; this.selected = h;
+          navigator.vibrate?.(15);
+          this.hooks.onContext(this.scene.nodes[h], cx, cy);
+        }, 520);
+      }
     });
     c.addEventListener("pointermove", (ev) => {
-      const r = c.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
+      const [mx, my] = local(ev);
+      const pt = pts.get(ev.pointerId);
+      if (pt) { pt.x = ev.clientX; pt.y = ev.clientY; }
+      if (pinch && pts.size >= 2) {
+        const [p, q] = [...pts.values()], r = c.getBoundingClientRect();
+        const cx = (p.x + q.x) / 2 - r.left, cy = (p.y + q.y) / 2 - r.top;
+        this.cam.z = Math.min(8, Math.max(0.03, pinch.z * Math.hypot(p.x - q.x, p.y - q.y) / pinch.d));
+        // keep the world point that was under the fingers' midpoint under it
+        this.cam.x = pinch.w.x - (cx - this.w / 2) / (UNIT * this.cam.z);
+        this.cam.y = pinch.w.y - (cy - this.h / 2) / (UNIT * this.cam.z);
+        return;
+      }
       if (drag) {
         const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
-        if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+        if (Math.abs(dx) + Math.abs(dy) > (drag.touch ? 8 : 3)) { drag.moved = true; cancelPress(); }
         if (drag.moved) { this.cam.x = drag.cx - dx / (UNIT * this.cam.z); this.cam.y = drag.cy - dy / (UNIT * this.cam.z); c.style.cursor = "grabbing"; return; }
       }
+      if (ev.pointerType !== "mouse") return; // no hover on touch screens
       const h = this._hit(mx, my);
       if (h !== this.hover) { this.hover = h; c.style.cursor = h >= 0 ? "pointer" : "grab"; }
       this.hooks.onHover?.(h >= 0 ? this.scene.nodes[h] : null, ev.clientX, ev.clientY);
     });
-    c.addEventListener("pointerup", (ev) => {
+    const up = (ev) => {
+      pts.delete(ev.pointerId);
+      if (ev.pointerType !== "mouse") touchUp = performance.now();
+      if (pinch) { if (pts.size < 2) pinch = null; drag = null; return; }
+      cancelPress();
       // a click that started elsewhere (e.g. on a search result lying over the map) is not a click on the map
-      if (!drag) return;
-      const wasDrag = drag.moved;
+      if (!drag || ev.type === "pointercancel") { drag = null; return; }
+      const { moved, used, touch } = drag;
       drag = null; c.style.cursor = this.hover >= 0 ? "pointer" : "grab";
-      if (wasDrag) return;
-      const r = c.getBoundingClientRect();
-      const h = this._hit(ev.clientX - r.left, ev.clientY - r.top);
+      if (moved || used) return;
+      const [mx, my] = local(ev);
+      const h = this._hit(mx, my, touch);
+      if (touch) { // double tap = double click
+        const now = performance.now();
+        if (lastTap && now - lastTap.t < 320 && Math.hypot(mx - lastTap.x, my - lastTap.y) < 30) {
+          lastTap = null;
+          if (h >= 0) this.hooks.onOpen?.(this.scene.nodes[h]); else this.fit();
+          return;
+        }
+        lastTap = { t: now, x: mx, y: my };
+      }
       this.selected = h;
       this.hooks.onSelect?.(h >= 0 ? this.scene.nodes[h] : null);
-    });
+    };
+    c.addEventListener("pointerup", up);
+    c.addEventListener("pointercancel", up);
     c.addEventListener("dblclick", (ev) => {
+      if (performance.now() - touchUp < 700) return; // the double tap was already handled
       const r = c.getBoundingClientRect();
       const h = this._hit(ev.clientX - r.left, ev.clientY - r.top);
       if (h >= 0) this.hooks.onOpen?.(this.scene.nodes[h]); else this.fit();
@@ -335,6 +390,7 @@ export class MapView {
     c.addEventListener("pointerleave", () => { this.hover = -1; this.hooks.onHover?.(null); });
     // right click on a node: context menu (the app decides what is in it)
     c.addEventListener("contextmenu", (ev) => {
+      if (ev.pointerType === "touch" || pts.size) { ev.preventDefault(); return; } // touch: handled by the long press
       const r = c.getBoundingClientRect();
       const h = this._hit(ev.clientX - r.left, ev.clientY - r.top);
       if (h < 0 || !this.hooks.onContext) return;
@@ -357,13 +413,13 @@ export class MapView {
     return (n.s > 0 ? 3.2 + 3 * n.s : 2.4) * k;
   }
 
-  _hit(mx, my) {
+  _hit(mx, my, touch = false) {
     const ns = this.scene.nodes;
     let best = -1, bd = 1e9;
     for (let i = 0; i < ns.length; i++) {
       const n = ns[i];
       if (!this._vis(n)) continue;
-      const dx = this._sx(n.x) - mx, dy = this._sy(n.y) - my, r = this._radius(n) + 5;
+      const dx = this._sx(n.x) - mx, dy = this._sy(n.y) - my, r = this._radius(n) + (touch ? 14 : 5);
       const d = dx * dx + dy * dy;
       if (d < r * r && d < bd) { bd = d; best = i; }
     }

@@ -25,7 +25,33 @@ export const TOUR_STEPS = [
   { id: "edit", sel: "#editBtn" },
   { id: "files", sel: "#exportBtn" },
   { id: "docs", sel: "#docsBtn" },
+  { id: "again", sel: "#tourBtn" },
   { id: "end" },
+];
+
+// The same tour on a phone (js/ui/mobile.js): `sheet` is the panel to open before the step ("" closes them).
+export const TOUR_STEPS_MOBILE = [
+  { id: "welcome", sheet: "" },
+  { id: "tabs", sel: "#mTabs", sheet: "" },
+  { id: "model", sel: "#modelSelect", sheet: "" },
+  { id: "search", sel: "#topbar .search", sheet: "" },
+  { id: "run", sel: "#runBtn", sheet: "" },
+  { id: "gestures", sel: "#map", sheet: "" },
+  { id: "nav", sel: "#navBar", sheet: "" },
+  { id: "view", sel: "#viewOpts", sheet: "" },
+  { id: "lines", sel: "#legendBox .qty", sheet: "" },
+  { id: "context", sel: "#secContext", sheet: "left" },
+  { id: "medium", sel: "#secMedium", sheet: "left" },
+  { id: "measured", sel: "#secMeasured", sheet: "left" },
+  { id: "objective", sel: "#secObjective", sheet: "left" },
+  { id: "perturb", sel: "#secPerturb", sheet: "left" },
+  { id: "compare", sel: "#secCompare", sheet: "left" },
+  { id: "details", sel: "#details", sheet: "right" },
+  { id: "more", sel: "#mMore", sheet: "mMore" },
+  { id: "mode", sel: "#modeToggle", sheet: "mMore" },
+  { id: "files", sel: "#exportBtn", sheet: "mMore" },
+  { id: "again", sel: "#tourBtn", sheet: "mMore" },
+  { id: "end", sheet: "" },
 ];
 
 const CSS = `
@@ -43,8 +69,11 @@ const CSS = `
 
 let styled = false;
 
-/** Start the walkthrough. */
-export function startTour(customSteps) {
+/**
+ * Start the walkthrough. opts.sheet(name) opens a panel of the phone layout before a step that has `sheet`
+ * (the panel slides in, so the step is placed once it has arrived).
+ */
+export function startTour(customSteps, opts = {}) {
   if (!styled) { const st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st); styled = true; }
   document.querySelector(".tour-shade")?.remove();
   const shade = document.createElement("div"); shade.className = "tour-shade";
@@ -52,9 +81,10 @@ export function startTour(customSteps) {
   const pop = document.createElement("div"); pop.className = "tour-pop"; pop.setAttribute("role", "dialog");
   shade.append(hole, pop);
   document.body.appendChild(shade);
-  const steps = (Array.isArray(customSteps) ? customSteps : TOUR_STEPS).filter((s) => !s.sel || visibleEl(s.sel));
+  // steps inside a closed panel are not visible yet: keep them if their element exists
+  const steps = (Array.isArray(customSteps) ? customSteps : TOUR_STEPS).filter((s) => !s.sel || (s.sheet ? document.querySelector(s.sel) : visibleEl(s.sel)));
   let i = 0;
-  const close = () => { shade.remove(); window.removeEventListener("keydown", key); window.removeEventListener("resize", place); };
+  const close = () => { if (steps.some((s) => s.sheet !== undefined)) opts.sheet?.(""); shade.remove(); window.removeEventListener("keydown", key); window.removeEventListener("resize", place); };
   const key = (ev) => {
     if (ev.key === "Escape") close();
     else if (ev.key === "ArrowRight" || ev.key === "Enter") go(1);
@@ -84,8 +114,11 @@ export function startTour(customSteps) {
     else { x = box.l + 16; y = box.t + 16; }
     pop.style.left = `${Math.max(8, Math.min(x, vw - pw - 8))}px`; pop.style.top = `${Math.max(8, Math.min(y, vh - ph - 8))}px`;
   }
+  let timer = null;
   function show() {
-    const s = steps[i], el = s.sel ? visibleEl(s.sel) : null;
+    const s = steps[i];
+    if (s.sheet !== undefined && opts.sheet) opts.sheet(s.sheet);
+    const el = s.sel ? visibleEl(s.sel) : null;
     if (el) {
       const sec = el.closest("section.fold"); if (sec?.classList.contains("folded")) sec.classList.remove("folded");
       el.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -97,6 +130,7 @@ export function startTour(customSteps) {
     pop.querySelector('[data-a="close"]').onclick = close;
     const b = pop.querySelector('[data-a="back"]'); if (b) b.onclick = () => go(-1);
     requestAnimationFrame(place);
+    clearTimeout(timer); if (s.sheet !== undefined) timer = setTimeout(() => { const e = s.sel ? visibleEl(s.sel) : null; e?.scrollIntoView({ block: "nearest" }); place(); }, 260);
     pop.querySelector('[data-a="next"]').focus();
   }
   window.addEventListener("keydown", key);
@@ -105,6 +139,7 @@ export function startTour(customSteps) {
 }
 
 function visibleEl(sel) {
-  for (const el of document.querySelectorAll(sel)) if (!el.hidden && el.offsetParent !== null && el.getClientRects().length) return el;
+  // offsetParent is null for hidden elements, and also for position: fixed ones (the phone tab bar and sheets)
+  for (const el of document.querySelectorAll(sel)) if (!el.hidden && el.getClientRects().length && (el.offsetParent !== null || getComputedStyle(el).position === "fixed")) return el;
   return null;
 }

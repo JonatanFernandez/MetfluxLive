@@ -1,0 +1,99 @@
+/* Phone layout (js/ui/mobile.js puts class "mobile" on <body>). The map fills the screen; the left panel (Setup),
+   the right panel (Results) and the More panel slide up from the tab bar as sheets. */
+
+#mTabs, #mMore, .m-head, .m-leg { display: none; }
+
+body.mobile { --tabs-h: 56px; --safe-b: env(safe-area-inset-bottom, 0px); }
+body.mobile main { display: block; position: relative; }
+body.mobile .resizer { display: none; }
+body.mobile #stage { position: absolute; inset: 0; }
+body.mobile #tooltip { display: none !important; } /* no hover on a touch screen */
+
+/* header: model, search, Simulate */
+body.mobile #topbar { display: flex; gap: 6px; padding: 6px 8px; padding-top: max(6px, env(safe-area-inset-top, 0px)); }
+body.mobile #topbar .tb-side { display: contents; }
+body.mobile #topbar .tb-side.right { display: none; }
+body.mobile #topbar .brand { display: none; }
+body.mobile #modelSelect { max-width: 104px; min-width: 0; font-size: 13px; }
+body.mobile #topbar .search { flex: 1; min-width: 0; position: static; }
+body.mobile #topbar .search input { width: 100%; font-size: 16px; } /* 16 px: iOS does not zoom into the field */
+body.mobile #searchResults { position: fixed; left: 6px; right: 6px; top: 50px; max-height: 60dvh; z-index: 60; }
+body.mobile #topbar .tb-center { gap: 6px; }
+body.mobile #autoBtn span { display: none; }
+body.mobile #runBtn { padding: 6px 10px; }
+
+/* map overlays */
+body.mobile #navBar { top: 8px; left: 8px; max-width: calc(100% - 16px); }
+body.mobile #viewOpts { top: 44px; left: 8px; right: 8px; max-width: none; flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; scrollbar-width: none; }
+body.mobile #viewOpts::-webkit-scrollbar { display: none; }
+body.mobile #viewOpts select { font-size: 13px; flex: 0 0 auto; }
+body.mobile #fitBtn { flex: 0 0 auto; min-width: 34px; min-height: 30px; }
+body.mobile #legendBox { left: 8px; right: 8px; bottom: calc(var(--tabs-h) + var(--safe-b) + 8px); max-width: none; }
+body.mobile #legend { max-height: 30dvh; overflow: auto; }
+body.mobile #legendBox:not(.open) #legend { display: none; }
+body.mobile #legendBox .qty { padding: 4px 8px; }
+body.mobile #legendBox .m-leg { display: inline-block;  border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 12px; padding: 2px 8px; font: inherit; font-size: 11.5px; }
+body.mobile #legendBox.open .m-leg { color: var(--text); border-color: var(--accent); }
+body.mobile #timeline { left: 8px; right: 8px; bottom: calc(var(--tabs-h) + var(--safe-b) + 52px); }
+body.mobile #statusBox { right: 8px; bottom: calc(var(--tabs-h) + var(--safe-b) + 50px); max-width: 70%; font-size: 12px; }
+body.mobile .navbtn { min-width: 34px; min-height: 32px; }
+
+/* sheets */
+body.mobile #left, body.mobile #right, body.mobile #mMore {
+  display: block; position: fixed; left: 0; right: 0; top: auto; width: auto; z-index: 30;
+  bottom: calc(var(--tabs-h) + var(--safe-b)); height: 52dvh; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--panel); border: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0;
+  box-shadow: 0 -12px 34px var(--shadow, rgba(0, 0, 0, .35));
+  transform: translateY(calc(100% + var(--tabs-h) + 40px)); visibility: hidden;
+  transition: transform .22s ease, height .22s ease, visibility 0s .22s;
+}
+body.mobile[data-sheet="left"] #left, body.mobile[data-sheet="right"] #right, body.mobile[data-sheet="mMore"] #mMore {
+  transform: none; visibility: visible; transition: transform .22s ease, height .22s ease;
+}
+body.mobile.sheet-full #left, body.mobile.sheet-full #right, body.mobile.sheet-full #mMore { height: calc(100dvh - 52px - var(--tabs-h) - var(--safe-b)); }
+body.mobile #right:has(#details:empty) { display: block; }
+@media (prefers-reduced-motion: reduce) { body.mobile #left, body.mobile #right, body.mobile #mMore { transition: none; } }
+
+body.mobile .m-head { display: flex; align-items: center; gap: 6px; position: sticky; top: 0; z-index: 3; background: var(--panel); padding: 12px 10px 6px 14px; border-bottom: 1px solid var(--line); touch-action: none; }
+body.mobile .m-head b { font-size: 14px; }
+body.mobile .m-head .spacer { flex: 1; }
+body.mobile .m-head .icon { min-width: 36px; min-height: 32px; }
+body.mobile .m-grab { position: absolute; left: 50%; top: 5px; width: 38px; height: 4px; margin-left: -19px; border-radius: 2px; background: var(--line); }
+
+/* More sheet */
+body.mobile #mMore .m-group { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+body.mobile #mMore h4 { margin: 0 0 8px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+body.mobile #mMore .m-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+body.mobile #mMore .m-row > button, body.mobile #mMore .m-row > .btn, body.mobile #mMore .m-row > select { min-height: 38px; }
+body.mobile #mMore .m-row .check { min-height: 36px; display: inline-flex; align-items: center; gap: 6px; }
+body.mobile #mMore #mFull { display: inline-flex; align-items: center; gap: 8px; }
+body.mobile #mMore #mFull svg { width: 18px; height: 18px; }
+body.mobile #mMore .hint { margin: 8px 0 0; }
+body.mobile #mMore #modeToggle { display: inline-flex; }
+
+/* tab bar */
+body.mobile #mTabs {
+  display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; height: calc(var(--tabs-h) + var(--safe-b));
+  padding-bottom: var(--safe-b); background: var(--panel); border-top: 1px solid var(--line);
+}
+#mTabs button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: none; border: 0; border-radius: 0; color: var(--muted); font: inherit; font-size: 11px; padding: 4px 0; cursor: pointer; }
+#mTabs button svg { width: 22px; height: 22px; }
+#mTabs button.on { color: var(--accent); }
+
+/* context menu: an action sheet at the bottom */
+body.mobile .ctxmenu { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: auto; border-radius: 14px 14px 0 0; padding: 6px 0 calc(10px + var(--safe-b)); z-index: 70; }
+body.mobile .ctxmenu .cm-head { max-width: none; font-size: 13px; padding: 8px 16px; }
+body.mobile .ctxmenu button { padding: 12px 16px; font-size: 15px; }
+
+/* dialogs use the whole screen */
+body.mobile dialog, body.mobile dialog.editor, body.mobile dialog.design, body.mobile dialog.look { width: 100vw; max-width: 100vw; max-height: 100dvh; height: auto; margin: auto 0 0; border-radius: 14px 14px 0 0; }
+body.mobile dialog form, body.mobile dialog.editor form { max-height: 100dvh; overflow: auto; padding: 14px; }
+
+/* first-visit tip */
+#mHint { position: absolute; left: 8px; right: 8px; top: 82px; z-index: 20; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--overlay-strong); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+#mHint span { flex: 1 1 100%; }
+
+/* bigger touch targets in the panels */
+body.mobile aside button, body.mobile aside select, body.mobile aside input:not([type=checkbox]):not([type=radio]) { min-height: 34px; }
+body.mobile aside input[type=search], body.mobile aside input[type=text], body.mobile aside input[type=number] { font-size: 16px; }
+body.mobile aside section { scroll-margin-top: 52px; }

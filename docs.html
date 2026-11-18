@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
   <title>MetfluxLive · Docs</title>
   <script>try { const d = document.documentElement; if (localStorage.getItem("metflux.theme") === "light") d.dataset.theme = "light"; const L = JSON.parse(localStorage.getItem("metflux.look") || "{}") || {}, s = d.dataset.theme === "light" ? L.surfaceLight : L.surfaceDark; if (s && s !== "default") d.dataset.palette = s; if (L.accent && L.accent !== "default") d.dataset.accent = L.accent; } catch { /* storage unavailable */ }</script>
   <link rel="stylesheet" href="css/palettes.css">
@@ -50,11 +51,32 @@
     .exp h3 { margin-top: 14px; } .exp ol { padding-left: 20px; } .exp .res { color: var(--muted); }
     .formula { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--field); border-radius: 8px; padding: 10px 14px; overflow-x: auto; font-size: 13.5px; }
     kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; font-size: 12.5px; background: var(--panel2); }
-    @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } nav { display: none; } article { padding: 6px 16px 60px; } }
+    #tocBtn, #topBtn, #tocShade { display: none; }
+    pre { overflow-x: auto; }
+    /* narrow screens and phones: the contents open as a drawer from the ☰ button */
+    @media (max-width: 860px) {
+      .wrap { grid-template-columns: 1fr; }
+      article { padding: 6px 16px 60px; }
+      header { gap: 8px; padding: 8px 12px; }
+      .brand { font-size: 15px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      #tocBtn { display: inline-block; font-size: 18px; line-height: 1; padding: 6px 10px; }
+      nav { position: fixed; top: 0; left: 0; bottom: 0; width: min(86vw, 330px); max-height: none; z-index: 20; background: var(--panel);
+        border-right: 1px solid var(--line); padding: 16px 10px 40px; transform: translateX(-105%); transition: transform .2s ease; overscroll-behavior: contain; }
+      nav a { padding: 7px 8px; } nav a.sub { padding: 5px 8px 5px 22px; }
+      body.toc-open nav { transform: none; }
+      body.toc-open #tocShade { display: block; position: fixed; inset: 0; z-index: 19; background: rgba(0, 0, 0, .45); }
+      #topBtn { position: fixed; right: 14px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 6; width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel2); color: var(--text); font-size: 18px; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
+      body.scrolled #topBtn { display: block; }
+      h1 { font-size: 23px; } h2 { font-size: 19px; margin-top: 34px; }
+      table { font-size: 13px; }
+      #docLang { max-width: 110px; }
+    }
+    @media (max-width: 860px) and (prefers-reduced-motion: reduce) { nav { transition: none; } }
   </style>
 </head>
 <body>
   <header>
+    <button id="tocBtn" type="button" aria-controls="toc" aria-expanded="false">☰</button>
     <div class="brand"><span class="logo"></span>Metflux<b>Live</b> · Docs</div>
     <div class="spacer"></div>
     <select id="docLang" aria-label="Language"></select>
@@ -62,6 +84,8 @@
   </header>
   <div class="wrap">
     <nav id="toc"></nav>
+    <div id="tocShade"></div>
+    <button id="topBtn" type="button">↑</button>
     <div>
 
 <!-- ============================================================ ENGLISH -->
@@ -190,6 +214,7 @@
   <li><b>Context menu.</b> The right-click menu also gives the details, flux range (FVA), knockout, use as objective, labelling a metabolite, its phase plane, opening a reaction's pathway, and copying the ID; on a pathway node, opening it and computing its flux flexibility.</li>
 </ul>
 
+<p><b>On a phone.</b> On a narrow screen the map fills the screen and a bar at the bottom opens <b>Setup</b> (medium, cell type, objective…), <b>Results</b> (summary and details) and <b>More</b> (mode, map options, tools, appearance, language, full screen) as panels that slide up over the map; pull a panel down to close it, up to enlarge it. One finger moves the map, two fingers zoom, a double tap opens a pathway, and a long press on a node opens the menu described above. For more room, use full screen or add MetfluxLive to the home screen from the browser menu: it then opens like an app. The walkthrough has a phone version too: More › Tools › Walkthrough.</p>
 <h3 id="en-appearance">Appearance: palettes and colour scales</h3>
 <p>The palette button next to the dark/light switch opens <i>Appearance</i>. There you choose the background of each theme (navy, black or grey in dark; pastel, white or warm paper in light), the accent colour, the colour of the flux lines, and the scales of the map: isotope label (slate–amber–magenta, viridis, plasma or cool–warm), change against the reference (blue–orange, blue–red or purple–green), free energy, and compartments. The choice is kept in this browser and also applies to the catalogue and to this documentation.</p>
 <p>Colour vision: every map scale keeps its two ends apart for protanopia and deuteranopia (checked by simulation, OKLab ΔE above 10). The default compartment colours do not; the <i>Colour-blind safe</i> set was chosen by search so that every pair stays apart (ΔE ≥ 11 on dark, ≥ 7.6 on light), and compartments are also named by their [c], [m]… label and in the legend.</p>
@@ -199,6 +224,7 @@
   <tr><th>What</th><th>Source</th><th>Used for</th></tr>
   <tr><td>Human-GEM 2.1.1</td><td><a href="https://github.com/SysBioChalmers/Human-GEM" target="_blank" rel="noopener">SysBioChalmers/Human-GEM</a>; Robinson et al., <i>Sci. Signal.</i> 2020</td><td>The human network: 12,748 reactions, 8,374 metabolites (one per compartment), 2,870 genes, 146 pathways, plus gene–reaction rules and metabolite structures.</td></tr>
   <tr><td>Mouse-GEM 1.8.0</td><td><a href="https://github.com/SysBioChalmers/Mouse-GEM" target="_blank" rel="noopener">SysBioChalmers/Mouse-GEM</a>; Wang et al., <i>PNAS</i> 2021</td><td>The mouse network. It shares identifiers with Human-GEM, so structures are reused.</td></tr>
+  <tr><td>Rat-GEM 1.8.0</td><td><a href="https://github.com/SysBioChalmers/Rat-GEM" target="_blank" rel="noopener">SysBioChalmers/Rat-GEM</a>; Wang et al., <i>PNAS</i> 2021</td><td>The rat network, built like Mouse-GEM from Human-GEM. Same identifiers and the same objective as Mouse-GEM (<a href="#en-mousebiomass">section 7</a>). No cell-type catalogue yet.</td></tr>
   <tr><td>Atom-to-atom maps</td><td>Computed for this app with <a href="https://github.com/rxn4chemistry/rxnmapper" target="_blank" rel="noopener">RXNMapper</a> (Schwaller et al., <i>Sci. Adv.</i> 2021) and RDKit, plus hand-curated corrections for central metabolism</td><td>Following individual atoms through each reaction.</td></tr>
   <tr><td>Plasmax and HPLM</td><td>Table S1 of <a href="https://pubmed.ncbi.nlm.nih.gov/30613774/" target="_blank" rel="noopener">Vande Voorde et al., <i>Sci. Adv.</i> 2019</a>; HPLM originally from Cantor et al., <i>Cell</i> 2017</td><td>Physiological media.</td></tr>
   <tr><td>Williams E</td><td>Supplementary Table 2 of Grankvist et al., <i>Nat. Metab.</i> 2024</td><td>The medium of the human liver slices (<a href="#en-medium">section 9</a>).</td></tr>
@@ -425,7 +451,7 @@
 <div class="tablebox"><table>
   <tr><th>Objective</th><th>Reaction (maximised)</th><th>Cell and function</th><th class="num">Value*</th><th>What limits it*</th></tr>
   <tr><td colspan="5"><b>Growth, energy and stress</b></td></tr>
-  <tr><td>Growth (generic biomass) — default</td><td>biomass (<code>MAR13082</code>; Mouse-GEM <code>MAR00021</code>)</td><td>Proliferating cells</td><td class="num">0.037 h⁻¹</td><td>O<sub>2</sub>, amino acids</td></tr>
+  <tr><td>Growth (generic biomass) — default</td><td>biomass (<code>MAR13082</code>)</td><td>Proliferating cells</td><td class="num">0.037 h⁻¹</td><td>O<sub>2</sub>, amino acids</td></tr>
   <tr><td>Maximum ATP production</td><td><code>MAR03964</code>, cytosolic ATP hydrolysis</td><td>Energy stress, non-growing cells; a classic alternative objective (Schuetz et al. 2007)</td><td class="num">13.2</td><td>O<sub>2</sub> (lower it to model hypoxia)</td></tr>
   <tr><td>Maximum glutathione synthesis</td><td><code>MAR09351</code>, GSH release</td><td>Oxidative stress (Lu 2013)</td><td class="num">0.020</td><td>cysteine, cystine, methionine</td></tr>
   <tr><td colspan="5"><b>Liver and lipid metabolism</b></td></tr>
@@ -482,7 +508,7 @@
 
 <h3 id="en-mousebiomass">Growth in Mouse-GEM</h3>
 <p><b>Why.</b> Mouse-GEM 1.8.0 ships with <code>MAR00021</code> as its objective. That reaction takes exactly one unit of each of 33 precursors (amino acids, cholesterol, lipid pools, DNA, RNA, cofactors…), with no weighting by how much of each a gram of cell contains, so its value is not a growth rate: about 0.00016 in the standard medium, against 0.0370 h⁻¹ for Human-GEM, and the fluxes it implies do not match the composition of a cell.</p>
-<p><b>How it is solved.</b> Mouse-GEM also contains <code>MAR13082</code>, the generic cell biomass reaction of Human-GEM, with exactly the same stoichiometry (5.34 mmol of protein pool, 0.22 of lipid pool, DNA, RNA, glycogen, metabolite and cofactor pools and 45 ATP per gram of dry weight), but closed (bounds 0/0). The built-in objective <b>Growth (generic cell biomass, MAR13082)</b>, offered only for Mouse-GEM, uses it: while it is the objective the simulator opens its upper bound to 1000, and only then. Nothing in the published model is rewritten: <code>MAR00021</code> remains the default objective, and choosing any other objective leaves <code>MAR13082</code> closed again. With it, Mouse-GEM grows at 0.0370 h⁻¹ in the standard medium and 0.0341 h⁻¹ with the NCI-60 measured fluxes, the same as Human-GEM. The composition is that of a generic human cell; a mouse-specific composition is not available in the model.</p>
+<p><b>How it is solved.</b> Mouse-GEM also contains <code>MAR13082</code>, the generic cell biomass reaction of Human-GEM, with exactly the same stoichiometry (5.34 mmol of protein pool, 0.22 of lipid pool, DNA, RNA, glycogen, metabolite and cofactor pools and 45 ATP per gram of dry weight), but closed (bounds 0/0). The default objective, <b>Growth (generic biomass)</b>, uses it in Mouse-GEM and Rat-GEM: while it is the objective the simulator opens its upper bound to 1000, and only then. Nothing in the published model is rewritten: <code>MAR00021</code> can still be chosen as a custom objective, and choosing any other objective leaves <code>MAR13082</code> closed again. With it, Mouse-GEM grows at 0.0370 h⁻¹ in the standard medium and 0.0341 h⁻¹ with the NCI-60 measured fluxes, the same as Human-GEM. The composition is that of a generic human cell; a mouse-specific composition is not available in the model.</p>
 
 <h2 id="en-modes">8. Steady state versus Dynamic</h2>
 <div class="tablebox"><table>
@@ -836,7 +862,7 @@
   <li><b>Dynamic mode</b> assumes one pool size for all intracellular metabolites. Labelling times, and therefore isotopologue curves over time, scale with that number: their order and shape are informative, their clock is not.</li>
   <li><b>Model edits are checked, not curated.</b> The checks catch impossible or unbalanced reactions and dead ends, not wrong biology. Automatic atom maps (maximum common substructure) can pair the wrong atoms; prefer a mapped SMILES.</li>
   <li><b>Scenarios are kept in memory</b> with their results. Download the session to keep them after closing the page.</li>
-  <li><b>Mouse-GEM 1.8.0</b> ships with an objective (<code>MAR00021</code>) whose value is not a growth rate; use the objective "Growth (generic cell biomass, MAR13082)" for growth in h⁻¹ (<a href="#en-mousebiomass">section 7</a>).</li>
+  <li><b>Mouse-GEM 1.8.0</b> ships with an objective (<code>MAR00021</code>) whose value is not a growth rate; the default objective is therefore MAR13082, the generic cell biomass, in h⁻¹ (<a href="#en-mousebiomass">section 7</a>). Rat-GEM 1.8.0 is in the same situation.</li>
   <li><b>Cell types</b> switch enzymes off where their mRNA is not detected, but do not scale fluxes with expression (<a href="#en-contexts">section 6</a>).</li>
 </ul>
 
@@ -1061,6 +1087,7 @@
   <li><b>Menú contextual.</b> El menú del clic derecho da también los detalles, el rango de flujo (FVA), el knockout, usar como objetivo, marcar un metabolito, su plano de fase, abrir la ruta de una reacción y copiar el ID; en un nodo de ruta, abrirla y calcular su flexibilidad de flujo.</li>
 </ul>
 
+<p><b>En el móvil.</b> En una pantalla estrecha el mapa ocupa toda la pantalla y una barra inferior abre <b>Ajustes</b> (medio, tipo celular, objetivo…), <b>Resultados</b> (resumen y detalles) y <b>Más</b> (modo, opciones del mapa, herramientas, apariencia, idioma, pantalla completa) como paneles que suben sobre el mapa; desliza un panel hacia abajo para cerrarlo y hacia arriba para ampliarlo. Un dedo mueve el mapa, dos dedos hacen zoom, un doble toque abre una ruta y una pulsación larga sobre un nodo abre el menú descrito arriba. Para tener más espacio, usa la pantalla completa o añade MetfluxLive a la pantalla de inicio desde el menú del navegador: así se abre como una app. El recorrido guiado también tiene una versión para el móvil: Más › Herramientas › Recorrido.</p>
 <h3 id="es-appearance">Apariencia: paletas y escalas de color</h3>
 <p>El botón de paleta junto al interruptor día/noche abre <i>Apariencia</i>. Ahí se elige el fondo de cada tema (azul marino, negro o gris en oscuro; pastel, blanco o papel cálido en claro), el color de acento, el color de las líneas de flujo y las escalas del mapa: marca isotópica (pizarra–ámbar–magenta, viridis, plasma o frío–cálido), cambio respecto a la referencia (azul–naranja, azul–rojo o morado–verde), energía libre y compartimentos. La elección se guarda en este navegador y se aplica también al catálogo y a esta documentación.</p>
 <p>Visión del color: todas las escalas del mapa mantienen sus dos extremos distinguibles con protanopía y deuteranopía (comprobado por simulación, ΔE en OKLab por encima de 10). Los colores de compartimento por defecto no; el conjunto <i>Apta para daltonismo</i> se eligió por búsqueda para que todos los pares sigan distinguiéndose (ΔE ≥ 11 en oscuro, ≥ 7,6 en claro), y los compartimentos se nombran además con su etiqueta [c], [m]… y en la leyenda.</p>
@@ -1070,6 +1097,7 @@
   <tr><th>Qué</th><th>Fuente</th><th>Para qué se usa</th></tr>
   <tr><td>Human-GEM 2.1.1</td><td><a href="https://github.com/SysBioChalmers/Human-GEM" target="_blank" rel="noopener">SysBioChalmers/Human-GEM</a>; Robinson et al., <i>Sci. Signal.</i> 2020</td><td>La red humana: 12 748 reacciones, 8374 metabolitos (uno por compartimento), 2870 genes, 146 rutas, además de las reglas gen–reacción y las estructuras de los metabolitos.</td></tr>
   <tr><td>Mouse-GEM 1.8.0</td><td><a href="https://github.com/SysBioChalmers/Mouse-GEM" target="_blank" rel="noopener">SysBioChalmers/Mouse-GEM</a>; Wang et al., <i>PNAS</i> 2021</td><td>La red de ratón. Comparte identificadores con Human-GEM, así que se reutilizan las estructuras.</td></tr>
+  <tr><td>Rat-GEM 1.8.0</td><td><a href="https://github.com/SysBioChalmers/Rat-GEM" target="_blank" rel="noopener">SysBioChalmers/Rat-GEM</a>; Wang et al., <i>PNAS</i> 2021</td><td>La red de rata, construida como Mouse-GEM a partir de Human-GEM. Mismos identificadores y el mismo objetivo que Mouse-GEM (<a href="#es-mousebiomass">sección 7</a>). Aún sin catálogo de tipos celulares.</td></tr>
   <tr><td>Mapas átomo a átomo</td><td>Calculados para esta aplicación con <a href="https://github.com/rxn4chemistry/rxnmapper" target="_blank" rel="noopener">RXNMapper</a> (Schwaller et al., <i>Sci. Adv.</i> 2021) y RDKit, más correcciones manuales en el metabolismo central</td><td>Seguir cada átomo a través de cada reacción.</td></tr>
   <tr><td>Plasmax y HPLM</td><td>Tabla S1 de <a href="https://pubmed.ncbi.nlm.nih.gov/30613774/" target="_blank" rel="noopener">Vande Voorde et al., <i>Sci. Adv.</i> 2019</a>; HPLM procede de Cantor et al., <i>Cell</i> 2017</td><td>Medios fisiológicos.</td></tr>
   <tr><td>Williams E</td><td>Tabla suplementaria 2 de Grankvist et al., <i>Nat. Metab.</i> 2024</td><td>El medio de los cortes de hígado humano (<a href="#es-medium">sección 9</a>).</td></tr>
@@ -1296,7 +1324,7 @@
 <div class="tablebox"><table>
   <tr><th>Objetivo</th><th>Reacción (maximizada)</th><th>Célula y función</th><th class="num">Valor*</th><th>Qué lo limita*</th></tr>
   <tr><td colspan="5"><b>Crecimiento, energía y estrés</b></td></tr>
-  <tr><td>Crecimiento (biomasa genérica) — por defecto</td><td>biomasa (<code>MAR13082</code>; Mouse-GEM <code>MAR00021</code>)</td><td>Células que proliferan</td><td class="num">0,037 h⁻¹</td><td>O<sub>2</sub>, aminoácidos</td></tr>
+  <tr><td>Crecimiento (biomasa genérica) — por defecto</td><td>biomasa (<code>MAR13082</code>)</td><td>Células que proliferan</td><td class="num">0,037 h⁻¹</td><td>O<sub>2</sub>, aminoácidos</td></tr>
   <tr><td>Máxima producción de ATP</td><td><code>MAR03964</code>, hidrólisis de ATP citosólico</td><td>Estrés energético, células que no crecen; un objetivo alternativo clásico (Schuetz et al. 2007)</td><td class="num">13,2</td><td>O<sub>2</sub> (bájalo para modelar hipoxia)</td></tr>
   <tr><td>Máxima síntesis de glutatión</td><td><code>MAR09351</code>, liberación de GSH</td><td>Estrés oxidativo (Lu 2013)</td><td class="num">0,020</td><td>cisteína, cistina, metionina</td></tr>
   <tr><td colspan="5"><b>Hígado y metabolismo lipídico</b></td></tr>
@@ -1353,7 +1381,7 @@
 
 <h3 id="es-mousebiomass">Crecimiento en Mouse-GEM</h3>
 <p><b>Por qué.</b> Mouse-GEM 1.8.0 trae <code>MAR00021</code> como objetivo. Esa reacción toma exactamente una unidad de cada uno de 33 precursores (aminoácidos, colesterol, reservas de lípidos, ADN, ARN, cofactores…), sin ponderar cuánto de cada uno contiene un gramo de célula, así que su valor no es una tasa de crecimiento: unos 0,00016 en el medio estándar, frente a 0,0370 h⁻¹ de Human-GEM, y los flujos que implica no corresponden a la composición de una célula.</p>
-<p><b>Cómo se resuelve.</b> Mouse-GEM contiene también <code>MAR13082</code>, la reacción de biomasa celular genérica de Human-GEM, con exactamente la misma estequiometría (5,34 mmol de reserva de proteína, 0,22 de lípidos, reservas de ADN, ARN, glucógeno, metabolitos y cofactores y 45 ATP por gramo de peso seco), pero cerrada (límites 0/0). El objetivo predefinido <b>Crecimiento (biomasa celular genérica, MAR13082)</b>, que sólo se ofrece en Mouse-GEM, la usa: mientras es el objetivo, el simulador abre su límite superior a 1000, y sólo entonces. No se reescribe nada del modelo publicado: <code>MAR00021</code> sigue siendo el objetivo por defecto, y al elegir cualquier otro objetivo <code>MAR13082</code> vuelve a quedar cerrada. Con ella Mouse-GEM crece a 0,0370 h⁻¹ en el medio estándar y a 0,0341 h⁻¹ con los flujos medidos del NCI-60, igual que Human-GEM. La composición es la de una célula humana genérica; el modelo no trae una composición propia de ratón.</p>
+<p><b>Cómo se resuelve.</b> Mouse-GEM contiene también <code>MAR13082</code>, la reacción de biomasa celular genérica de Human-GEM, con exactamente la misma estequiometría (5,34 mmol de reserva de proteína, 0,22 de lípidos, reservas de ADN, ARN, glucógeno, metabolitos y cofactores y 45 ATP por gramo de peso seco), pero cerrada (límites 0/0). El objetivo por defecto, <b>Crecimiento (biomasa genérica)</b>, la usa en Mouse-GEM y Rat-GEM: mientras es el objetivo, el simulador abre su límite superior a 1000, y sólo entonces. No se reescribe nada del modelo publicado: <code>MAR00021</code> se puede elegir aún como objetivo personalizado, y al elegir cualquier otro objetivo <code>MAR13082</code> vuelve a quedar cerrada. Con ella Mouse-GEM crece a 0,0370 h⁻¹ en el medio estándar y a 0,0341 h⁻¹ con los flujos medidos del NCI-60, igual que Human-GEM. La composición es la de una célula humana genérica; el modelo no trae una composición propia de ratón.</p>
 
 <h2 id="es-modes">8. Estacionario frente a Dinámico</h2>
 <div class="tablebox"><table>
@@ -1707,7 +1735,7 @@
   <li><b>El modo dinámico</b> supone un único tamaño de pool para todos los metabolitos intracelulares. Los tiempos de marcaje, y por tanto las curvas de isotopólogos en el tiempo, escalan con ese número: su orden y su forma son informativos; su reloj, no.</li>
   <li><b>Las ediciones del modelo se comprueban, no se curan.</b> Las comprobaciones detectan reacciones imposibles o sin balancear y callejones sin salida, no biología equivocada. Los mapas de átomos automáticos (subestructura común máxima) pueden emparejar mal los átomos; mejor un SMILES mapeado.</li>
   <li><b>Los escenarios se guardan en memoria</b> con sus resultados. Descarga la sesión para conservarlos al cerrar la página.</li>
-  <li><b>Mouse-GEM 1.8.0</b> trae un objetivo (<code>MAR00021</code>) cuyo valor no es una tasa de crecimiento; usa el objetivo «Crecimiento (biomasa celular genérica, MAR13082)» para un crecimiento en h⁻¹ (<a href="#es-mousebiomass">sección 7</a>).</li>
+  <li><b>Mouse-GEM 1.8.0</b> trae un objetivo (<code>MAR00021</code>) cuyo valor no es una tasa de crecimiento; por eso el objetivo por defecto es MAR13082, la biomasa celular genérica, en h⁻¹ (<a href="#es-mousebiomass">sección 7</a>). Rat-GEM 1.8.0 está en la misma situación.</li>
   <li><b>Los tipos celulares</b> apagan enzimas cuyo ARNm no se detecta, pero no escalan los flujos con la expresión (<a href="#es-contexts">sección 6</a>).</li>
 </ul>
 
@@ -1813,10 +1841,10 @@
     // the other languages are in docs/<code>.html and are loaded on demand.
     (function () {
       var LANGS = {
-        en: ["English", "Docs", "← App"], es: ["Español", "Documentación", "← Aplicación"],
-        pt: ["Português", "Documentação", "← Aplicação"], it: ["Italiano", "Documentazione", "← Applicazione"],
-        fr: ["Français", "Documentation", "← Application"], de: ["Deutsch", "Dokumentation", "← Anwendung"],
-        el: ["Ελληνικά", "Τεκμηρίωση", "← Εφαρμογή"]
+        en: ["English", "Docs", "← App", "Contents", "Back to top"], es: ["Español", "Documentación", "← Aplicación", "Índice", "Volver arriba"],
+        pt: ["Português", "Documentação", "← Aplicação", "Sumário", "Voltar ao topo"], it: ["Italiano", "Documentazione", "← Applicazione", "Indice", "Torna su"],
+        fr: ["Français", "Documentation", "← Application", "Sommaire", "Haut de page"], de: ["Deutsch", "Dokumentation", "← Anwendung", "Inhalt", "Nach oben"],
+        el: ["Ελληνικά", "Τεκμηρίωση", "← Εφαρμογή", "Περιεχόμενα", "Επιστροφή στην αρχή"]
       };
       var lang = new URLSearchParams(location.search).get("lang");
       if (!LANGS[lang]) { try { lang = localStorage.getItem("metflux.lang"); } catch (e) { lang = null; } }
@@ -1840,9 +1868,19 @@
         toc.textContent = "";
         art.querySelectorAll("h2, h3[id]").forEach(function (h) { var a = document.createElement("a"); a.href = "#" + h.id; a.textContent = h.textContent; if (h.tagName === "H3") a.className = "sub"; toc.appendChild(a); });
         document.getElementById("back").textContent = LANGS[l][2];
+        ["tocBtn", 3, "topBtn", 4].forEach(function (x, i, a) { if (i % 2) return; var b = document.getElementById(x); b.title = LANGS[l][a[i + 1]]; b.setAttribute("aria-label", LANGS[l][a[i + 1]]); });
         // keep the reader in the same section when switching language (ids are "<lang>-<section>")
         if (!keepHash && location.hash.length > 4) { var t = document.getElementById(l + location.hash.slice(3)); if (t) { history.replaceState(null, "", "#" + t.id); t.scrollIntoView(); } }
       }
+      // the contents drawer (narrow screens): opens with ☰, closes on a link, on the shade or with Escape
+      var tocBtn = document.getElementById("tocBtn");
+      function drawer(open) { document.body.classList.toggle("toc-open", open); tocBtn.setAttribute("aria-expanded", open ? "true" : "false"); }
+      tocBtn.onclick = function () { drawer(!document.body.classList.contains("toc-open")); };
+      document.getElementById("tocShade").onclick = function () { drawer(false); };
+      document.getElementById("toc").addEventListener("click", function (ev) { if (ev.target.closest("a")) drawer(false); });
+      window.addEventListener("keydown", function (ev) { if (ev.key === "Escape") drawer(false); });
+      document.getElementById("topBtn").onclick = function () { window.scrollTo({ top: 0 }); };
+      window.addEventListener("scroll", function () { document.body.classList.toggle("scrolled", window.scrollY > 600); }, { passive: true });
       sel.onchange = function () { ensure(sel.value, function (l) { show(l, false); }); };
       ensure(lang, function (l) {
         show(l, true);
