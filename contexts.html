@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MetfluxLive · Cell types</title>
-  <script>try { if (localStorage.getItem("metflux.theme") === "light") document.documentElement.dataset.theme = "light"; } catch { /* storage unavailable */ }</script>
+  <script>try { const d = document.documentElement; if (localStorage.getItem("metflux.theme") === "light") d.dataset.theme = "light"; const L = JSON.parse(localStorage.getItem("metflux.look") || "{}") || {}, s = d.dataset.theme === "light" ? L.surfaceLight : L.surfaceDark; if (s && s !== "default") d.dataset.palette = s; if (L.accent && L.accent !== "default") d.dataset.accent = L.accent; } catch { /* storage unavailable */ }</script>
+  <link rel="stylesheet" href="css/palettes.css">
   <style>
     :root { --bg: #0b1020; --panel: #111830; --panel2: #162040; --line: #243055; --text: #e8eefc; --muted: #93a2c6; --accent: #4cc9f0; --hot: #ffbe3c; }
     :root[data-theme="light"] { --bg: #eceff5; --panel: #f7f8fb; --panel2: #e6ebf3; --line: #d0d7e4; --text: #283044; --muted: #67718a; --accent: #2b7ca3; --hot: #b26f0e; }
@@ -26,6 +27,12 @@
     .warn { color: var(--hot); }
     tr:hover td { background: var(--panel); }
     button.exp { background: none; border: 0; color: var(--accent); cursor: pointer; font-size: 13px; padding: 0 4px; }
+    #cmpBox { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 0 0 14px; background: var(--panel); }
+    #cmpBox h2 { font-size: 15px; margin: 0 0 8px; }
+    .cmp-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .cmp-row input { min-width: 240px; }
+    .hbtn { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: 5px 12px; cursor: pointer; font: inherit; }
+    .warn { color: var(--hot); }
     tr.detail > td { background: var(--panel); padding: 6px 12px 12px; }
   </style>
 </head>
@@ -37,17 +44,30 @@
     <input id="q" type="search" autocomplete="off" spellcheck="false" data-i18n-ph="cat.filter">
     <span class="count" id="count"></span>
     <span style="flex:1"></span>
+    <button id="tourBtn" class="hbtn" data-i18n="h.tour"></button>
     <a id="docs" data-i18n="cat.docs"></a>
     <a href="index.html" data-i18n="cat.back"></a>
   </header>
   <main>
     <p class="note" data-i18n-html="cat.note"></p>
+    <section id="cmpBox">
+      <h2 data-i18n="cmpc.title"></h2>
+      <div class="cmp-row">
+        <label>A <input id="cmpA" list="ctxList" autocomplete="off" spellcheck="false" data-i18n-ph="cmpc.pick"></label>
+        <label>B <input id="cmpB" list="ctxList" autocomplete="off" spellcheck="false" data-i18n-ph="cmpc.pick"></label>
+        <button id="cmpGo" class="hbtn" data-i18n="cmpc.go"></button>
+        <a id="cmpSim" hidden data-i18n="cmpc.sim" data-i18n-title="cmpc.simTitle"></a>
+      </div>
+      <datalist id="ctxList"></datalist>
+      <div id="cmpOut"></div>
+    </section>
     <table><thead><tr id="head"></tr></thead><tbody id="rows"></tbody></table>
   </main>
   <script type="module">
     import { t, initLang, applyDom, docsLang } from "./js/i18n.js";
     import { CONTEXT_GROUPS, offGenes, blockedReactions } from "./js/core/contexts.js";
-    import { renderCtxTable, CTT_CSS } from "./js/ui/ctxtable.js";
+    import { renderCtxTable, renderCtxCompare, CTT_CSS } from "./js/ui/ctxtable.js";
+    import { startTour } from "./js/ui/tour.js";
     { const st = document.createElement("style"); st.textContent = CTT_CSS; document.head.appendChild(st); }
     const modelCache = new Map();
     const getModel = (slug) => { if (!modelCache.has(slug)) modelCache.set(slug, fetch(`data/${slug}/model.json`).then((r) => r.json())); return modelCache.get(slug); };
@@ -69,6 +89,7 @@
     async function load() {
       const slug = $("model").value;
       const d = await fetch(`data/${slug}/contexts.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      try { const mine = JSON.parse(localStorage.getItem("metflux.userctx." + slug) || "[]"); if (d && Array.isArray(mine)) d.contexts.unshift(...mine); } catch { /* no storage */ }
       const order = new Map(CONTEXT_GROUPS.map((g, i) => [g, i]));
       rows = (d?.contexts || []).map((c) => {
         const i = c.info || {};
@@ -77,7 +98,7 @@
         return { c, group: order.get(c.group) ?? 9, name: c.name, desc, src: t("ctx.src." + c.src), off, blocked: c.nBlocked ?? 0, rescued: c.rescued.length,
           pairs: (c.pairs || []).map((p) => t("meas.name." + p)).join("; "), hay: norm([c.name, desc, i.category, i.cellosaurus, i.entity, t("ctx.group." + c.group)].join(" | ")), slug };
       });
-      render();
+      render(); fillList();
     }
     function render() {
       const q = norm($("q").value).trim().split(/\s+/).filter(Boolean), g = $("group").value;
@@ -105,9 +126,31 @@
       const off = offGenes(r.c, model.genes), blocked = blockedReactions(model, off);
       renderCtxTable(row.firstElementChild, model, off, blocked, { name: r.name });
     };
+    // ---- comparator: two contexts of the same model
+    const ctxByLabel = new Map();
+    function fillList() {
+      const dl = $("ctxList"); dl.textContent = ""; ctxByLabel.clear();
+      for (const r of rows) { const label = `${r.name} — ${t("ctx.group." + r.c.group)}`; ctxByLabel.set(label, r); ctxByLabel.set(r.name, ctxByLabel.get(r.name) || r); const o = document.createElement("option"); o.value = label; dl.appendChild(o); }
+    }
+    async function compareNow() {
+      const A = ctxByLabel.get($("cmpA").value.trim()), B = ctxByLabel.get($("cmpB").value.trim()), out = $("cmpOut");
+      $("cmpSim").hidden = true;
+      if (!A || !B) { out.innerHTML = `<p class="warn">${esc(t("cmpc.need"))}</p>`; return; }
+      out.innerHTML = `<p class="note">${esc(t("ctt.loading"))}</p>`;
+      const model = await getModel(A.slug);
+      const side = (r) => { const off = offGenes(r.c, model.genes); return { name: r.name, off, blocked: blockedReactions(model, off) }; };
+      renderCtxCompare(out, model, side(A), side(B));
+      const sim = $("cmpSim");
+      sim.href = `index.html?model=${encodeURIComponent(A.slug)}&context=${encodeURIComponent(A.c.id)}&vs=${encodeURIComponent(B.c.id)}`;
+      sim.hidden = false;
+    }
+    $("cmpGo").onclick = compareNow;
+    $("tourBtn").onclick = () => startTour(CAT_TOUR);
     $("model").onchange = load; $("group").onchange = render; $("q").oninput = render;
     if (params.get("group")) $("group").value = params.get("group");
-    load();
+    const CAT_TOUR = [{ id: "cat.welcome" }, { id: "cat.model", sel: "#model" }, { id: "cat.filter", sel: "#q" }, { id: "cat.table", sel: "table" }, { id: "cat.expand", sel: "#rows button.exp" }, { id: "cat.use", sel: "#rows td:last-child a" }, { id: "cat.compare", sel: "#cmpBox" }, { id: "cat.sim", sel: "#cmpGo" }, { id: "cat.end" }];
+    await load();
+    try { if (!localStorage.getItem("metflux.catTourSeen")) { localStorage.setItem("metflux.catTourSeen", "1"); startTour(CAT_TOUR); } } catch { /* no storage */ }
   </script>
 </body>
 </html>

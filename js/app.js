@@ -6,12 +6,13 @@ import { gprActivity } from "./core/gpr.js";
 import { loadContexts, offGenes, blockedReactions, offGenesOf, ContextIndex, taskName } from "./core/contexts.js";
 import { ModelIndex, fmtFlux, fmtTime, escapeHtml as esc } from "./modelindex.js";
 import { MapView, COMP_COLORS, enrichColor, deltaColor, energyColor, setMapTheme } from "./ui/mapview.js";
+import { loadLook, applyLook, openLookDialog } from "./ui/look.js";
 import { OBJECTIVES, OBJECTIVE_GROUPS, objectiveIndex } from "./core/objectives.js";
 import { SearchIndex, attachSearch } from "./ui/search.js";
 import { renderMolecule, tracerName } from "./ui/molecule.js";
 import { buildCellLayout } from "./celllayout.js";
 import { metDepths, cascadeGlobal, cascadeSub } from "./cascade.js";
-import { IsotopologueSampler, naturalMid } from "./core/isotopologues.js";
+import { IsotopologueSampler, naturalMid, withNaturalAbundance } from "./core/isotopologues.js";
 import { DATASETS, buildResults } from "./export/results.js";
 import { makeZip, readStoredZip } from "./export/zip.js";
 import { t, initLang, setLang, getLang, docsLang, applyDom, LANGS } from "./i18n.js";
@@ -19,7 +20,10 @@ import { applyEdits, editedLayout, editsFile, readEditsFile, modelLookups, EDIT_
 import { createEditor } from "./ui/editor.js";
 import { createCompare } from "./ui/compare.js";
 import { renderCtxTable, CTT_CSS } from "./ui/ctxtable.js";
-import { QUANTITIES, ATOM_Q, carrierBases, excludedPools, carrierShare, transferableAtoms, cofactorWeights, groupEnergy, dgRunning } from "./core/flows.js";
+import { startTour } from "./ui/tour.js";
+import { createDesign } from "./ui/design.js";
+import { loadTracers, tracerLabel } from "./core/tracerlib.js";
+import { QUANTITIES, ATOM_Q, COFACTOR_Q, REDOX_PAIRS, carrierBases, excludedPools, carrierShare, transferableAtoms, cofactorWeights, groupEnergy, dgRunning } from "./core/flows.js";
 
 const SESSION_FORMAT = "metfluxlive-session";
 
@@ -56,7 +60,8 @@ async function boot() {
   try { const a = JSON.parse(localStorage.getItem("metflux.auto") || "null"); if (a) S.auto = { steady: a.steady !== false, dynamic: !!a.dynamic }; } catch { /* storage unavailable */ }
   setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark", false);
   try { const q = localStorage.getItem("metflux.quantity"); if (QUANTITIES.includes(q)) S.quantity = q; } catch { /* storage unavailable */ }
-  map = new MapView($("map"), { onSelect: onMapSelect, onOpen: onMapOpen, onHover: onMapHover });
+  window.__metflux = { S, get map() { return map; } }; // for diagnostics and automated tests
+  map = new MapView($("map"), { onSelect: onMapSelect, onOpen: onMapOpen, onHover: onMapHover, onContext: openCtxMenu, onNav: navGo });
   editor = createEditor({ S, setEdits, gotoReaction, gotoMet, refreshDetails: renderDetails });
   compare = createCompare({ S, capture, opsKey, load: (sc) => loadScenario(sc), show: showScenario, redraw: () => { applyFrame(); renderDetails(); }, mediumName, frame });
   bindUi();
@@ -75,7 +80,13 @@ async function boot() {
   const urlModel = new URLSearchParams(location.search).get("model"); // links from the cell-type catalogue
   if (models.some((m) => m.slug === urlModel)) wanted = urlModel;
   sel.value = wanted;
-  await loadModel(wanted);
+  const url = new URLSearchParams(location.search), vs = url.get("vs"), ctxA = url.get("context");
+  await loadModel(wanted, { noRun: !!vs });
+  if (vs) await compareContexts(ctxA, vs);
+  // first visit in this browser: open the walkthrough once (closing it early also counts)
+  let seen = true;
+  try { seen = !!localStorage.getItem("metflux.tourSeen"); if (!seen) localStorage.setItem("metflux.tourSeen", "1"); } catch { /* no storage: never auto-open */ }
+  if (!seen && !ctxA) startTour();
 }
 
 async function loadModel(slug, opts = {}) {
@@ -92,7 +103,8 @@ async function loadModel(slug, opts = {}) {
     const [model, structures, atommaps, layout, thermo, ctxData] = await Promise.all([get("model.json"), get("structures.json"), get("atommaps.json"), get("layout.json"), optional("thermo.json"), loadContexts(slug)]);
     model.meta = { ...model.meta, slug };
     Object.assign(S, { slug, base: { model, structures, atommaps, layout, thermo }, result: null, sel: null, frameIdx: 0 });
-    S.ctxData = ctxData; S.ctxIndex = ctxData ? new ContextIndex(ctxData, ctxLabels) : null;
+    S.ctxData = ctxData || { meta: {}, taskNames: [], contexts: [], byId: new Map() };
+    mergeUserContexts(slug);
     S.context = storedContext(slug);
     const urlCtx = new URLSearchParams(location.search).get("context");
     if (urlCtx && ctxData?.byId.has(urlCtx)) {
@@ -116,6 +128,7 @@ async function loadModel(slug, opts = {}) {
     renderContext(); renderSupplies(); renderMeasured(); renderPerturb(); renderEvents(); renderObjective(); openGlobal(); renderDetails();
     editor.render(); compare.render();
     loading.classList.add("done");
+    navReset();
     if (!opts.noRun) run();
   } catch (err) {
     console.error(err);
@@ -203,7 +216,7 @@ function capture() {
       components: S.supplies.map((it) => ({ met: mid(it.met), conc: it.conc, conc0: it.conc0, vmax: it.vmax, km: it.km, unlimited: !!it.unlimited, hold: !!it.hold, label: labelIdx(it.label), fraction: it.fraction ?? 1 })),
     },
     measured: { set: S.measured.set, tol: S.measured.tol, ngam: S.measured.ngam, edited: S.measured.edited, items: S.measured.items.map((x) => ({ met: mid(x.met), rate: x.rate })) },
-    context: { id: S.context.id, mode: S.context.mode },
+    context: { id: S.context.id, mode: S.context.mode, user: S.context.id?.startsWith("user:") ? currentContext() : undefined },
     perturbations: S.perturb.map((p) => ({ type: p.type, target: p.type === "gene" ? p.ref : M.rxns[p.ref].id, activity: p.a })),
     objective: { reaction: M.rxns[S.cfg.objective].id, maximize: S.cfg.maximize, parsimonious: S.cfg.parsimonious },
     dynamic: { hours: +$("dynHours").value || 24, biomass: +$("dynBiomass").value || 0.5, pool: +$("dynPool").value || 0.5 },
@@ -240,6 +253,7 @@ function applySettings(o) {
   const set = MEASURED_SETS.some((x) => x.id === o.measured.set) ? o.measured.set : "none";
   S.measured = { set, tol: +o.measured.tol || 0, ngam: +o.measured.ngam || 0, edited: !!o.measured.edited, items: [] };
   for (const x of o.measured.items) { const m = met(x.met); if (m !== undefined && S.sim.exchanges.has(m)) S.measured.items.push({ met: m, rate: +x.rate }); }
+  if (o.context?.user && !S.ctxData.byId.has(o.context.id)) addUserContext(o.context.user); // a session carries its own RNA-seq cell type
   if (o.context && o.context.id && !S.ctxData?.byId.has(o.context.id)) lost++;
   setContext(o.context?.id && S.ctxData?.byId.has(o.context.id) ? o.context.id : null, o.context?.mode === "penalty" ? "penalty" : "block", false);
   S.perturb = [];
@@ -426,6 +440,7 @@ function subScene(ss) {
 }
 
 function openGlobal() {
+  if (S.view?.kind !== "global") navPush();
   S.view = { kind: "global", ss: -1 };
   $("listView").hidden = true;
   map.setScene(globalScene());
@@ -436,6 +451,7 @@ function openGlobal() {
 /** Open a pathway map; `grp` restricts a list view to one cell-view group. */
 function openSubsystem(ss, keepSel = false, grp = null) {
   const sc = subScene(ss);
+  if (S.view?.kind !== (sc ? "sub" : "list") || S.view.ss !== ss || (S.view.grp ?? null) !== grp) navPush();
   S.view = { kind: sc ? "sub" : "list", ss, grp: sc ? null : grp };
   if (!keepSel) S.sel = grp !== null && !sc ? { type: "grp", g: grp } : { type: "sub", ss };
   if (sc) { $("listView").hidden = true; map.setScene(sc); }
@@ -452,7 +468,12 @@ function renderCrumbs() {
   const a = document.createElement("a");
   a.textContent = t(isCascade() ? "crumb.cascade" : isCell() ? "crumb.cell" : "crumb.global"); a.onclick = () => { S.sel = null; openGlobal(); renderDetails(); };
   c.appendChild(a);
-  if (S.view.kind !== "global") {
+  if (S.view.kind === "focus") {
+    const sep = document.createElement("span"); sep.className = "sep"; sep.textContent = "›";
+    const cur = document.createElement("span"), cn = S.view.center;
+    cur.textContent = t("crumb.focus", { n: cn.type === "met" ? S.index.metName(cn.ref) : S.model.rxns[cn.ref].n });
+    c.append(sep, cur);
+  } else if (S.view.kind !== "global") {
     const sep = document.createElement("span"); sep.className = "sep"; sep.textContent = "›";
     const cur = document.createElement("span");
     cur.textContent = S.model.subsystems[S.view.ss] + (S.view.grp != null ? " · " + locName(cellLayout().groups[S.view.grp].loc) : "");
@@ -478,9 +499,175 @@ function renderListView(mask) {
 // ------------------------------------------------------------- navigation ----
 const drawable = (ss) => !!S.layout.subs[ss];
 
+// History of views (pathway, global, centred view) with their selection and camera: back / forward.
+const NAV = { back: [], fwd: [], restoring: false };
+const navState = () => ({ view: { ...S.view }, sel: S.sel ? { ...S.sel } : null, cam: { ...map.cam } });
+function navPush() {
+  if (NAV.restoring || !S.model || !S.view) return;
+  NAV.back.push(navState());
+  if (NAV.back.length > 60) NAV.back.shift();
+  NAV.fwd = [];
+  renderNavBtns();
+}
+function navGo(dir) {
+  const from = dir < 0 ? NAV.back : NAV.fwd, to = dir < 0 ? NAV.fwd : NAV.back;
+  if (!from.length) return;
+  to.push(navState());
+  const st = from.pop();
+  NAV.restoring = true;
+  try {
+    const v = st.view;
+    if (v.kind === "global") openGlobal();
+    else if (v.kind === "focus") openFocus(v.center);
+    else openSubsystem(v.ss, true, v.grp ?? null);
+    S.sel = st.sel;
+    map.cam = { ...st.cam }; map.camTarget = null;
+    applyGhosts();
+    if (st.sel?.type === "met" || st.sel?.type === "rxn") map.selected = map.findNode(st.sel.type === "met" ? 0 : 1, st.sel.type === "met" ? st.sel.met : st.sel.rxn);
+    renderDetails();
+  } finally { NAV.restoring = false; }
+  renderNavBtns();
+}
+function navReset() { NAV.back = []; NAV.fwd = []; renderNavBtns(); }
+function renderNavBtns() { if (!$("navBack")) return; $("navBack").disabled = !NAV.back.length; $("navFwd").disabled = !NAV.fwd.length; }
+
+/** Open the pathway of a reaction (a reaction of another pathway clicked on the map) and select it there. */
+function goToPathwayOf(j) {
+  S.sel = { type: "rxn", rxn: j };
+  openSubsystem(S.model.rxns[j].ss, true);
+  const i = map.findNode(1, j);
+  if (i >= 0) map.focusNode(i);
+  renderDetails();
+}
+
+/**
+ * Inside a pathway, a selected metabolite also shows, around it and for as long as it is selected, the reactions
+ * of other pathways that make or use it with flux (up to 8, dashed ring; click one to go to its pathway).
+ */
+function applyGhosts(force = false) {
+  const cur = map.scene, base = cur.ghostBase || cur, f = frame();
+  let m = null;
+  if (S.view.kind === "sub" && S.sel?.type === "met" && f && base.nodes.some((n) => n.type === 0 && n.ref === S.sel.met)) m = S.sel.met;
+  if (m === null) { if (cur.ghostBase) { map.setScene(base, true); map.selected = -1; applyFrame(); } return; }
+  if (!force && cur.ghostBase && cur.ghostOf === m && cur.ghostResult === S.result && cur.ghostFrame === S.frameIdx) return;
+  const { index, model } = S, inScene = new Set(base.nodes.filter((n) => n.type === 1).map((n) => n.ref));
+  const list = [];
+  for (let p = index.rxnStart[m]; p < index.rxnStart[m + 1]; p++) {
+    const j = index.rxnList[p], x = f.v[j] * index.rxnCoef[p];
+    if (Math.abs(x) > 1e-9 && !inScene.has(j) && !model.rxns[j].removed) list.push({ j, x, coef: index.rxnCoef[p] });
+  }
+  list.sort((a, b) => Math.abs(b.x) - Math.abs(a.x));
+  const top = list.slice(0, 8), mi = base.nodes.findIndex((n) => n.type === 0 && n.ref === m), c = base.nodes[mi];
+  if (!top.length) { if (cur.ghostBase) { map.setScene(base, true); applyFrame(); } map.selected = mi; return; }
+  const nodes = base.nodes.slice(), edges = base.edges.slice();
+  top.forEach((g, k) => {
+    const a = -Math.PI / 2 + ((k + 0.5) * 2 * Math.PI) / top.length, R = 3.4;
+    const r = model.rxns[g.j], name = r.n.length <= 22 ? r.n : r.id;
+    edges.push({ r: nodes.length, m: mi, coef: g.coef });
+    nodes.push({ type: 1, ref: g.j, x: c.x + R * Math.cos(a), y: c.y + R * Math.sin(a), label: `${name} → ${model.subsystems[r.ss]}`, ghost: true });
+  });
+  map.setScene({ ...base, nodes, edges, labelOrder: undefined, ghostBase: base, ghostOf: m, ghostResult: S.result, ghostFrame: S.frameIdx }, true);
+  map.selected = mi;
+  applyFrame();
+}
+
+/**
+ * A map arranged around one metabolite or reaction. Metabolite: the reactions that make it on the left, those that
+ * use it on the right, inactive ones below, and their other metabolites further out. Reaction: its substrates on the
+ * left, products on the right, and the reactions with flux that make or use them further out.
+ */
+function focusScene(center) {
+  const { model, index } = S, f = frame(), cur = index.currency;
+  const nodes = [], edges = [], metAt = new Map(), rxnAt = new Map();
+  const metLabel = (m) => model.bases[model.mets[m].b].n + ` [${model.mets[m].c}]`;
+  const addMet = (m, x, y) => { if (metAt.has(m)) return metAt.get(m); metAt.set(m, nodes.length); nodes.push({ type: 0, ref: m, x, y, label: metLabel(m), comp: model.mets[m].c }); return nodes.length - 1; };
+  const addRxn = (j, x, y) => { if (rxnAt.has(j)) return rxnAt.get(j); rxnAt.set(j, nodes.length); const r = model.rxns[j]; nodes.push({ type: 1, ref: j, x, y, label: r.n.length <= 26 ? r.n : r.id }); return nodes.length - 1; };
+  const rxnsOf = (m) => { const out = []; for (let p = index.rxnStart[m]; p < index.rxnStart[m + 1]; p++) { const j = index.rxnList[p]; if (!model.rxns[j].removed) out.push({ j, coef: index.rxnCoef[p], x: f ? f.v[j] * index.rxnCoef[p] : 0 }); } return out; };
+  const fan = (items, center0, R, step) => items.map((it, k) => { const a = center0 + (k - (items.length - 1) / 2) * step; return { ...it, x: R * Math.cos(a), y: R * Math.sin(a), a }; });
+  if (center.type === "met") {
+    const m = center.ref, ci = addMet(m, 0, 0);
+    const all = rxnsOf(m).sort((a, b) => Math.abs(b.x) - Math.abs(a.x));
+    const prod = all.filter((r) => r.x > 1e-9).slice(0, 12), cons = all.filter((r) => r.x < -1e-9).slice(0, 12), idle = all.filter((r) => Math.abs(r.x) <= 1e-9).slice(0, 8);
+    const R1 = 3.2, step = 0.32;
+    for (const g of [fan(prod, Math.PI, R1, step), fan(cons, 0, R1, step), fan(idle, Math.PI / 2, R1 + 0.8, step)]) for (const it of g) {
+      const ri = addRxn(it.j, it.x, it.y);
+      edges.push({ r: ri, m: ci, coef: it.coef });
+      const r = model.rxns[it.j], others = r.m.map((mm, q) => [mm, r.c[q]]).filter(([mm]) => mm !== m && !cur[model.mets[mm].b]);
+      others.forEach(([mm, cc], k) => {
+        const a = it.a + (k - (others.length - 1) / 2) * 0.11, R2 = R1 + 3;
+        const mi = addMet(mm, R2 * Math.cos(a), R2 * Math.sin(a));
+        edges.push({ r: ri, m: mi, coef: cc });
+      });
+    }
+  } else {
+    const j = center.ref, r = model.rxns[j], ri = addRxn(j, 0, 0), v = f ? f.v[j] : 0, dir = v < 0 ? -1 : 1;
+    const mets = r.m.map((mm, q) => ({ m: mm, coef: r.c[q] })).filter((x) => !cur[model.mets[x.m].b]);
+    const subs = mets.filter((x) => x.coef * dir < 0), prods = mets.filter((x) => x.coef * dir > 0), R1 = 3, step = 0.45;
+    for (const g of [fan(subs, Math.PI, R1, step), fan(prods, 0, R1, step)]) for (const it of g) {
+      const mi = addMet(it.m, it.x, it.y);
+      edges.push({ r: ri, m: mi, coef: it.coef });
+      const near = rxnsOf(it.m).filter((x) => x.j !== j && Math.abs(x.x) > 1e-9).sort((a, b) => Math.abs(b.x) - Math.abs(a.x)).slice(0, 5);
+      near.forEach((nx, k) => {
+        const a = it.a + (k - (near.length - 1) / 2) * 0.16, R2 = R1 + 3;
+        const rj = addRxn(nx.j, R2 * Math.cos(a), R2 * Math.sin(a));
+        edges.push({ r: rj, m: mi, coef: nx.coef });
+      });
+    }
+  }
+  return { kind: "sub", ss: -1, focus: true, nodes, edges };
+}
+
+function openFocus(center) {
+  if (!(S.view?.kind === "focus" && S.view.center.type === center.type && S.view.center.ref === center.ref)) navPush();
+  S.view = { kind: "focus", ss: -1, center: { ...center } };
+  $("listView").hidden = true;
+  map.setScene(focusScene(center));
+  S.sel = center.type === "met" ? { type: "met", met: center.ref } : { type: "rxn", rxn: center.ref };
+  renderCrumbs(); applyFrame();
+  map.selected = map.findNode(center.type === "met" ? 0 : 1, center.ref);
+  renderDetails();
+}
+
+/** Right-click menu on a map node. */
+function openCtxMenu(node, x, y) {
+  const menu = $("ctxMenu"), { model } = S, items = [];
+  let head = "";
+  if (node.type === 0) {
+    const m = node.ref, ppMet = S.supplies.find((it) => model.mets[it.met].b === model.mets[m].b && S.sim.exchanges.has(it.met))?.met;
+    head = S.index.metName(m);
+    items.push(["cm.focus", () => openFocus({ type: "met", ref: m })]);
+    if (node.ghost !== true && S.view.kind !== "sub") items.push(["cm.openMet", () => gotoMet(m)]);
+    items.push(["cm.details", () => { S.sel = { type: "met", met: m }; applyGhosts(); renderDetails(); }]);
+    items.push(["cm.label", () => addSupply(m, true)]);
+    if (ppMet !== undefined) items.push(["cm.phase", () => { S.sel = { type: "met", met: m }; renderDetails(); phasePlane(ppMet); }]);
+    items.push(["cm.copy", () => navigator.clipboard?.writeText(model.mets[m].id)]);
+  } else if (node.type === 1) {
+    const j = node.ref;
+    head = model.rxns[j].n;
+    items.push(["cm.focus", () => openFocus({ type: "rxn", ref: j })]);
+    if (node.ghost || S.view.kind !== "sub" || S.view.ss !== model.rxns[j].ss) items.push(["cm.openRxn", () => goToPathwayOf(j)]);
+    items.push(["cm.details", () => { S.sel = { type: "rxn", rxn: j }; renderDetails(); }]);
+    items.push(["cm.fva", () => { S.sel = { type: "rxn", rxn: j }; renderDetails(); fluxRange(j); }]);
+    items.push(["cm.ko", () => addPerturb("rxn", j)]);
+    items.push(["cm.objective", () => { S.cfg.objective = j; renderObjective(); changed(); }]);
+    items.push(["cm.copy", () => navigator.clipboard?.writeText(model.rxns[j].id)]);
+  } else {
+    head = node.label;
+    items.push(["cm.open", () => onMapOpen(node)]);
+    if (!map.scene.cell) items.push(["cm.flex", () => { openSubsystem(node.ref); computeFlex(node.ref); }]);
+  }
+  menu.innerHTML = `<div class="cm-head">${esc(head)}</div>` + items.map(([k], i) => `<button type="button" role="menuitem" data-i="${i}">${t(k)}</button>`).join("");
+  menu.hidden = false;
+  const w = menu.offsetWidth, h = menu.offsetHeight;
+  menu.style.left = Math.min(x, innerWidth - w - 8) + "px"; menu.style.top = Math.min(y, innerHeight - h - 8) + "px";
+  menu.onclick = (ev) => { const b = ev.target.closest("[data-i]"); if (!b) return; menu.hidden = true; items[+b.dataset.i][1](); };
+  menu.querySelector("button")?.focus();
+}
+
 function gotoReaction(j) {
   S.sel = { type: "rxn", rxn: j };
   let i = map.findNode(1, j);
+  if (i >= 0 && map.scene.nodes[i].ghost) i = -1;
   if (i < 0) {
     openSubsystem(S.model.rxns[j].ss, true);
     i = map.findNode(1, j);
@@ -522,12 +709,15 @@ function gotoGene(sym) {
 
 function gotoMet(m) {
   S.sel = { type: "met", met: m };
+  if (map.scene.ghostBase) { map.setScene(map.scene.ghostBase, true); applyFrame(); }
   let i = map.findNode(0, m);
   if (i < 0) {
     const ss = bestSubsystemForMet(m);
     if (ss >= 0) { openSubsystem(ss, true); i = map.findNode(0, m); }
   }
   if (i >= 0) map.focusNode(i);
+  applyGhosts();
+  if (i >= 0) map.focusNode(map.findNode(0, m));
   renderDetails();
 }
 
@@ -550,10 +740,14 @@ function onSearchPick(it) {
 }
 
 function onMapSelect(node) {
+  if (node?.ghost) { goToPathwayOf(node.ref); return; } // a reaction of another pathway: go there
+  // adaptive view: a click on a metabolite or reaction re-arranges the map around it
+  if (S.adaptive && node && node.type < 2 && !(S.view.kind === "focus" && S.view.center.type === (node.type ? "rxn" : "met") && S.view.center.ref === node.ref)) { openFocus({ type: node.type ? "rxn" : "met", ref: node.ref }); return; }
   if (!node) S.sel = S.view.kind === "sub" ? { type: "sub", ss: S.view.ss } : null;
   else if (node.type === 0) S.sel = { type: "met", met: node.ref };
   else if (node.type === 1) S.sel = { type: "rxn", rxn: node.ref };
   else S.sel = map.scene.cell ? { type: "grp", g: node.ref } : { type: "sub", ss: node.ref };
+  applyGhosts();
   renderDetails();
 }
 
@@ -652,8 +846,23 @@ function perturbActivities() {
 }
 
 /** Status line, bottom right. kind: "busy" (amber, a calculation is running), "done" (green, result ready) or none. */
+/**
+ * Progress bar next to the status: null hides it, true = working without a known end (moving bar),
+ * a number 0..1 = share done. Hidden again whenever the status stops being "busy".
+ */
+function setProgress(x) {
+  const p = $("progress"), bar = p.firstElementChild;
+  if (x === null || x === undefined || x === false) { p.hidden = true; return; }
+  p.hidden = false;
+  const indet = x === true;
+  p.classList.toggle("indet", indet);
+  if (!indet) { const pc = Math.round(100 * Math.min(1, Math.max(0, x))); bar.style.width = pc + "%"; p.setAttribute("aria-valuenow", pc); p.title = pc + " %"; }
+  else { bar.style.width = ""; p.removeAttribute("aria-valuenow"); p.title = ""; }
+}
+
 function setStatus(fn, err = false, kind = null) {
   S.statusFn = fn; S.statusErr = err; S.statusKind = kind;
+  if (kind !== "busy") setProgress(null);
   const s = $("status"); s.textContent = fn(); s.classList.toggle("err", err);
   s.classList.toggle("busy", kind === "busy" && !err); s.classList.toggle("done", kind === "done" && !err);
 }
@@ -684,13 +893,13 @@ async function run() {
     const evList = mode === "dynamic" ? S.events.map((ev) => ({ ...ev })) : [];
     let res;
     if (mode === "steady") {
-      setStatus(() => t("status.fba"), false, "busy");
+      setStatus(() => t("status.fba"), false, "busy"); setProgress(true);
       res = await S.sim.runSteady(cfg, S.supplies, S.structures, (phase) => { if (seq === S.runSeq) setStatus(() => t(phase === "ref" ? "status.ref" : "status.fba"), false, "busy"); });
     } else {
       setStatus(() => t("status.dyn", { p: 0, t: fmtTime(0) }), false, "busy");
       res = await S.sim.runDynamic(cfg, S.supplies, S.structures, dyn, (p, fr, frames, phase) => {
         if (seq !== S.runSeq) throw SUPERSEDED; // a newer run started: stop computing this one
-        const pc = Math.round(100 * p);
+        const pc = Math.round(100 * p); setProgress(p);
         if (phase === "ref") { setStatus(() => t("status.dynRef", { p: pc }), false, "busy"); return; }
         setStatus(() => t("status.dyn", { p: pc, t: fmtTime(fr.t) }), false, "busy");
         // show frames as they are computed
@@ -710,7 +919,7 @@ async function run() {
     if (last.status !== "optimal") setStatus(() => t("status.nosol", { why: statusWhy(last.status) }), true);
     else setStatus(() => t("status.done", { mode: mode === "steady" ? t("status.steady") : t("status.dynamic", { n: res.solves }), s: secs }) + (last.converged === false ? t("status.notconv") : "") + (res.frames.some((f) => f.relaxed) ? t("status.relaxed") : ""), false, "done");
     setupTimeline();
-    applyFrame(); renderDetails();
+    applyFrame(); applyGhosts(true); renderDetails();
     if (mode === "dynamic" && res.frames.length > 1) { S.frameIdx = 0; $("timeSlider").value = 0; applyFrame(); startPlay(); }
   } catch (err) {
     if (err === SUPERSEDED) return;
@@ -748,6 +957,7 @@ function toggleAuto() {
 function setTheme(name, redraw = true) {
   if (name === "light") document.documentElement.dataset.theme = "light"; else delete document.documentElement.dataset.theme;
   setMapTheme(name);
+  applyLook(loadLook()); // surfaces depend on the theme; the map scales are re-applied on top of it
   const b = $("themeBtn");
   b.setAttribute("aria-checked", String(name !== "light")); // the switch reads "dark mode: on"
   try { localStorage.setItem("metflux.theme", name); } catch { /* ignore */ }
@@ -768,8 +978,8 @@ function applyFrame() {
   fs.value = filt;
   const mode = filt === "delta" ? "delta" : filt === "dlabel" ? "dlabel" : f?.metE ? "tracer" : "flux";
   const mask = filt === "all" ? null : frameMask(f, filt);
-  if (S.view.kind === "sub") {
-    map.setData(f ? { v: f.v, turnover: frameTurnover(f), metE: f.metE, uncertain: f.uncertain, mode, mask, ref: f.ref?.v, refE: f.ref?.metE, perturb: S.result.pert, dG: S.quantity === "dg" ? S.flowData.dG : null, blocked: S.ctxBlock ? (S.ctxBlockSet ??= new Set(S.ctxBlock)) : null } : {});
+  if (S.view.kind === "sub" || S.view.kind === "focus") {
+    map.setData(f ? { v: f.v, turnover: frameTurnover(f), metE: f.metE, uncertain: f.uncertain, mode, mask, ref: f.ref?.v, refE: f.ref?.metE, perturb: S.result.pert, dG: S.quantity === "dg" ? S.flowData.dG : null, blocked: S.ctxBlock ? (S.ctxBlockSet ??= new Set(S.ctxBlock)) : null, qflux: cofactorRxnFlux(f, S.quantity), flex: S.flex && S.flex.result === S.result && S.flex.frameIdx === S.frameIdx ? S.flex.map : null } : {});
   } else if (S.view.kind === "global") {
     let gHas = null;
     if (mask) {
@@ -807,7 +1017,7 @@ function startPlay() {
 function stopPlay() { if (S.playing) clearInterval(S.playing); S.playing = null; $("playBtn").textContent = "▶"; }
 
 function renderLegend(mode) {
-  const sub = S.view.kind === "sub";
+  const sub = S.view.kind === "sub" || S.view.kind === "focus";
   const comps = sub ? [...new Set(map.scene.nodes.filter((n) => n.type === 0).map((n) => n.comp))] : [];
   const ramp = (colors, labels) => `<div class="ramp" style="background:linear-gradient(90deg,${colors.join(",")})"></div><div class="scale">${labels.map((l) => `<span>${l}</span>`).join("")}</div>`;
   const q = S.quantity, energy = q === "dg";
@@ -817,11 +1027,15 @@ function renderLegend(mode) {
     h += `<div style="margin-top:6px">${t(sub ? "legend.dgSub" : "legend.dgGlobal")}</div>${ramp([-1, -0.4, 0, 0.5, 1].map((x) => energyColor(x)), sub ? ["+40", "0", "−40 kJ/mol"] : [t("legend.dgUp"), t("legend.dgDown")])}`;
     h += `<div><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${energyColor(NaN)};margin-right:4px"></i>${t("legend.dgUnknown")}</div>`;
     if (!S.flowData.hasDG) h += `<div class="err">${t("legend.dgMissing")}</div>`;
-  } else if (sub && q !== "carbon") h += `<div>${t("legend.qSubOnly")}</div>`;
+  } else if (sub && (COFACTOR_Q[q] || q === "redox")) h += `<div>${t("legend.qSubCof", { q: esc(t("qty." + q)) })}</div>`;
+  else if (sub && q !== "carbon") h += `<div>${t("legend.qSubOnly")}</div>`;
   if (mode === "tracer" && !energy) h += `<div style="margin-top:6px">${t("legend.enrich")}</div>${ramp([0, 0.05, 0.2, 0.5, 1].map((x) => enrichColor(x)), ["0 %", "5", "20", "50", "100 %"])}<div>${t("legend.uncertain")}</div>`;
   if (mode === "dlabel" && !energy) h += `<div style="margin-top:6px">${t("legend.dlabel", { name: esc(frame()?.ref?.scen?.name || ""), cur: esc(compare.shownName()) })}</div>${ramp([-1, -0.3, 0, 0.3, 1].map((x) => deltaColor(x)), [t("legend.lessLabel"), t("legend.same"), t("legend.moreLabel")])}`;
   if (mode === "delta" && !energy) h += `<div style="margin-top:6px">${t(frame()?.ref?.scen ? "legend.deltaScen" : "legend.delta", { name: esc(frame()?.ref?.scen?.name || ""), cur: esc(compare.shownName()) })}</div>${ramp([-1, -0.3, 0, 0.3, 1].map((x) => deltaColor(x)), [t("legend.down"), t("legend.same"), t("legend.up")])}${sub ? `<div>${t("legend.lost")}</div>` : ""}`;
   if (sub && S.result?.pert?.size) h += `<div>${t("legend.pert")}</div>`;
+  if (sub && map.scene.ghostBase) h += `<div style="margin-top:4px">${t("legend.ghost")}</div>`;
+  if (S.view.kind === "focus") h += `<div style="margin-top:4px">${t("legend.focus")}</div>`;
+  if (sub && S.flex && S.flex.result === S.result && S.view.ss === S.flex.ss) h += `<div style="margin-top:4px">${t("flex.legend", { frac: Math.round(S.flex.frac * 100) })}<br>${["fixed", "required", "optional", "loop"].map((c) => `<span class="fx-dot fx-${c}"></span>${t("flex.c." + c)}`).join(" ")}</div>`;
   if (sub && S.ctxBlock?.length) h += `<div><svg width="26" height="10" style="vertical-align:middle;margin-right:4px"><line x1="1" y1="5" x2="25" y2="5" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 3"/></svg>${t(S.context.mode === "penalty" ? "legend.ctxPenal" : "legend.ctxBlocked", { ctx: esc(currentContext()?.name || "") })}</div>`;
   if (comps.length) h += `<div class="comps">${comps.map((c) => `<span><i style="border-color:${COMP_COLORS[c] || COMP_COLORS.c}"></i>${esc(compName(c))}</span>`).join("")}</div>`;
   h += `<div style="margin-top:4px">${sub ? t("legend.subHint") : t("legend.globalHint") + (map.scene.cell ? "<br>" + t("legend.cellHint") : "")}</div>`;
@@ -927,6 +1141,7 @@ const ctxLabels = {
   sub: (c) => {
     const i = c.info || {};
     if (c.id === "nci60") return t("ctx.nci60Sub", { n: (i.lines || []).length });
+    if (c.group === "user") return [t("ctx.src.user"), i.file].filter(Boolean).join(" · ");
     return [i.disease || (c.group === "lineOther" ? i.category : ""), i.site, t("ctx.src." + c.src)].filter(Boolean).join(" · ");
   },
 };
@@ -986,6 +1201,7 @@ function renderContext() {
   if (i.entity) extra.push(`<a href="https://www.bgee.org/search/anat-entities?search=${encodeURIComponent(i.entity)}" target="_blank" rel="noopener">${esc(i.entity)}</a>`);
   if (i.category && ctx.group !== "lineCancer" && ctx.group !== "lineOther") extra.push(esc(i.category));
   if (i.note) extra.push(esc(i.note));
+  if (ctx.group === "user") extra.push(t("rna.chipInfo", { file: esc(i.file), matched: i.matched, total: S.base.model.genes.length, thr: i.thr }) + ` <button class="link" id="rnaDelete">${t("rna.delete")}</button>`);
   cur.innerHTML = `<div class="chip ctx-chip"><span class="badge b-${ctxBadgeClass(ctx.group)}">${esc(t("ctx.badge." + ctx.group))}</span> <b>${esc(ctx.name)}</b>
     <div class="sub">${esc(ctxLabels.sub(ctx))}${extra.length ? "<br>" + extra.join(" · ") : ""}</div></div>`;
   const off = offGenes(ctx, genes);
@@ -1002,9 +1218,165 @@ function renderContext() {
   if (S.context.mode === "penalty" && !S.cfg.parsimonious) parts.push(`<span class="warn">${t("ctx.penaltyNoPfba")}</span>`);
   parts.push(`<span class="ctx-src">${t("ctx.license." + (S.slug === "human-gem" ? "hpa" : "bgee"), { lang: docsLang() })}</span>`);
   note.innerHTML = parts.join("<br>");
+  $("rnaDelete")?.addEventListener("click", () => { if (confirm(t("rna.deleteConfirm", { name: ctx.name }))) { deleteUserContext(ctx.id); setContext(null, S.context.mode); } });
   note.querySelectorAll("[data-pair]").forEach((b) => { b.onclick = () => { loadMeasured(b.dataset.pair); renderObjective(); renderContext(); }; });
 }
-const ctxBadgeClass = (g) => ({ lineCancer: "cancer", lineOther: "gene", cellType: "met", tissue: "rxn", consensus: "sub" }[g] || "sub");
+const ctxBadgeClass = (g) => ({ user: "sub", lineCancer: "cancer", lineOther: "gene", cellType: "met", tissue: "rxn", consensus: "sub" }[g] || "sub");
+
+// ------------------------------------------------- cell type from the user's RNA-seq ----
+// The table is parsed in the page, matched to the model genes, and the context is built in a worker with the same
+// metabolic-task rescue as the catalogue (js/core/ctxbuild.js). Nothing leaves the browser; the result is kept in
+// localStorage (metflux.userctx.<slug>) and inside exported sessions.
+const userCtxKey = (slug) => "metflux.userctx." + slug;
+function storedUserContexts(slug) {
+  try { const a = JSON.parse(localStorage.getItem(userCtxKey(slug)) || "[]"); return Array.isArray(a) ? a : []; } catch { return []; }
+}
+function addUserContext(c, store = true) {
+  const D = S.ctxData;
+  if (!D.byId.has(c.id)) { D.contexts.unshift(c); D.byId.set(c.id, c); }
+  if (store) {
+    const all = storedUserContexts(S.slug).filter((x) => x.id !== c.id); all.unshift(c);
+    try { localStorage.setItem(userCtxKey(S.slug), JSON.stringify(all)); } catch { setStatus(() => t("rna.storageFull"), true); }
+  }
+  S.ctxIndex = new ContextIndex(D, ctxLabels);
+}
+function deleteUserContext(id) {
+  const D = S.ctxData;
+  D.contexts = D.contexts.filter((c) => c.id !== id); D.byId.delete(id);
+  try { localStorage.setItem(userCtxKey(S.slug), JSON.stringify(storedUserContexts(S.slug).filter((c) => c.id !== id))); } catch { /* ignore */ }
+  S.ctxIndex = new ContextIndex(D, ctxLabels);
+}
+function mergeUserContexts(slug) {
+  for (const c of storedUserContexts(slug).reverse()) addUserContext(c, false);
+  S.ctxIndex = new ContextIndex(S.ctxData, ctxLabels);
+}
+
+const RNA = { table: null, file: "" };
+function openRnaDialog() {
+  RNA.table = null; $("rnaFile").value = ""; $("rnaParsed").hidden = true; $("rnaBuild").disabled = true; $("rnaStatus").textContent = "";
+  $("rnaDialog").showModal();
+}
+
+/** Parse a delimited text table: delimiter, header, identifier and numeric columns are detected. */
+function parseExpressionTable(text) {
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim() && !l.startsWith("#"));
+  if (lines.length < 2) throw new Error(t("rna.errEmpty"));
+  const first = lines[0];
+  const delim = ["\t", ",", ";"].map((d) => [d, first.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const split = (l) => l.split(delim).map((x) => x.trim().replace(/^"(.*)"$/, "$1"));
+  const rows = lines.map(split);
+  const num = (x) => x !== "" && Number.isFinite(+x);
+  const nCol = Math.max(...rows.slice(0, 50).map((r) => r.length));
+  const header = rows[0].some((x, k) => !num(x) && rows.slice(1, 20).some((r) => num(r[k])));
+  const body = header ? rows.slice(1) : rows;
+  const names = Array.from({ length: nCol }, (_, k) => (header && rows[0][k]) || t("rna.column", { n: k + 1 }));
+  const numeric = names.map((_, k) => body.slice(0, 500).filter((r) => num(r[k])).length >= 0.8 * Math.min(500, body.length));
+  return { names, body, numeric };
+}
+
+/** Model gene (symbol used in the GPR rules) for an identifier: Ensembl gene ID (version stripped) or symbol. */
+function geneMatcher() {
+  const m = new Map();
+  for (const g of S.base.model.genes) { m.set(g[1].toUpperCase(), g[1]); if (g[0]) m.set(String(g[0]).toUpperCase().replace(/\.\d+$/, ""), g[1]); }
+  return (id) => m.get(String(id).toUpperCase().replace(/^(ENS[A-Z]*G\d+)\.\d+$/, "$1"));
+}
+
+async function readRnaFile(file) {
+  if (!file) return;
+  $("rnaStatus").textContent = "";
+  try {
+    const tbl = parseExpressionTable(await file.text());
+    RNA.table = tbl; RNA.file = file.name;
+    const match = geneMatcher();
+    const hits = tbl.names.map((_, k) => tbl.body.slice(0, 2000).filter((r) => match(r[k] ?? "")).length);
+    const idCol = hits.indexOf(Math.max(...hits));
+    const fill = (sel, opts, val) => { sel.textContent = ""; for (const [v, l] of opts) sel.add(new Option(l, v)); sel.value = val; };
+    fill($("rnaIdCol"), tbl.names.map((n, k) => [k, n]), idCol);
+    const numCols = tbl.names.map((n, k) => [k, n]).filter(([k]) => tbl.numeric[k] && k !== idCol);
+    if (!numCols.length) throw new Error(t("rna.errNoValues"));
+    fill($("rnaValCol"), [...numCols, ...(numCols.length > 1 ? [["mean", t("rna.meanCols", { n: numCols.length })]] : [])], numCols[0][0]);
+    const looksLog = numCols.every(([k]) => tbl.body.slice(0, 2000).every((r) => !num0(r[k]) || +r[k] < 25));
+    $("rnaLog").checked = looksLog;
+    $("rnaName").value = file.name.replace(/\.[^.]+$/, "").slice(0, 60);
+    $("rnaParsed").hidden = false;
+    rnaPreview();
+  } catch (err) { RNA.table = null; $("rnaParsed").hidden = true; $("rnaBuild").disabled = true; $("rnaStatus").innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+}
+const num0 = (x) => x !== undefined && x !== "" && Number.isFinite(+x);
+
+/** Expression per model gene from the chosen columns (several rows for a gene: the highest). */
+function rnaLevels() {
+  const tbl = RNA.table, idCol = +$("rnaIdCol").value, vc = $("rnaValCol").value, log = $("rnaLog").checked;
+  const cols = vc === "mean" ? tbl.names.map((_, k) => k).filter((k) => tbl.numeric[k] && k !== idCol) : [+vc];
+  const match = geneMatcher(), level = new Map();
+  let rows = 0;
+  for (const r of tbl.body) {
+    const g = match(r[idCol] ?? "");
+    const xs = cols.map((k) => +r[k]).filter(Number.isFinite);
+    if (!g || !xs.length) continue;
+    rows++;
+    let x = xs.reduce((s, v) => s + v, 0) / xs.length;
+    if (log) x = Math.pow(2, x) - 1;
+    level.set(g, Math.max(level.get(g) ?? -Infinity, x));
+  }
+  return { level, rows };
+}
+
+function rnaPreview() {
+  if (!RNA.table) return;
+  const { level, rows } = rnaLevels(), thr = Math.max(0, +$("rnaThr").value || 0), n = S.base.model.genes.length;
+  const off = [...level.values()].filter((x) => x < thr).length;
+  const low = level.size < 0.5 * n;
+  $("rnaInfo").innerHTML = t("rna.preview", { rows: RNA.table.body.length, used: rows, matched: level.size, n, pct: Math.round(100 * level.size / n), off, thr })
+    + (low ? `<br><span class="warn">${t("rna.lowMatch")}</span>` : "");
+  $("rnaBuild").disabled = !level.size;
+}
+
+let rnaWorker = null;
+async function buildRnaContext() {
+  const { level } = rnaLevels(), thr = Math.max(0, +$("rnaThr").value || 0);
+  const name = $("rnaName").value.trim() || RNA.file;
+  $("rnaBuild").disabled = true;
+  $("rnaStatus").textContent = t("rna.loading");
+  const tasksText = await fetch("data/tasks/metabolicTasks_Essential.txt").then((r) => r.text());
+  rnaWorker?.terminate();
+  rnaWorker = new Worker(new URL("./core/ctxbuild.worker.js", import.meta.url), { type: "module" });
+  const t0 = performance.now();
+  rnaWorker.onmessage = (ev) => {
+    const m = ev.data;
+    if (m.type === "progress") { // shown in the dialog and in the status bar, so the dialog can be closed meanwhile
+      const msg = () => `${esc(name)}: ${t("rna.progress", { i: m.i + 1, n: m.n, s: Math.round((performance.now() - t0) / 1000) })}`;
+      $("rnaStatus").textContent = msg(); setStatus(msg, false, "busy"); setProgress(m.i / m.n);
+      return;
+    }
+    rnaWorker.terminate(); rnaWorker = null; setProgress(null);
+    if (m.type === "error") { $("rnaStatus").innerHTML = `<span class="err">${esc(m.message)}</span>`; $("rnaBuild").disabled = false; setStatus(() => t("status.error", { msg: m.message }), true); return; }
+    const genes = S.base.model.genes, gi = new Map(genes.map((g, i) => [g[1], i]));
+    const b = new Uint8Array(Math.ceil(genes.length / 8));
+    for (const g of m.off) { const i = gi.get(g); if (i !== undefined) b[i >> 3] |= 1 << (i & 7); }
+    let bin = ""; for (const x of b) bin += String.fromCharCode(x);
+    const c = { id: "user:" + Date.now().toString(36), name, group: "user", src: "user",
+      info: { file: RNA.file, column: $("rnaValCol").selectedOptions[0]?.text || "", matched: level.size, thr, log: $("rnaLog").checked, created: new Date().toISOString() },
+      off: btoa(bin), nOff0: m.nOff0, rescued: m.rescued.map(([g, task]) => [gi.get(g), task]).filter(([i]) => i !== undefined), nBlocked: m.nBlocked, failed: m.failed, pairs: [] };
+    addUserContext(c);
+    $("rnaDialog").close();
+    setContext(c.id, S.context.mode);
+  };
+  rnaWorker.postMessage({ model: S.base.model, levels: [...level], thr, tasksText });
+}
+
+/** From the catalogue's comparator: B is simulated and saved as the reference scenario, then A becomes current. */
+async function compareContexts(a, b) {
+  const D = S.ctxData;
+  if (!D.byId.has(a) || !D.byId.has(b)) { run(); return; }
+  setContext(b, S.context.mode, false); renderContext();
+  await run();
+  const scB = compare.save(D.byId.get(b).name);
+  setContext(a, S.context.mode, false); renderContext();
+  await run();
+  if (scB) compare.setCompare(scB.id);
+  renderDetails();
+}
 
 /** The context as written to the exports. */
 function contextExport() {
@@ -1459,7 +1831,7 @@ function changedHtml(f) {
   // against a scenario the arrows read "scenario → shown"; against the perturbation reference, "reference → perturbed"
   const unit = f.ref.scen ? `${t("cmp.metTitle", { name: esc(f.ref.scen.name), cur: esc(compare.shownName()) })} · ${n}` : t("sum.changedUnit", { n });
   return `<h4>${t("sum.changed")}${small(unit)}</h4>` +
-    bars(rows.slice(0, 12).map(([name, d, j]) => [name, `${fmtFlux(f.ref.v[j])} → ${fmtFlux(f.v[j])}`, `rxn:${j}`, d / mx]), "linear-gradient(90deg,#5a96ff,#ff9f5a)", true);
+    bars(rows.slice(0, 12).map(([name, d, j]) => [name, `${fmtFlux(f.ref.v[j])} → ${fmtFlux(f.v[j])}`, `rxn:${j}`, d / mx]), `linear-gradient(90deg,${deltaColor(-1)},${deltaColor(1)})`, true);
 }
 
 /** Flux variability of the selected reaction, on demand (two LPs with the objective held at its optimum). */
@@ -1467,17 +1839,19 @@ async function fluxRange(j) {
   const box = $("fvaOut");
   if (!box) return;
   if (S.mode !== "steady") { box.innerHTML = `<div class="note">${t("rxn.fvaSteady")}</div>`; return; }
-  box.innerHTML = `<p class="meta">${t("rxn.fvaBusy")}</p>`;
+  box.innerHTML = `<p class="meta">${t("rxn.fvaBusy")}</p>`; setProgress(true);
   const cfg = { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
     context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
   try {
-    const r = await S.sim.fluxRange(cfg, S.supplies, j, frame()?.ref?.v);
+    const r = await S.sim.fluxRange(cfg, S.supplies, j, frame()?.ref?.v, S.flexCycles === false ? null : 0.05).finally(() => setProgress(null));
     if (!$("fvaOut") || S.sel?.rxn !== j) return;
     if (!r.range) { $("fvaOut").innerHTML = `<div class="note">${t("sum.nosol", { why: esc(statusWhy(r.status)) })}</div>`; return; }
     const [lo, hi] = r.range, fixed = Math.abs(hi - lo) <= 1e-6 * Math.max(1, Math.abs(hi), Math.abs(lo));
     const fmt = (x) => (Number.isFinite(x) ? fmtFlux(x) : x > 0 ? "∞" : "−∞");
     const kind = fixed ? (Math.abs(lo) < 1e-9 ? "rxn.fvaZero" : "rxn.fvaFixed") : lo > 1e-9 || hi < -1e-9 ? "rxn.fvaRequired" : "rxn.fvaFree";
-    $("fvaOut").innerHTML = `<div class="note"><b>${t("rxn.fvaRange", { lo: fmt(lo), hi: fmt(hi) })}</b><br>${t(kind)}${Math.max(Math.abs(lo), Math.abs(hi)) >= 999 ? " " + t("rxn.fvaLoop") : ""}${r.relaxed ? " " + t("sum.relaxed") : ""}</div>`;
+    const flexible = !fixed && Math.max(Math.abs(lo), Math.abs(hi)) < 999;
+    $("fvaOut").innerHTML = `${flexible ? `<button class="link" id="fvaAltBtn">${t("flex.altButton")}</button><div id="fvaAlt"></div>` : ""}<div class="note"><b>${t("rxn.fvaRange", { lo: fmt(lo), hi: fmt(hi) })}</b><br>${t(kind)}${Math.max(Math.abs(lo), Math.abs(hi)) >= 999 ? " " + t("rxn.fvaLoop") : ""}${r.relaxed ? " " + t("sum.relaxed") : ""}</div>`;
+    $("fvaAltBtn")?.addEventListener("click", () => fvaAlternatives(j));
   } catch (err) { $("fvaOut").innerHTML = `<div class="note err">${esc(err.message)}</div>`; }
 }
 
@@ -1514,10 +1888,11 @@ async function geneScreen() {
   try {
     res = await S.sim.screenKnockouts(cfg, S.supplies, list.map((g) => g.rxns), (done, total) => {
       out.innerHTML = `<p class="meta">${t("scr.progress", { done, total, genes: list.reduce((s, g) => s + g.genes.length, 0) })}</p>`;
+      setProgress(done / total);
       return !S.screening.stop;
     });
   } catch (err) { out.innerHTML = `<div class="note err">${esc(err.message)}</div>`; }
-  S.screening = null; $("geneScreen").textContent = t("scr.button");
+  S.screening = null; $("geneScreen").textContent = t("scr.button"); setProgress(null);
   if (!res) return;
   const rows = [];
   res.forEach((r, i) => { for (const g of list[i].genes) rows.push({ g, x: r.objective / ref, relaxed: r.relaxed, status: r.status, rxns: list[i].rxns }); });
@@ -1539,26 +1914,215 @@ async function geneScreen() {
   out.querySelectorAll("[data-gene]").forEach((b) => { b.onclick = () => { S.sel = { type: "gene", sym: b.dataset.gene }; renderDetails(); }; });
 }
 
+/**
+ * Phase plane of one medium metabolite: the objective as its maximum uptake goes from 0 to about three times the
+ * current one, with the stretches where the same bound limits the objective (its "regimes").
+ */
+async function phasePlane(m) {
+  const out = $("ppOut"), f = frame();
+  if (!out) return;
+  if (S.mode !== "steady" || !f || f.status !== "optimal") { out.innerHTML = `<div class="note">${t("scr.needSteady")}</div>`; return; }
+  const it = S.supplies.find((x) => x.met === m), e = S.sim.exchanges.get(m);
+  const cap = it.unlimited ? Infinity : uptakeCapacity(it.conc, it.vmax, it.km), now = Math.max(0, f.v[e.rxn] * e.dir);
+  const xmax = Math.min(cap, Math.max(3 * now, 0.05)), N = 24, xs = Array.from({ length: N + 1 }, (_, i) => (xmax * i) / N);
+  const cfg = { ...S.cfg, measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+    context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
+  out.innerHTML = `<p class="meta">${t("pp.busy")}</p>`;
+  const seq = (S.ppSeq = (S.ppSeq || 0) + 1), sel = S.sel; // stop if the details panel moves on
+  const pts = await S.sim.phasePlane(cfg, S.supplies, m, xs, (i, n) => { if ($("ppOut")) $("ppOut").innerHTML = `<p class="meta">${t("pp.progress", { i, n })}</p>`; setProgress(i / n); return S.sel === sel && S.ppSeq === seq; });
+  setProgress(null);
+  if (!$("ppOut") || S.sel !== sel || S.ppSeq !== seq) return;
+  // regimes, from the curve itself: where it rises, the metabolite varied is what limits (its marginal value is the
+  // slope); where it is flat, the bound that limits the objective there (most frequent over the stretch, since a
+  // degenerate LP can name a different bound at each point)
+  const name = S.model.bases[S.model.mets[m].b].n, ytop = Math.max(1e-12, ...pts.map((p) => p.objective));
+  const segs = [];
+  for (let i = 1; i < pts.length; i++) {
+    const a0 = pts[i - 1], a1 = pts[i];
+    let l;
+    if (a0.status !== "optimal" || a1.status !== "optimal") l = t(S.measured.items.length ? "pp.infeasibleMeas" : "pp.infeasible");
+    else {
+      const slope = (a1.objective - a0.objective) / (a1.x - a0.x);
+      l = slope > 1e-4 * ytop / (xmax || 1) ? t("pp.self", { n: name }) : a1.limit ? limitLabel(a1.limit, a1) : t("pp.none");
+    }
+    segs.push({ l, x0: a0.x, x1: a1.x, rise: l === t("pp.self", { n: name }) ? (a1.objective - a0.objective) / (a1.x - a0.x) : 0 });
+  }
+  const reg = [];
+  for (const g of segs) { const last = reg.at(-1); if (last && last.l === g.l) { last.x1 = g.x1; last.rise.push(g.rise); } else reg.push({ l: g.l, x0: g.x0, x1: g.x1, rise: [g.rise] }); }
+  for (const r of reg) if (r.l === t("pp.self", { n: name })) r.l += t("pp.slope", { x: fmtFlux(r.rise.reduce((s, x) => s + x, 0) / r.rise.length) });
+  const W = 300, H = 150, P = { l: 40, r: 8, t: 8, b: 26 }, ymax = ytop * 1.05;
+  const X = (x) => P.l + ((W - P.l - P.r) * x) / (xmax || 1), Y = (y) => H - P.b - ((H - P.t - P.b) * y) / ymax;
+  let path = "", pen = false; // gaps where there is no solution
+  for (const p of pts) { if (p.status !== "optimal") { pen = false; continue; } path += `${pen ? "L" : "M"}${X(p.x).toFixed(1)},${Y(p.objective).toFixed(1)}`; pen = true; }
+  const shades = reg.map((r, i) => `<rect x="${X(r.x0)}" y="${P.t}" width="${Math.max(1, X(r.x1) - X(r.x0))}" height="${H - P.t - P.b}" fill="var(--panel2)" opacity="${i % 2 ? 0.9 : 0}"><title>${esc(r.l)}</title></rect>`).join("");
+  const unit = S.model.rxns[S.cfg.objective].obj || S.model.rxns[S.cfg.objective].id === "MAR13082" ? "h⁻¹" : "mmol/gDW/h";
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(t("pp.button"))}" style="font-size:10px">
+    ${shades}<line x1="${P.l}" y1="${H - P.b}" x2="${W - P.r}" y2="${H - P.b}" stroke="var(--line)"/><line x1="${P.l}" y1="${P.t}" x2="${P.l}" y2="${H - P.b}" stroke="var(--line)"/>
+    <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    ${now > 0 && now <= xmax ? `<line x1="${X(now)}" y1="${P.t}" x2="${X(now)}" y2="${H - P.b}" stroke="var(--hot)" stroke-dasharray="3 3"><title>${esc(t("pp.now"))}</title></line>` : ""}
+    <text x="${P.l - 4}" y="${P.t + 8}" text-anchor="end" fill="var(--muted)">${fmtFlux(ymax / 1.05)}</text><text x="${P.l - 4}" y="${H - P.b}" text-anchor="end" fill="var(--muted)">0</text>
+    <text x="${P.l}" y="${H - 8}" fill="var(--muted)">0</text><text x="${W - P.r}" y="${H - 8}" text-anchor="end" fill="var(--muted)">${fmtFlux(xmax)}</text>
+    <text x="${(P.l + W - P.r) / 2}" y="${H - 2}" text-anchor="middle" fill="var(--muted)">${esc(t("pp.xAxis", { n: S.model.bases[S.model.mets[m].b].n }))}</text></svg>`;
+  out.innerHTML = `<h4>${t("pp.head")}${small(t("pp.yAxis", { u: unit }))}</h4>${svg}<div class="pp-reg">${reg.map((r) => `<div><b>${fmtFlux(r.x0)}–${fmtFlux(r.x1)}</b>: ${esc(r.l)}</div>`).join("")}</div><p class="meta">${t("pp.note")}</p>`;
+}
+
+/**
+ * Inside a pathway, with a cofactor chosen in "Lines": per reaction, how much of that cofactor it makes or uses
+ * (|sum of coefficient x flux| over all compartments, so transports cancel out; redox carriers weighted in electron
+ * pairs as in the global map). Reactions without the cofactor get 0 and are drawn as inactive. null otherwise.
+ */
+function cofactorRxnFlux(f, q) {
+  const w = q === "redox" ? REDOX_PAIRS : COFACTOR_Q[q] ? Object.fromEntries(COFACTOR_Q[q].map((n) => [n, 1])) : null;
+  if (!w || !f?.v) return null;
+  const key = q + "|" + S.frameIdx;
+  if (f.qfluxCache?.key === key) return f.qfluxCache.v;
+  const { model } = S, out = new Float64Array(model.rxns.length);
+  model.rxns.forEach((r, j) => {
+    const v = f.v[j];
+    if (!v) return;
+    let net = 0;
+    r.m.forEach((mi, k) => { const x = w[model.bases[model.mets[mi].b].n]; if (x) net += x * r.c[k]; });
+    out[j] = Math.abs(net * v) < 1e-12 ? 0 : Math.abs(net * v);
+  });
+  f.qfluxCache = { key, v: out };
+  return out;
+}
+
+/** Readable name of a limiting bound (from FbaProblem._limits). */
+function limitLabel(L, f) {
+  const { model } = S;
+  if (L.j < 0) { const it = f?.srcItems?.[-1 - L.j]; return t("lim.injection", { n: it ? S.index.metName(it.met) : "?" }); }
+  const ex = [...S.sim.exchanges].find(([, e]) => e.rxn === L.j);
+  let txt;
+  if (ex) {
+    const n = model.bases[model.mets[ex[0]].b].n, upt = L.half * ex[1].dir > 0;
+    txt = t(L.kind === "closed" ? "lim.exClosed" : L.kind === "ub" ? (upt ? "lim.maxUptake" : "lim.maxSecretion") : upt ? "lim.minUptake" : "lim.minSecretion", { n });
+  } else {
+    const n = model.rxns[L.j].n;
+    txt = t(L.kind === "closed" ? "lim.closed" : L.kind === "ub" ? (L.half > 0 ? "lim.maxFwd" : "lim.maxRev") : L.half > 0 ? "lim.minFwd" : "lim.minRev", { n });
+  }
+  if (L.kind === "closed" && S.ctxBlock && (S.ctxBlockSet ??= new Set(S.ctxBlock)).has(L.j)) txt += t("lim.byCtx");
+  else if (S.result?.pert?.has(L.j)) txt += t("lim.byKo");
+  return txt;
+}
+
+/** Metabolites whose free supply would raise the objective most (shadow prices), one per value: the smallest molecule. */
+function metValueHtml(f) {
+  if (!f.metValue) return "";
+  const { model } = S, nAtoms = (fm) => (fm || "").match(/\d+|[A-Z]/g)?.reduce((s, x) => s + (/\d/.test(x) ? +x - 1 : 1), 0) ?? 999;
+  const groups = new Map();
+  model.mets.forEach((m, i) => {
+    const v = f.metValue[i];
+    if (!(v > 1e-9) || m.removed) return;
+    const b = model.bases[m.b];
+    if (!/^([A-Z][a-z]?\d*)+$/.test(b.f || "")) return; // no formula: pools, macromolecules
+    const key = v.toPrecision(4), cur = groups.get(key), size = nAtoms(b.f);
+    if (!cur || size < cur.size || (size === cur.size && m.c === "c")) groups.set(key, { i, v, size, n: (cur?.n || 0) + 1 });
+    else cur.n++;
+  });
+  const top = [...groups.values()].sort((a, b) => b.v - a.v).slice(0, 5);
+  if (!top.length) return "";
+  const mx = top[0].v;
+  return `<h4>${t("sum.metValue")}${small(t("sum.metValueUnit"))}</h4>` + bars(top.map((g) => [S.index.metName(g.i) + (g.n > 1 ? " · " + t("sum.metValueMore", { n: g.n - 1 }) : ""), "+" + fmtFlux(g.v), `met:${g.i}`, g.v / mx]), "linear-gradient(90deg,#5fd38d,#ffbe3c)") + `<p class="meta">${t("sum.metValueNote")}</p>`;
+}
+
+/**
+ * Energy and redox balance: which pathways produce and consume ATP, NADH and NADPH (all compartments summed, so
+ * transports between compartments cancel out).
+ */
+const COFACTORS = { ATP: ["ATP"], NADH: ["NADH"], NADPH: ["NADPH"] };
+function cofactorBalance(f, key) {
+  const { model } = S, names = new Set(COFACTORS[key]);
+  const byPath = new Map(), byRxn = [];
+  let made = 0, used = 0;
+  model.rxns.forEach((r, j) => {
+    const v = f.v[j];
+    if (!v || r.removed) return;
+    let net = 0;
+    r.m.forEach((mi, q) => { if (names.has(model.bases[model.mets[mi].b].n)) net += r.c[q] * v; });
+    if (Math.abs(net) < 1e-9) return;
+    if (net > 0) made += net; else used -= net;
+    const o = byPath.get(r.ss) || { made: 0, used: 0 };
+    if (net > 0) o.made += net; else o.used -= net;
+    byPath.set(r.ss, o);
+    byRxn.push([j, net]);
+  });
+  return { made, used, byPath, byRxn };
+}
+function cofactorHtml(f) {
+  const key = S.cofTab || "ATP", b = cofactorBalance(f, key);
+  if (!b.made && !b.used) return "";
+  const rows = (sel, tot) => [...b.byPath].map(([ss, o]) => [ss, sel(o)]).filter(([, x]) => x > 1e-9).sort((a, c) => c[1] - a[1]).slice(0, 6)
+    .map(([ss, x]) => [S.model.subsystems[ss], `${fmtFlux(x)} · ${Math.round((100 * x) / tot)} %`, `sub:${ss}`, x / tot]);
+  return `<h4>${t("cof.title")}${small(t("cof.unit"))}</h4><div class="tabs cof-tabs">${Object.keys(COFACTORS).map((k) => `<button data-cof="${k}" class="${k === key ? "on" : ""}">${k}</button>`).join("")}</div>
+    <div class="meta">${t("cof.total", { x: fmtFlux(b.made), c: key })}</div>
+    <h5>${t("cof.made")}</h5>${bars(rows((o) => o.made, b.made), "#5fd38d")}<h5>${t("cof.used")}</h5>${bars(rows((o) => o.used, b.used), "#ff9f5a")}`;
+}
+
+/** A few plain sentences about the result, built from the same numbers as the panels below. */
+function plainSummaryHtml(f) {
+  const { model } = S, out = [], obj = model.rxns[S.cfg.objective];
+  const growth = obj.obj || obj.id === "MAR13082";
+  const val = growth ? t("ps.growth", { x: fmtFlux(f.objective) }) : t("ps.objective", { n: esc(obj.n), x: fmtFlux(f.objective) });
+  out.push(f.limits?.length ? val + " " + t("ps.limit", { l: esc(limitLabel(f.limits[0], f)) }) : val);
+  const ex = (name) => { for (const [mi, e] of S.sim.exchanges) if (model.bases[model.mets[mi].b].n === name) return f.v[e.rxn] * e.dir; return 0; };
+  const glc = ex("glucose"), lac = -ex("L-lactate");
+  if (glc > 1e-6 && lac > 1e-6) out.push(t("ps.lactate", { p: Math.min(100, Math.round((100 * lac) / (2 * glc))) }));
+  for (const key of ["ATP", "NADPH"]) {
+    const b = cofactorBalance(f, key);
+    if (!(b.made > 1e-9)) continue;
+    const top = [...b.byPath].filter(([, o]) => o.made > 0).sort((a, c) => c[1].made - a[1].made).slice(0, 2);
+    out.push(t(key === "ATP" ? "ps.atp" : "ps.nadph", { list: top.map(([ss, o]) => `${esc(model.subsystems[ss])} (${Math.round((100 * o.made) / b.made)} %)`).join(t("ps.and")) }));
+  }
+  const prods = [];
+  for (const [mi, e] of S.sim.exchanges) { const x = -f.v[e.rxn] * e.dir; if (x > 1e-6 && !S.index.currency[model.mets[mi].b] && model.bases[model.mets[mi].b].n !== "biomass") prods.push([model.bases[model.mets[mi].b].n, x]); }
+  prods.sort((a, b) => b[1] - a[1]);
+  if (prods.length) out.push(t("ps.secretes", { list: prods.slice(0, 3).map(([n, x]) => `${esc(n)} (${fmtFlux(x)})`).join(", ") }));
+  const ctx = currentContext();
+  if (ctx && S.ctxBlock) out.push(t("ps.context", { ctx: esc(ctx.name), n: S.ctxBlock.length }));
+  if (f.relaxed) out.push(t("ps.relaxed"));
+  return `<div class="plain"><b>${t("ps.title")}</b> ${out.join(" ")}</div>`;
+}
+
+/** The configuration of a steady-state run with everything in the left panel (shared by FVA, scans, design). */
+function runCfg() {
+  return { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+    context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
+}
+const design = createDesign({ S, frame: () => frame(), opsKey: () => opsKey(), runCfg, fmtFlux, setProgress: (x) => setProgress(x),
+  applyDocsLinks: (root) => root.querySelectorAll("a[data-docs]").forEach((a) => { a.href = `docs.html?lang=${docsLang()}#${docsLang()}-${a.dataset.docs}`; }) });
+
+/** The tracer library (data/tracers.json) as a menu in the medium section: one click labels that nutrient. */
+async function renderTracerLib() {
+  const lib = await loadTracers(), sel = $("trLib");
+  sel.textContent = "";
+  sel.add(new Option(t("trl.pick"), ""));
+  const groups = new Map();
+  for (const tr of lib?.tracers || []) { if (!groups.has(tr.use)) groups.set(tr.use, []); groups.get(tr.use).push(tr); }
+  for (const [use, trs] of groups) {
+    const g = document.createElement("optgroup"); g.label = t("trl.use." + use);
+    for (const tr of trs) g.appendChild(new Option(`${tr.name} · ${tr.item}`, tr.id));
+    sel.appendChild(g);
+  }
+}
+async function applyLibraryTracer(id) {
+  const lib = await loadTracers(), tr = lib?.tracers.find((x) => x.id === id);
+  if (!tr) return;
+  const base = S.model.bases.findIndex((b) => b.n === tr.met), lab = base >= 0 ? tracerLabel(tr, S.structures[S.model.bases[base].id]) : null;
+  const met = base >= 0 ? S.index.metsOfBase[base].find((m) => S.sim.exchanges.has(m)) : undefined;
+  if (!lab || met === undefined) { setStatus(() => t("trl.cannot", { n: tr.name }), true); return; }
+  const it = S.supplies.find((x) => x.met === met) || addSupply(met);
+  it.label = lab.label; it.fraction = it.fraction || 1;
+  renderSupplies(); changed();
+  setStatus(() => t("trl.applied", { n: tr.name, item: tr.item }));
+}
+
 /** "What limits the objective": the bounds with the largest reduced cost in the FBA stage (js/core/fba.js). */
 function limitsHtml(f) {
   if (!f.limits || Math.abs(f.objective) < 1e-12) return "";
   const { model } = S, exOf = new Map([...S.sim.exchanges].map(([met, e]) => [e.rxn, { met, dir: e.dir }]));
   const blocked = S.ctxBlock ? (S.ctxBlockSet ??= new Set(S.ctxBlock)) : null, pert = S.result?.pert;
-  const rows = f.limits.slice(0, 6).map((L) => {
-    if (L.j < 0) { const it = f.srcItems?.[-1 - L.j]; return [t("lim.injection", { n: it ? S.index.metName(it.met) : "?" }), L, it ? `met:${it.met}` : ""]; }
-    const ex = exOf.get(L.j);
-    let txt;
-    if (ex) {
-      const n = model.bases[model.mets[ex.met].b].n, upt = L.half * ex.dir > 0;
-      txt = t(L.kind === "closed" ? "lim.exClosed" : L.kind === "ub" ? (upt ? "lim.maxUptake" : "lim.maxSecretion") : upt ? "lim.minUptake" : "lim.minSecretion", { n });
-    } else {
-      const n = model.rxns[L.j].n;
-      txt = t(L.kind === "closed" ? "lim.closed" : L.kind === "ub" ? (L.half > 0 ? "lim.maxFwd" : "lim.maxRev") : L.half > 0 ? "lim.minFwd" : "lim.minRev", { n });
-    }
-    if (L.kind === "closed" && blocked?.has(L.j)) txt += t("lim.byCtx");
-    else if (pert?.has(L.j)) txt += t("lim.byKo");
-    return [txt, L, `rxn:${L.j}`];
-  });
+  const rows = f.limits.slice(0, 6).map((L) => [limitLabel(L, f), L, L.j < 0 ? "" : `rxn:${L.j}`]);
   if (!rows.length) return "";
   const mx = rows[0][1].gain;
   return `<h4>${t("sum.limits")}${small(t("sum.limitsUnit"))}</h4>` + bars(rows.map(([n, L, k]) => [n, "+" + fmtFlux(L.gain), k, L.gain / mx]), "linear-gradient(90deg,#b48cff,#ff5d6c)") + `<p class="meta">${t("sum.limitsNote")}</p>`;
@@ -1578,7 +2142,7 @@ function summaryHtml() {
   }
   let h = `<div class="kind">${t("sum.title")}${S.result.frames.length > 1 ? " · t = " + fmtTime(f.t) : ""}</div><h3>${esc($("modelSelect").selectedOptions[0]?.text || model.meta.id || "")}</h3><div class="meta">${esc(model.meta.name || "")}</div>
     <div class="cards">
-      <div class="card"><div class="lbl">${t(obj.obj || obj.id === "MAR13082" ? "sum.growth" : "sum.objective")}</div><div class="big">${fmtFlux(f.objective)}<small>${obj.obj || obj.id === "MAR13082" ? "h⁻¹" : "mmol/gDW/h"}</small></div>${vs}</div>
+      <div class="card"><div class="lbl">${t(obj.obj || obj.id === "MAR13082" ? "sum.growth" : "sum.objective")}</div><div class="big">${fmtFlux(f.objective)}<small><a class="unitlink" target="_blank" href="docs.html?lang=${docsLang()}#${docsLang()}-units" title="${esc(t(obj.obj || obj.id === "MAR13082" ? "unit.growthTip" : "unit.fluxTip"))}">${obj.obj || obj.id === "MAR13082" ? "h⁻¹" : "mmol/gDW/h"}</a></small></div>${vs}</div>
       <div class="card"><div class="lbl">${t("sum.active")}</div><div class="big">${active}<small>${t("sum.of", { n: model.rxns.length })}</small></div></div>
       ${f.biomass ? `<div class="card"><div class="lbl">${t("sum.biomass")}</div><div class="big">${f.biomass.toFixed(2)}<small>gDW/L</small></div></div>` : ""}
     </div>`;
@@ -1586,6 +2150,7 @@ function summaryHtml() {
     h += `<h4>${t("sum.events")}</h4><div class="evlist">${S.result.evList.map((ev) => `<div class="${f.t > ev.t ? "done" : ""}">${esc(ev.type === "medium" ? t("sum.evMedium", { t: fmtTime(ev.t), name: mediumName(ev.mediumId) }) : t("sum.evAdd", { t: fmtTime(ev.t), c: ev.conc, name: eventName(ev) }))}</div>`).join("")}</div>`;
   }
   if (f.status !== "optimal") return h + `<div class="note">${t("sum.nosol", { why: esc(statusWhy(f.status)) })}</div>`;
+  h += plainSummaryHtml(f);
   if (f.relaxed) h += `<div class="note">${t("sum.relaxed")}</div>`;
   if (Math.abs(f.objective) < 1e-9) h += `<div class="note">${t("sum.zero")}</div>`;
   if (f.ref) h += changedHtml(f);
@@ -1593,7 +2158,7 @@ function summaryHtml() {
   const fate = labelFate(f);
   if (fate) {
     h += `<h4>${t("sum.fate")}${small(t("sum.fateUnit"))}</h4>` +
-      bars(fate.rows.slice(0, 10).map(([n, v, k]) => [n, (100 * v / fate.total).toFixed(1) + " %", k, v / fate.total]), "linear-gradient(90deg,#ffbe3c,#ff2d78)");
+      bars(fate.rows.slice(0, 10).map(([n, v, k]) => [n, (100 * v / fate.total).toFixed(1) + " %", k, v / fate.total]), `linear-gradient(90deg,${enrichColor(0.15)},${enrichColor(1)})`);
     if (fate.rest > fate.total * 0.005) h += `<div class="bar-row"><span class="nm" style="color:var(--muted)">${t("sum.rest")}</span><span class="val">${(100 * fate.rest / fate.total).toFixed(1)} %</span></div>`;
   } else if (!S.supplies.some(isLabelled)) {
     if (!f.ref) h += `<div class="note">${t("sum.noTracer")}</div>`;
@@ -1609,6 +2174,8 @@ function summaryHtml() {
   f.srcItems?.forEach((it, i) => { if (f.sourceFlux[i] > 1e-9) up.push([t("sum.injection", { n: S.index.metName(it.met) }), f.sourceFlux[i], `met:${it.met}`]); });
   const top = (arr, color) => { arr.sort((a, b) => b[1] - a[1]); const mx = arr.length ? arr[0][1] : 1; return bars(arr.slice(0, 8).map(([n, v, k]) => [n, fmtFlux(v), k, v / mx]), color); };
   h += limitsHtml(f);
+  h += metValueHtml(f);
+  h += cofactorHtml(f);
   h += `<h4>${t("sum.uptake")}${small("mmol/gDW/h")}</h4>${top(up, "#5fd38d") || '<p class="meta">—</p>'}`;
   h += `<h4>${t("sum.secretion")}</h4>${top(out, "#4cc9f0") || '<p class="meta">—</p>'}`;
   if (S.result.frames.length > 1) h += `<h4>${t("sum.medium")}${small(t("sum.mediumUnit"))}</h4>${concChart()}`;
@@ -1658,7 +2225,9 @@ function metHtml(m) {
   }
   const D = depths(), d = D.depth[m];
   h += `<div class="meta">${index.currency[met.b] ? t("met.depthCur") : d < 0 ? t("met.depthNone") : d === 0 ? t("met.depth0") : t("met.depth", { d, p: Math.round((100 * d) / Math.max(1, D.max)) })}</div>`;
-  h += `<div class="actions"><button data-act="supply">${t("met.addSupply")}</button><button data-act="label">${t("met.label")}</button></div>`;
+  if (f?.metValue && f.status === "optimal") h += `<div class="meta" title="${esc(t("met.valueTitle"))}">${t("met.value", { x: `<b>${fmtFlux(f.metValue[m])}</b>` })}</div>`;
+  const ppMet = S.supplies.find((it) => S.model.mets[it.met].b === met.b && S.sim.exchanges.has(it.met))?.met; // its medium form
+  h += `<div class="actions"><button data-act="supply">${t("met.addSupply")}</button><button data-act="label">${t("met.label")}</button>${ppMet !== undefined ? `<button data-act="phase" title="${esc(t("pp.title"))}">${t("pp.button")}</button>` : ""}</div><div id="ppOut"></div>`;
   if (S.editMode) h += `<div class="actions edit"><button data-act="newRxnMet">${t("ed.act.newRxnMet")}</button><button data-act="newComp">${t("ed.act.newComp")}</button><button data-act="removeMet" class="danger">${t("ed.act.removeMet")}</button></div>`;
   if (f?.ref?.scen) h += `<div id="detCmp"></div>`;
   const prod = [], cons = [];
@@ -1695,9 +2264,17 @@ function midHtml(f, m) {
   let r = cache.get(m);
   if (r === undefined) cache.set(m, (r = sampler(f).mid(m, 2000, 220)));
   if (!r) return `<p class="meta">${t("mid.none")}</p>`;
-  return `${midBars(r.dist, 0)}
-    <div class="meta" style="margin-top:6px">${t("mid.caption", { n: r.n })}</div>${r.approx > 0.1 ? `<div class="note">${t("mid.approx", { p: Math.round(100 * r.approx) })}</div>` : ""}`;
+  return `${natToggle()}${midBars(midShown(r.dist, m, f), 0)}
+    <div class="meta" style="margin-top:6px">${t(S.natAb ? "mid.captionNat" : "mid.caption", { n: r.n })}</div>${r.approx > 0.1 ? `<div class="note">${t("mid.approx", { p: Math.round(100 * r.approx) })}</div>` : ""}`;
 }
+
+/** The isotopologue distribution as shown: with natural abundance added when the user asks for it. */
+function midShown(dist, m, f) {
+  if (!S.natAb) return dist;
+  const els = f?.elements || S.result?.frames.find((x) => x.elements)?.elements || [];
+  return withNaturalAbundance(dist, S.model.bases[S.model.mets[m].b].f, new Set(els)) || dist;
+}
+const natToggle = () => `<label class="nat-tg" title="${esc(t("mid.natTitle"))}"><input type="checkbox" data-natab${S.natAb ? " checked" : ""}> ${t("mid.natToggle")}</label>`;
 
 /** Time-aware sampler of the finished dynamic run (null while it is still running or without label). */
 function dynSampler() {
@@ -1714,7 +2291,7 @@ function midDynHtml(m) {
   // 2000 molecules also while the animation plays: fewer made 2-3 % isotopologues flicker between frames
   if (r === undefined) cache.set(key, (r = dynSampler().mid(m, 2000, 220, fi)));
   if (!r) return `<p class="meta">${t("mid.none")}</p>`;
-  return `${midBars(r.dist, 0)}
+  return `${natToggle()}${midBars(midShown(r.dist, m, R.frames[fi]), 0)}
     <div class="meta" style="margin-top:6px">${t("mid.dynCaption", { n: r.n, t: fmtTime(R.frames[fi].t) })}</div>${r.approx > 0.1 ? `<div class="note">${t("mid.approx", { p: Math.round(100 * r.approx) })}</div>` : ""}
     <div class="midtime" id="midTime">${R.midTime?.has(m) ? midTimeSvg(R.midTime.get(m)) : `<button data-act="midTime">${t("mid.overTime")}</button>`}</div>`;
 }
@@ -1842,7 +2419,75 @@ function rxnListHtml(kind, title, rxns, ss, canOpen) {
   return `<div class="kind">${esc(kind)}</div><h3>${esc(title)}</h3>
     <div class="meta">${t("sub.meta", { n: rows.length, a: act.length })}${drawable(ss) ? "" : t("sub.listOnly")}</div>
     ${canOpen ? `<div class="actions"><button data-act="open">${t("sub.open")}</button></div>` : ""}
-    <h4>${t("sub.top")}</h4>${bars(act.slice(0, 14).map(([n, v, k]) => [n, fmtFlux(v), k, v / mx]), "#4cc9f0") || `<p class="meta">${t("sub.none")}</p>`}`;
+    <h4>${t("sub.top")}</h4>${bars(act.slice(0, 14).map(([n, v, k]) => [n, fmtFlux(v), k, v / mx]), "#4cc9f0") || `<p class="meta">${t("sub.none")}</p>`}
+    ${ss >= 0 ? flexHtml(ss, rxns) : ""}`;
+}
+
+// ------------------------------------------------------ flux flexibility (FVA per pathway) ----
+/** Class of a flux range: fixed / zero / required (always used, amount varies) / optional / loop (reaches ±1000). */
+function fvaClass(lo, hi) {
+  if (Math.max(Math.abs(lo), Math.abs(hi)) >= 999) return "loop";
+  if (Math.abs(hi - lo) <= 1e-6 * Math.max(1, Math.abs(hi), Math.abs(lo))) return Math.abs(lo) < 1e-9 ? "zero" : "fixed";
+  return lo > 1e-9 || hi < -1e-9 ? "required" : "optional";
+}
+const FVA_ORDER = ["fixed", "required", "optional", "loop", "zero"];
+const flexFor = (ss) => (S.flex && S.flex.result === S.result && S.flex.frameIdx === S.frameIdx && S.flex.ss === ss ? S.flex : null);
+
+function flexHtml(ss, rxns) {
+  const fx = flexFor(ss);
+  const sel = `<select id="flexFrac" title="${esc(t("flex.fracTitle"))}">${[1, 0.99, 0.95].map((x) => `<option value="${x}"${(S.flexFrac || 1) === x ? " selected" : ""}>${Math.round(x * 100)} %</option>`).join("")}</select>`;
+  const cyc = `<label class="fx-cyc" title="${esc(t("flex.cyclesTitle"))}"><input type="checkbox" id="flexCycles"${S.flexCycles === false ? "" : " checked"}> ${t("flex.cycles")}</label>`;
+  let h = `<h4>${t("flex.title")}</h4><div class="row">${sel}${cyc}<button data-flex="${ss}" class="link" title="${esc(t("flex.btnTitle"))}">${t(fx ? "flex.again" : "flex.button")}</button> <a class="link" data-docs="flex" target="_blank">${t("obj.help")}</a></div><div id="flexOut">`;
+  if (fx) {
+    const f = frame(), cnt = {};
+    let tot = 0, fixed = 0;
+    for (const j of rxns) { const c = fx.map.get(j)?.cls; if (!c) continue; cnt[c] = (cnt[c] || 0) + 1; const v = Math.abs(f.v[j]); tot += v; if (c === "fixed") fixed += v; }
+    h += `<div class="meta">${t("flex.summary", { p: tot > 0 ? Math.round((100 * fixed) / tot) : 0, frac: Math.round(fx.frac * 100) })}${fx.cycles ? " " + t("flex.noCycles") : ""}<br>${FVA_ORDER.filter((c) => cnt[c]).map((c) => `<span class="fx-dot fx-${c}"></span>${t("flex.c." + c)}: ${cnt[c]}`).join(" · ")}</div>`;
+    const rows = rxns.filter((j) => fx.map.has(j) && fx.map.get(j).cls !== "zero").sort((a, b) => FVA_ORDER.indexOf(fx.map.get(a).cls) - FVA_ORDER.indexOf(fx.map.get(b).cls) || Math.abs(f.v[b]) - Math.abs(f.v[a]));
+    h += `<div class="scr-list">${rows.map((j) => { const r = fx.map.get(j); return `<div class="fx-row" data-go="rxn:${j}"><span class="fx-dot fx-${r.cls}" title="${esc(t("flex.c." + r.cls))}"></span><span class="nm">${esc(S.model.rxns[j].n)}</span><span class="val">${fmtFlux(r.lo)} … ${fmtFlux(r.hi)}</span></div>`; }).join("")}</div>`;
+  }
+  return h + "</div>";
+}
+
+/** FVA of every reaction of a pathway, in batches, then redraw the map with the classes. */
+async function computeFlex(ss) {
+  const out = $("flexOut"), f = frame();
+  if (!out) return;
+  if (S.mode !== "steady" || !f || f.status !== "optimal") { out.innerHTML = `<div class="note">${t("rxn.fvaSteady")}</div>`; return; }
+  const frac = S.flexFrac || 1, rxns = S.index.rxnsOfSub[ss].filter((j) => !S.model.rxns[j].removed), result = S.result;
+  const cfg = { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+    context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
+  const map = new Map(), t0 = performance.now(), B = 20;
+  for (let i = 0; i < rxns.length; i += B) {
+    if ($("flexOut")) $("flexOut").innerHTML = `<p class="meta">${t("flex.progress", { i, n: rxns.length, s: Math.round((performance.now() - t0) / 1000) })}</p>`;
+    setProgress(i / rxns.length);
+    const part = rxns.slice(i, i + B), r = await S.sim.fluxRanges(cfg, S.supplies, part, f.ref?.v, { frac, cycles: S.flexCycles === false ? null : 0.05 });
+    if (S.result !== result) { setProgress(null); return; } // a new simulation replaced the one being analysed
+    if (!r.ranges) { if ($("flexOut")) $("flexOut").innerHTML = `<div class="note">${t("sum.nosol", { why: esc(statusWhy(r.status)) })}</div>`; setProgress(null); return; }
+    part.forEach((j, k) => { const [lo, hi] = r.ranges[k]; map.set(j, { lo, hi, cls: fvaClass(lo, hi) }); });
+  }
+  S.flex = { ss, frac, map, result, frameIdx: S.frameIdx, cycles: S.flexCycles !== false };
+  setProgress(null);
+  applyFrame(); renderDetails();
+}
+
+/** Reactions that change most between the two ends of a flexible reaction's range: what can stand in for it. */
+async function fvaAlternatives(j) {
+  const box = $("fvaAlt");
+  if (!box) return;
+  box.innerHTML = `<p class="meta">${t("flex.altBusy")}</p>`; setProgress(true);
+  const f = frame(), cfg = { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+    context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
+  const r = await S.sim.fluxRanges(cfg, S.supplies, [j], f.ref?.v, { frac: S.flexFrac || 1, solutions: true, cycles: S.flexCycles === false ? null : 0.05 }).finally(() => setProgress(null));
+  if (!$("fvaAlt") || S.sel?.rxn !== j) return;
+  const [vmin, vmax] = r.solutions?.[0] || [];
+  if (!vmin || !vmax) { $("fvaAlt").innerHTML = `<p class="meta">—</p>`; return; }
+  const diff = [];
+  for (let k = 0; k < vmin.length; k++) if (k !== j && !S.sim.exchangeRxns?.has?.(k)) { const d = vmax[k] - vmin[k]; if (Math.abs(d) > 1e-6) diff.push([k, d]); }
+  diff.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  const dj = vmax[j] - vmin[j], mx = diff.length ? Math.abs(diff[0][1]) : 1;
+  $("fvaAlt").innerHTML = `<h4>${t("flex.altTitle")}${small(t("flex.altUnit"))}</h4>` + bars(diff.slice(0, 8).map(([k, d]) => [S.model.rxns[k].n + " · " + S.model.subsystems[S.model.rxns[k].ss], `${d > 0 ? "+" : ""}${fmtFlux(d)}`, `rxn:${k}`, Math.abs(d) / mx]), "linear-gradient(90deg,#b48cff,#4cc9f0)", true)
+    + `<p class="meta">${t("flex.altNote", { d: fmtFlux(dj) })}</p>`;
 }
 
 const subHtml = (ss) => rxnListHtml(t("sub.kind"), S.model.subsystems[ss], S.index.rxnsOfSub[ss], ss, S.view.ss !== ss);
@@ -1885,6 +2530,7 @@ function renderDetails() {
     if (host && st) renderMolecule(host, st, { enrich: f?.e ? S.sim.tracer.atomsEnrichment({ e: f.e }, m) : null, height: 220 });
     on("supply", () => addSupply(m));
     on("label", () => addSupply(m, true));
+    on("phase", () => { const b = S.model.mets[m].b, mm = S.supplies.find((it) => S.model.mets[it.met].b === b && S.sim.exchanges.has(it.met))?.met; if (mm !== undefined) phasePlane(mm); });
     on("newRxnMet", () => editor.openRxnDialog({ seedMet: m }));
     on("newComp", () => editor.openMetDialog({ base: S.model.mets[m].b }));
     on("removeMet", () => editor.removeMet(m));
@@ -2101,10 +2747,12 @@ function bindResizers() {
 // When the three groups of the top bar do not fit (narrow window, or a language with long words), the
 // right-hand buttons are reduced to their icon (full label kept as tooltip and accessible name), then the
 // brand text is hidden.
-const HEADER_ICONS = { editBtn: "✎", importBtn: "⤒", exportBtn: "⤓" };
+const HEADER_ICONS = { tourBtn: "➜", editBtn: "✎", importBtn: "⤒", exportBtn: "⤓" };
 function fitHeader() {
   const tb = $("topbar");
-  const over = () => [...tb.children].some((c) => c.scrollWidth > c.clientWidth);
+  // a right-aligned row that does not fit spills to the left, where scrollWidth does not see it: add up the widths
+  const need = (c) => { const k = [...c.children].filter((x) => x.offsetParent !== null); return k.reduce((w, x) => w + x.offsetWidth, 0) + (parseFloat(getComputedStyle(c).columnGap) || 0) * Math.max(0, k.length - 1); };
+  const over = () => [...tb.children].some((c) => c.scrollWidth > c.clientWidth || need(c) > c.clientWidth + 1);
   tb.classList.remove("compact1", "compact2", "compact3", "compact4");
   for (const id of Object.keys(HEADER_ICONS)) {
     const b = $(id);
@@ -2132,6 +2780,7 @@ function changeLanguage(lang) {
   if (S.view.kind === "global") map.setScene(globalScene(), true);
   else if (S.view.kind === "sub" && isCascade()) map.setScene(subScene(S.view.ss), true);
   if (S.ctxData) S.ctxIndex = new ContextIndex(S.ctxData, ctxLabels);
+  design.reset(); renderTracerLib();
   renderContext(); renderMediumSel(); renderSupplies(); renderMeasured(); renderPerturb(); renderEvents(); renderObjective(); renderCrumbs(); applyFrame(); renderDetails();
   editor.render(); compare.render(); renderEditBadge();
   if (S.statusFn) setStatus(S.statusFn, S.statusErr, S.statusKind);
@@ -2143,6 +2792,10 @@ function bindUi() {
   attachSearch($("addSupply"), $("addResults"), () => S.search, (it) => addSupply(pickSupplyMet(it.ref)), { filter: (it) => it.type === "met", limit: 80 });
   attachSearch($("addPerturb"), $("perturbResults"), () => S.search, (it) => addPerturb(it.type, it.ref), { filter: (it) => it.type === "gene" || it.type === "rxn", limit: 80 });
   attachSearch($("ctxInput"), $("ctxResults"), () => S.ctxIndex, (it) => setContext(it.ref, S.context.mode), { limit: 120 });
+  $("rnaOpen").onclick = openRnaDialog;
+  $("rnaFile").onchange = (ev) => readRnaFile(ev.target.files[0]);
+  ["rnaIdCol", "rnaValCol", "rnaLog", "rnaThr"].forEach((id) => { $(id).onchange = rnaPreview; });
+  $("rnaBuild").onclick = buildRnaContext;
   $("ctxMode").onchange = (ev) => setContext(S.context.id, ev.target.value);
   $("clearContext").onclick = () => setContext(null, S.context.mode);
   attachSearch($("objInput"), $("objResults"), () => S.search, (it) => { S.cfg.objective = it.ref; renderObjective(); changed(); }, { filter: (it) => it.type === "rxn", limit: 120 });
@@ -2153,9 +2806,31 @@ function bindUi() {
   $("modelSelect").onchange = (ev) => loadModel(ev.target.value);
   $("langSel").onchange = (ev) => changeLanguage(ev.target.value);
   $("runBtn").onclick = run;
+  $("tourBtn").onclick = startTour;
+  $("navBack").onclick = () => navGo(-1); $("navFwd").onclick = () => navGo(1);
+  window.addEventListener("keydown", (ev) => {
+    if (ev.altKey && (ev.key === "ArrowLeft" || ev.key === "ArrowRight")) { ev.preventDefault(); navGo(ev.key === "ArrowLeft" ? -1 : 1); }
+    if (ev.key === "Escape") $("ctxMenu").hidden = true;
+  });
+  document.addEventListener("pointerdown", (ev) => { if (!ev.target.closest("#ctxMenu")) $("ctxMenu").hidden = true; });
+  $("map").addEventListener("wheel", () => { $("ctxMenu").hidden = true; }, { passive: true });
+  $("designBtn").onclick = () => design.open();
+  $("trLib").onchange = (ev) => { applyLibraryTracer(ev.target.value); ev.target.value = ""; };
+  renderTracerLib();
+  $("details").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-cof]"); if (b) { S.cofTab = b.dataset.cof; renderDetails(); }
+    const fx = ev.target.closest("[data-flex]"); if (fx) computeFlex(+fx.dataset.flex);
+  });
+  $("details").addEventListener("change", (ev) => { if (ev.target.matches("[data-natab]")) { S.natAb = ev.target.checked; renderDetails(); return; } if (ev.target.id === "flexFrac") S.flexFrac = +ev.target.value; if (ev.target.id === "flexCycles") S.flexCycles = ev.target.checked; });
   $("autoBtn").onclick = toggleAuto;
   renderAuto();
   $("themeBtn").onclick = () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
+  $("lookBtn").onclick = () => openLookDialog(() => {
+    if (!S.model) return;
+    S.scenes = {}; // the cell backdrop carries its compartment colours
+    if (S.view.kind === "global") map.setScene(globalScene(), true);
+    applyFrame(); renderDetails();
+  });
   $("objPreset").onchange = (ev) => pickObjective(ev.target.value);
   $("saveObjective").onclick = saveObjective;
   $("deleteObjective").onclick = deleteObjective;
@@ -2204,6 +2879,9 @@ function bindUi() {
   $("filterSel").onchange = (ev) => { S.filter = ev.target.value; applyFrame(); if (S.view.kind !== "list") map.fit(true, true); };
   $("optInactive").onchange = (ev) => { map.options.inactive = ev.target.checked; };
   $("optParticles").onchange = (ev) => { map.options.particles = ev.target.checked; };
+  try { S.adaptive = localStorage.getItem("metflux.adaptive") === "1"; } catch { /* ignore */ }
+  $("optAdaptive").checked = !!S.adaptive;
+  $("optAdaptive").onchange = (ev) => { S.adaptive = ev.target.checked; try { localStorage.setItem("metflux.adaptive", S.adaptive ? "1" : "0"); } catch { /* ignore */ } };
   $("fitBtn").onclick = () => map.fit(true, false);
   $("timeSlider").oninput = (ev) => { stopPlay(); S.frameIdx = +ev.target.value; applyFrame(); renderDetails(); };
   $("playBtn").onclick = () => { if (S.playing) stopPlay(); else { if (S.frameIdx >= S.result.frames.length - 1) S.frameIdx = 0; startPlay(); } };

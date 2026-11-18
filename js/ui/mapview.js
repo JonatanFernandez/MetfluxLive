@@ -19,7 +19,7 @@ const THEMES = {
     inactiveEdge: "rgba(125,145,190,0.13)", structEdge: "rgba(125,145,190,0.10)", guide: "rgba(125,145,190,0.25)", guideText: "rgba(147,162,198,0.9)",
     metOn: "#1d3350", metOff: "#141c30", rxnOn: "#e8eefc", rxnTransport: "#9fb4d8", rxnOff: "#2a3552",
     labelOn: "#eef3ff", labelOff: "rgba(170,185,215,0.6)", rxnLabelOn: "#b8c6e6", rxnLabelOff: "rgba(140,155,190,0.5)", groupLabelOff: "rgba(165,180,212,0.62)",
-    hover: "rgba(255,255,255,0.55)", selected: "#ffffff", pulse: [255, 255, 255], gene: "#b48cff", ko: "#ff5d6c", blocked: "#6b768f",
+    hover: "rgba(255,255,255,0.55)", selected: "#ffffff", pulse: [255, 255, 255], gene: "#b48cff", ko: "#ff5d6c", blocked: "#6b768f", flexFix: "#5fd38d", flexOpt: "#ffbe3c",
     groupOff: "#151d33", groupRing: "rgba(235,242,255,0.9)", groupRingOff: "rgba(130,148,190,0.45)", groupListOnly: "rgba(160,175,210,0.45)",
     groupFill: (s) => `rgb(${28 + 30 * s},${60 + 90 * s},${92 + 110 * s})`, unknown: [70, 80, 108],
   },
@@ -28,19 +28,87 @@ const THEMES = {
     inactiveEdge: "rgba(90,105,140,0.18)", structEdge: "rgba(90,105,140,0.13)", guide: "rgba(90,105,140,0.3)", guideText: "rgba(95,108,135,0.95)",
     metOn: "#d3e3f0", metOff: "#eef1f6", rxnOn: "#3a4560", rxnTransport: "#7f8fb2", rxnOff: "#c9d0dd",
     labelOn: "#263046", labelOff: "rgba(90,102,128,0.65)", rxnLabelOn: "#4a5672", rxnLabelOff: "rgba(110,122,148,0.55)", groupLabelOff: "rgba(95,108,135,0.7)",
-    hover: "rgba(40,50,70,0.45)", selected: "#283044", pulse: [40, 60, 90], gene: "#8d68d6", ko: "#d04452", blocked: "#9aa3b4",
+    hover: "rgba(40,50,70,0.45)", selected: "#283044", pulse: [40, 60, 90], gene: "#8d68d6", ko: "#d04452", blocked: "#9aa3b4", flexFix: "#2f8a52", flexOpt: "#b26f0e",
     groupOff: "#e6eaf1", groupRing: "rgba(45,62,92,0.75)", groupRingOff: "rgba(120,134,165,0.45)", groupListOnly: "rgba(120,134,165,0.45)",
     groupFill: (s) => `rgb(${222 - 150 * s},${234 - 100 * s},${244 - 60 * s})`, unknown: [196, 202, 214],
   },
 };
-let TH = THEMES.dark;
+let TH = THEMES.dark, themeName = "dark";
+
+/**
+ * Colour scales the user can choose (Appearance dialog). Every ramp starts and ends at mid lightness, so that both
+ * ends stay visible on the dark and the light background.
+ */
+export const SCALES = {
+  // enrichment, from unlabelled to fully labelled
+  enrich: {
+    default: [[118, 136, 176], [255, 190, 60], [255, 120, 50], [255, 45, 120]], // slate -> amber -> magenta
+    viridis: [[72, 40, 120], [49, 104, 142], [33, 145, 140], [94, 201, 98], [222, 205, 30]],
+    plasma: [[106, 0, 168], [177, 42, 144], [225, 100, 98], [252, 166, 54], [230, 210, 40]],
+    coolwarm: [[118, 136, 176], [80, 160, 230], [235, 140, 80], [210, 40, 50]],
+  },
+  // change against the reference: down / up (the midpoint is always neutral slate)
+  delta: {
+    default: { down: [90, 150, 255], up: [255, 159, 90] }, // blue - orange
+    redblue: { down: [70, 130, 235], up: [230, 75, 70] },
+    greenpurple: { down: [165, 105, 230], up: [60, 180, 105] },
+  },
+  // free energy: uphill colour, and the downhill ramp
+  energy: {
+    default: { up: [176, 120, 255], down: [[124, 138, 170], [255, 196, 70], [255, 80, 60]] },
+    cb: { up: [70, 150, 240], down: [[124, 138, 170], [235, 195, 60], [225, 110, 20]] },
+  },
+  // compartments: a set chosen by search so that every pair stays apart under protanopia and deuteranopia
+  // (OKLab ΔE ≥ 11 on the dark background, ≥ 7.6 on the light one, where the [c]/[m] labels and the legend also name them)
+  comp: {
+    default: null,
+    cvd: {
+      dark: { c: "#ffffff", m: "#e69f00", i: "#e69f00", e: "#009e73", s: "#009e73", r: "#b48cff", x: "#8a5a00", l: "#ffb3d1", g: "#f0e442", n: "#0072b2" },
+      light: { c: "#000000", m: "#8a5a00", i: "#8a5a00", e: "#2f8a52", s: "#2f8a52", r: "#5e3c99", x: "#56b4e9", l: "#cc79a7", g: "#b8a800", n: "#0072b2" },
+    },
+  },
+  // colour of flux lines (null = the theme's own)
+  flux: {
+    default: null,
+    green: { dark: [95, 211, 141], light: [47, 138, 82] },
+    orange: { dark: [255, 159, 90], light: [196, 100, 30] },
+    violet: { dark: [180, 140, 255], light: [118, 80, 196] },
+    grey: { dark: [205, 214, 235], light: [70, 80, 100] },
+  },
+};
+let LOOK = { enrich: "default", delta: "default", energy: "default", comp: "default", flux: "default" };
+let RAMP = SCALES.enrich.default;
+let D_UP = SCALES.delta.default.up, D_DOWN = SCALES.delta.default.down;
+const D_SAME = [124, 138, 170];
+let G_DOWN = SCALES.energy.default.down, G_UP = SCALES.energy.default.up;
+
+function applyLook() {
+  const pick = (k) => SCALES[k][LOOK[k]] ?? SCALES[k].default;
+  RAMP = pick("enrich");
+  ({ up: D_UP, down: D_DOWN } = pick("delta"));
+  ({ up: G_UP, down: G_DOWN } = pick("energy"));
+  const base = THEMES[themeName] || THEMES.dark, fl = pick("flux")?.[themeName === "light" ? "light" : "dark"];
+  if (fl) {
+    const mix = (a, b, k) => a.map((x, i) => Math.round(x + (b[i] - x) * k));
+    const lightT = themeName === "light", off = lightT ? [230, 234, 241] : [21, 29, 51];
+    TH = { ...base, flux: fl, particle: `rgba(${mix(fl, lightT ? [0, 0, 0] : [255, 255, 255], lightT ? 0.3 : 0.55).join(",")},0.85)`,
+      groupFill: (x) => `rgb(${mix(off, fl, 0.3 + 0.7 * x).join(",")})` };
+  } else TH = base;
+  const comp = pick("comp")?.[themeName === "light" ? "light" : "dark"];
+  Object.assign(COMP_COLORS, comp || (themeName === "light" ? COMP_LIGHT : COMP_DARK));
+}
+
 /** Switch the neutral colours of every map (and COMP_COLORS) to "dark" or "light". */
 export function setMapTheme(name) {
-  TH = THEMES[name] || THEMES.dark;
-  Object.assign(COMP_COLORS, name === "light" ? COMP_LIGHT : COMP_DARK);
+  themeName = THEMES[name] ? name : "dark";
+  applyLook();
 }
-// enrichment ramp: unlabelled slate -> amber -> hot magenta
-const RAMP = [[118, 136, 176], [255, 190, 60], [255, 120, 50], [255, 45, 120]];
+
+/** Choose colour scales: { enrich, delta, energy, comp, flux } (names from SCALES; unknown names = default). */
+export function setMapLook(look) {
+  LOOK = { ...LOOK, ...look };
+  applyLook();
+}
 
 export function enrichColor(e, alpha = 1) {
   const t = Math.pow(Math.min(1, Math.max(0, e)), 0.55) * (RAMP.length - 1);
@@ -49,15 +117,13 @@ export function enrichColor(e, alpha = 1) {
   return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
 }
 
-// flux change against the reference: blue (down) - slate (same) - orange (up)
-const D_UP = [255, 159, 90], D_DOWN = [90, 150, 255], D_SAME = [124, 138, 170];
+// flux change against the reference: blue (down) - slate (same) - orange (up) by default
 export function deltaColor(d, alpha = 1) {
   const k = d ? Math.min(1, 0.3 + Math.abs(d) * 1.2) : 0, to = d > 0 ? D_UP : D_DOWN;
   const c = D_SAME.map((x, i) => Math.round(x + (to[i] - x) * k));
   return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
 }
 // free energy: violet (uphill at 1 mM) - slate (near equilibrium) - amber - red (strongly dissipating); NaN = unknown
-const G_DOWN = [[124, 138, 170], [255, 196, 70], [255, 80, 60]], G_UP = [176, 120, 255];
 export function energyColor(g, alpha = 1) {
   if (!Number.isFinite(g)) return `rgba(${TH.unknown[0]},${TH.unknown[1]},${TH.unknown[2]},${alpha})`;
   let c;
@@ -152,7 +218,9 @@ export class MapView {
     if (sc.kind === "sub") {
       const mask = d.mask, ref = d.ref;
       let max = 0;
-      for (const e of sc.edges) { const f = d.v ? d.v[sc.nodes[e.r].ref] * e.coef : 0; e.f = f; if (Math.abs(f) > max) max = Math.abs(f); }
+      // with a cofactor chosen, a reaction's edges carry how much of it the reaction makes or uses (d.qflux)
+      const fl = (e) => { const j = sc.nodes[e.r].ref, x = d.v ? d.v[j] * e.coef : 0; return d.qflux ? Math.sign(x) * d.qflux[j] : x; };
+      for (const e of sc.edges) { const f = fl(e); e.f = f; if (Math.abs(f) > max) max = Math.abs(f); }
       let tmax = 0;
       for (const n of sc.nodes) if (n.type === 0 && d.turnover) tmax = Math.max(tmax, d.turnover[n.ref]);
       for (const n of sc.nodes) {
@@ -162,12 +230,13 @@ export class MapView {
           n.de = this.dlabel ? Math.max(-1, Math.min(1, 3 * (n.e - (d.refE ? d.refE[n.ref] : 0)))) : 0;
           n.hidden = !!mask && !mask.met[n.ref];
         } else {
-          n.flux = d.v ? Math.abs(d.v[n.ref]) : 0; n.s = logScale(n.flux, max); n.dir = d.v ? Math.sign(d.v[n.ref]) : 0;
+          n.flux = d.qflux ? d.qflux[n.ref] : d.v ? Math.abs(d.v[n.ref]) : 0; n.s = logScale(n.flux, max); n.dir = d.v ? Math.sign(d.v[n.ref]) : 0;
           const f0 = ref ? Math.abs(ref[n.ref]) : n.flux;
           n.d = rel(n.flux, f0); n.lost = !n.flux && f0 > 0;
           n.hidden = !!mask && !mask.rxn[n.ref];
           n.pert = d.perturb ? d.perturb.get(n.ref) : undefined;
           n.blk = !!(d.blocked && d.blocked.has(n.ref)); // no detected enzyme in the chosen cell type
+          n.fx = d.flex ? d.flex.get(n.ref)?.cls : undefined; // flux variability class (FVA of the pathway)
         }
       }
       if (d.dG) { // reactions coloured by dG'm in the direction they run: -40 kJ/mol and below is full red
@@ -264,6 +333,17 @@ export class MapView {
       if (h >= 0) this.hooks.onOpen?.(this.scene.nodes[h]); else this.fit();
     });
     c.addEventListener("pointerleave", () => { this.hover = -1; this.hooks.onHover?.(null); });
+    // right click on a node: context menu (the app decides what is in it)
+    c.addEventListener("contextmenu", (ev) => {
+      const r = c.getBoundingClientRect();
+      const h = this._hit(ev.clientX - r.left, ev.clientY - r.top);
+      if (h < 0 || !this.hooks.onContext) return;
+      ev.preventDefault();
+      this.selected = h;
+      this.hooks.onContext(this.scene.nodes[h], ev.clientX, ev.clientY);
+    });
+    // mouse back / forward buttons
+    c.addEventListener("mouseup", (ev) => { if (ev.button === 3 || ev.button === 4) { ev.preventDefault(); this.hooks.onNav?.(ev.button === 3 ? -1 : 1); } });
   }
 
   toWorld(px, py) { return { x: this.cam.x + (px - this.w / 2) / (UNIT * this.cam.z), y: this.cam.y + (py - this.h / 2) / (UNIT * this.cam.z) }; }
@@ -381,12 +461,18 @@ export class MapView {
     if (sel >= 0) { near.add(sel); for (const e of sc.edges) { if (e.r === sel) near.add(e.m); if (e.m === sel) near.add(e.r); } }
     const dim = (i) => (sel >= 0 && !near.has(i) ? 0.28 : 1);
     const onScreen = (i) => sx[i] > -60 && sx[i] < this.w + 60 && sy[i] > -60 && sy[i] < this.h + 60;
+    // an edge is drawn when the box around its two ends (plus the curve's bulge) meets the view: with both ends off
+    // screen a long edge can still cross it when zoomed into a pathway
+    const segOn = (i, k) => {
+      const m = 80 + 0.12 * Math.max(Math.abs(sx[i] - sx[k]), Math.abs(sy[i] - sy[k]));
+      return Math.max(sx[i], sx[k]) > -m && Math.min(sx[i], sx[k]) < this.w + m && Math.max(sy[i], sy[k]) > -m && Math.min(sy[i], sy[k]) < this.h + m;
+    };
 
     // inactive edges
     if (this.options.inactive) {
       ctx.beginPath();
       for (const e of sc.edges) {
-        if (e.s > 0 || e.hidden || (!onScreen(e.r) && !onScreen(e.m))) continue;
+        if (e.s > 0 || e.hidden || !segOn(e.r, e.m)) continue;
         ctx.moveTo(sx[e.r], sy[e.r]); ctx.lineTo(sx[e.m], sy[e.m]);
       }
       ctx.strokeStyle = TH.inactiveEdge; ctx.lineWidth = 1; ctx.stroke();
@@ -395,7 +481,7 @@ export class MapView {
     {
       ctx.beginPath(); let any = false;
       for (const e of sc.edges) {
-        if (!sc.nodes[e.r]?.blk || e.hidden || (!onScreen(e.r) && !onScreen(e.m))) continue;
+        if (!sc.nodes[e.r]?.blk || e.hidden || !segOn(e.r, e.m)) continue;
         ctx.moveTo(sx[e.r], sy[e.r]); ctx.lineTo(sx[e.m], sy[e.m]); any = true;
       }
       if (any) { ctx.setLineDash([4, 4]); ctx.strokeStyle = TH.blocked; ctx.lineWidth = 1.3; ctx.stroke(); ctx.setLineDash([]); }
@@ -404,7 +490,7 @@ export class MapView {
     if (this.mode === "delta") {
       ctx.beginPath();
       for (const e of sc.edges) {
-        if (e.s > 0 || !e.lost || e.hidden || (!onScreen(e.r) && !onScreen(e.m))) continue;
+        if (e.s > 0 || !e.lost || e.hidden || !segOn(e.r, e.m)) continue;
         ctx.moveTo(sx[e.r], sy[e.r]); ctx.lineTo(sx[e.m], sy[e.m]);
       }
       ctx.setLineDash([5, 4]); ctx.strokeStyle = this._dc(-1, 0.75); ctx.lineWidth = 1.6; ctx.stroke(); ctx.setLineDash([]);
@@ -413,7 +499,7 @@ export class MapView {
     const parts = [];
     const wk = Math.min(1.8, Math.max(0.5, Math.sqrt(z)));
     for (const e of sc.edges) {
-      if (!e.s || e.hidden || (!onScreen(e.r) && !onScreen(e.m))) continue;
+      if (!e.s || e.hidden || !segOn(e.r, e.m)) continue;
       const a = e.out ? e.r : e.m, b = e.out ? e.m : e.r;
       const d = sel >= 0 && !(e.r === sel || e.m === sel) ? 0.22 : 1;
       const [cx, cy] = this._curve(sx[a], sy[a], sx[b], sy[b], 0.1);
@@ -450,6 +536,17 @@ export class MapView {
         ctx.fillStyle = this.mode === "delta" ? this._dc(n.lost ? -1 : n.d, n.s ? 1 : 0.7) : n.s ? (n.transport ? TH.rxnTransport : TH.rxnOn) : TH.rxnOff;
         if (n.blk && !n.s) ctx.fillStyle = TH.blocked;
         ctx.fillRect(-r, -r, 2 * r, 2 * r); ctx.restore();
+        if (n.ghost) { // a reaction of another pathway shown around the selected metabolite
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 5, 0, 6.283);
+          ctx.strokeStyle = TH.gene; ctx.lineWidth = 1.6; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
+        }
+        if (n.fx && n.fx !== "zero") { // flux flexibility: solid = determined, dotted = optional, red dotted = loop
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 6, 0, 6.283);
+          ctx.strokeStyle = n.fx === "loop" ? TH.ko : n.fx === "optional" ? TH.flexOpt : TH.flexFix;
+          ctx.lineWidth = n.fx === "fixed" ? 2.4 : 1.6;
+          if (n.fx === "optional" || n.fx === "loop") ctx.setLineDash([2, 3]);
+          ctx.stroke(); ctx.setLineDash([]);
+        }
         if (n.blk) { // not detected in the cell type: grey dashed ring
           ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 3, 0, 6.283);
           ctx.strokeStyle = TH.blocked; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]);
@@ -477,7 +574,7 @@ export class MapView {
     const want = (i) => {
       const n = ns[i];
       if (!onScreen(i) || !this._vis(n)) return false;
-      if (near.has(i)) return true;
+      if (near.has(i) || n.ghost) return true;
       if (n.type === 0) return z > 0.75 || (n.s > 0 && drawn < 28);
       return z > 1.7;
     };
@@ -489,6 +586,7 @@ export class MapView {
       if (this._label(ctx, n.label, sx[i], sy[i] + r + size * 0.75, size, col, boxes)) drawn++;
     };
     for (const i of near) if (this._vis(ns[i])) drawLabel(i);
+    ns.forEach((n, i) => { if (n.ghost && !near.has(i) && this._vis(n) && onScreen(i)) drawLabel(i); });
     for (const i of order) { if (drawn >= maxLabels) break; if (!near.has(i) && want(i)) drawLabel(i); }
   }
 

@@ -76,9 +76,9 @@ export class Simulator {
    * Flux range of reaction j (FVA): [min, max] with the objective at its optimum, under the same medium, measured
    * fluxes, cell type and (given the reference fluxes) perturbations as a steady-state run.
    */
-  async fluxRange(cfg, supplies, j, refV) {
+  async fluxRange(cfg, supplies, j, refV, cycles = null) {
     const caps = cfg.perturb?.length && refV ? this._caps(cfg.perturb, refV) : null;
-    const res = await this._solve({ ...cfg, fva: j }, supplies, null, null, caps);
+    const res = await this._solve({ ...cfg, fva: j, fvaCycles: cycles }, supplies, null, null, caps);
     return res.status === "optimal" ? { range: res.range, relaxed: !!res.relaxed } : { status: res.status };
   }
 
@@ -97,6 +97,46 @@ export class Simulator {
       if (onProgress && onProgress(i + 1, groups.length) === false) break;
     }
     return out;
+  }
+
+  /**
+   * Phase plane: the objective as the maximum uptake of one medium metabolite goes through xs (FBA only, no pFBA),
+   * with the same medium, measured fluxes (except that metabolite's) and cell type; perturbations are left out.
+   * @returns [{ x, objective, status, relaxed, limit }] (limit: the bound that limits the objective most there)
+   */
+  async phasePlane(cfg, supplies, met, xs, onProgress) {
+    const base = { ...cfg, parsimonious: false, perturb: [], noRelax: true, measured: cfg.measured ? { ...cfg.measured, items: cfg.measured.items.filter((x) => x.met !== met) } : undefined };
+    const out = [];
+    for (let i = 0; i < xs.length; i++) {
+      const r = await this._solve(base, supplies, null, new Map([[met, xs[i]]]), null);
+      out.push({ x: xs[i], objective: r.status === "optimal" ? r.objective : 0, status: r.status, relaxed: !!r.relaxed, limit: r.status === "optimal" ? r.limits?.[0] : null, srcItems: r.srcItems });
+      if (onProgress && onProgress(i + 1, xs.length) === false) break;
+    }
+    return out;
+  }
+
+  /**
+   * FVA of several reactions in one go (one FBA, then two LPs per reaction), optionally at a fraction of the optimum
+   * and with the flux vectors at both ends (to see what replaces a flexible reaction).
+   */
+  async fluxRanges(cfg, supplies, rxns, refV, { frac = 1, solutions = false, cycles = null } = {}) {
+    const caps = cfg.perturb?.length && refV ? this._caps(cfg.perturb, refV) : null;
+    const res = await this._solve({ ...cfg, fva: Array.from(rxns), fvaFrac: frac, fvaSolutions: solutions, fvaCycles: cycles }, supplies, null, null, caps);
+    return res.status === "optimal" ? { ranges: res.ranges, solutions: res.solutions, relaxed: !!res.relaxed } : { status: res.status };
+  }
+
+  /**
+   * Label propagation on a given flux vector (isotopic steady state), for the tracer-experiment designer.
+   * @param src    { sourceFlux, srcItems } of the run the fluxes come from (injections), or null
+   * @param labels Map met -> per-atom labelled fraction of what enters (label x fraction)
+   * @returns { e, inputs } as in a steady-state frame
+   */
+  traceFlux(v, src, labels) {
+    const inputs = [];
+    for (const [met, e] of this.exchanges) { const up = v[e.rxn] * e.dir; if (up > 1e-9) inputs.push({ met, flux: up, label: labels.get(met) || null }); }
+    src?.srcItems?.forEach((it, i) => { if (src.sourceFlux[i] > 1e-9) inputs.push({ met: it.met, flux: src.sourceFlux[i], label: labels.get(it.met) || null }); });
+    const prog = this.tracer.compile(v, inputs), sol = this.tracer.advance(prog, null, Infinity);
+    return { e: Float32Array.from(sol.e.subarray(0, this.tracer.nAtoms)), inputs };
   }
 
   /** The unperturbed reference is reused while medium and objective stay the same. */
@@ -146,11 +186,11 @@ export class Simulator {
     let res = await this._call({
       type: "solve",
       params: { lb, ub, objective: cfg.objective, maximize: cfg.maximize, parsimonious: cfg.parsimonious, sources,
-        penalty: ctx && ctx.mode === "penalty" ? { rxns: ctx.block, w: CONTEXT_PENALTY } : undefined, fva: cfg.fva },
+        penalty: ctx && ctx.mode === "penalty" ? { rxns: ctx.block, w: CONTEXT_PENALTY } : undefined, fva: cfg.fva, fvaFrac: cfg.fvaFrac, fvaSolutions: cfg.fvaSolutions, fvaCycles: cfg.fvaCycles },
     });
     // the measured fluxes belong to cells in a rich medium: when they cannot be met (a nutrient removed or
     // exhausted, a perturbation…) they are relaxed instead of leaving the user without a solution
-    if (measured && res.status !== "optimal" && !cfg.relaxed) {
+    if (measured && res.status !== "optimal" && !cfg.relaxed && !cfg.noRelax) {
       res = await this._solve({ ...cfg, relaxed: true }, supplies, concOverride, capLimit, pertCaps);
       res.relaxed = true;
       return res;
@@ -223,7 +263,7 @@ export class Simulator {
   }
 
   _frame(t, res, inputs, prog, sol, elements, extra = {}) {
-    const frame = { t, v: res.v, status: res.status, objective: res.objective, inputs, sourceFlux: res.sourceFlux, srcItems: res.srcItems, elements, relaxed: !!res.relaxed, limits: res.limits, ...extra };
+    const frame = { t, v: res.v, status: res.status, objective: res.objective, inputs, sourceFlux: res.sourceFlux, srcItems: res.srcItems, elements, relaxed: !!res.relaxed, limits: res.limits, metValue: res.metValue, ...extra };
     if (sol) {
       const sum = this.tracer.summarize(prog, sol, elements);
       frame.e = Float32Array.from(sol.e.subarray(0, this.tracer.nAtoms));

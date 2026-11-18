@@ -1,0 +1,516 @@
+{
+ "note": "Labelled tracers sold by Cambridge Isotope Laboratories, item numbers from its catalogue 'Stable Isotope-Labeled Products for Metabolic Research' (2019), checked 2026-11-18. Per-tracer references are studies that used the tracer for that purpose; 'general' are reviews of tracer use. Positions follow IUPAC carbon numbering.",
+ "vendor": {
+  "name": "Cambridge Isotope Laboratories",
+  "url": "https://www.isotope.com"
+ },
+ "refs": {
+  "metallo2009": "Metallo CM, Walther JL, Stephanopoulos G. Evaluation of 13C isotopic tracers for metabolic flux analysis in mammalian cells. J. Biotechnol. 2009; 144:167–174. doi:10.1016/j.jbiotec.2009.07.010",
+  "lee1998": "Lee WNP, Boros LG, Puigjaner J, et al. Mass isotopomer study of the nonoxidative pathways of the pentose cycle with [1,2-13C2]glucose. Am. J. Physiol. 1998; 274:E843–E851. doi:10.1152/ajpendo.1998.274.5.E843",
+  "metallo2012": "Metallo CM, Gameiro PA, Bell EL, et al. Reductive glutamine metabolism by IDH1 mediates lipogenesis under hypoxia. Nature 2012; 481:380–384. doi:10.1038/nature10602",
+  "mullen2012": "Mullen AR, Wheaton WW, Jin ES, et al. Reductive carboxylation supports growth in tumour cells with defective mitochondria. Nature 2012; 481:385–388. doi:10.1038/nature10642",
+  "hui2017": "Hui S, Ghergurovich JM, Morscher RJ, et al. Glucose feeds the TCA cycle via circulating lactate. Nature 2017; 551:115–118. doi:10.1038/nature24057",
+  "faubert2017": "Faubert B, Li KY, Cai L, et al. Lactate metabolism in human lung tumors. Cell 2017; 171:358–371. doi:10.1016/j.cell.2017.09.019",
+  "labuschagne2014": "Labuschagne CF, van den Broek NJ, Mackay GM, et al. Serine, but not glycine, supports one-carbon metabolism and proliferation of cancer cells. Cell Rep. 2014; 7:1248–1258. doi:10.1016/j.celrep.2014.04.045",
+  "comerford2014": "Comerford SA, Huang Z, Du X, et al. Acetate dependence of tumors. Cell 2014; 159:1591–1602. doi:10.1016/j.cell.2014.11.020",
+  "jang2018": "Jang C, Chen L, Rabinowitz JD. Metabolomics and isotope tracing. Cell 2018; 173:822–837. doi:10.1016/j.cell.2018.03.055",
+  "buescher2015": "Buescher JM, Antoniewicz MR, Boros LG, et al. A roadmap for interpreting 13C metabolite labeling patterns from cells. Curr. Opin. Biotechnol. 2015; 34:189–201. doi:10.1016/j.copbio.2015.02.003"
+ },
+ "tracers": [
+  {
+   "id": "glc_u",
+   "met": "glucose",
+   "name": "[U-13C6]glucose",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-1396",
+   "use": "glycolysis",
+   "refs": [
+    "metallo2009"
+   ]
+  },
+  {
+   "id": "glc_12",
+   "met": "glucose",
+   "name": "[1,2-13C2]glucose",
+   "label": {
+    "C": [
+     "C1",
+     "C2"
+    ]
+   },
+   "item": "CLM-504",
+   "use": "ppp",
+   "refs": [
+    "lee1998",
+    "metallo2009"
+   ]
+  },
+  {
+   "id": "glc_1",
+   "met": "glucose",
+   "name": "[1-13C]glucose",
+   "label": {
+    "C": [
+     "C1"
+    ]
+   },
+   "item": "CLM-420",
+   "use": "ppp",
+   "refs": [
+    "metallo2009"
+   ]
+  },
+  {
+   "id": "glc_6",
+   "met": "glucose",
+   "name": "[6-13C]glucose",
+   "label": {
+    "C": [
+     "C6"
+    ]
+   },
+   "item": "CLM-481",
+   "use": "ppp",
+   "refs": []
+  },
+  {
+   "id": "glc_2",
+   "met": "glucose",
+   "name": "[2-13C]glucose",
+   "label": {
+    "C": [
+     "C2"
+    ]
+   },
+   "item": "CLM-746",
+   "use": "ppp",
+   "refs": []
+  },
+  {
+   "id": "glc_34",
+   "met": "glucose",
+   "name": "[3,4-13C2]glucose",
+   "label": {
+    "C": [
+     "C3",
+     "C4"
+    ]
+   },
+   "item": "CLM-6750",
+   "use": "pc",
+   "refs": []
+  },
+  {
+   "id": "gln_u",
+   "met": "glutamine",
+   "name": "[U-13C5]glutamine",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-1822-H",
+   "use": "tca",
+   "refs": [
+    "metallo2009",
+    "metallo2012"
+   ]
+  },
+  {
+   "id": "gln_5",
+   "met": "glutamine",
+   "name": "[5-13C]glutamine",
+   "label": {
+    "C": [
+     "C5"
+    ]
+   },
+   "item": "CLM-1166",
+   "use": "reductive",
+   "refs": [
+    "metallo2012",
+    "mullen2012"
+   ]
+  },
+  {
+   "id": "gln_1",
+   "met": "glutamine",
+   "name": "[1-13C]glutamine",
+   "label": {
+    "C": [
+     "C1"
+    ]
+   },
+   "item": "CLM-3612",
+   "use": "reductive",
+   "refs": [
+    "metallo2012",
+    "mullen2012"
+   ]
+  },
+  {
+   "id": "gln_u15",
+   "met": "glutamine",
+   "name": "[U-13C5,15N2]glutamine",
+   "label": {
+    "C": "all",
+    "N": "all"
+   },
+   "item": "CNLM-1275-H",
+   "use": "nitrogen",
+   "refs": []
+  },
+  {
+   "id": "gln_n2",
+   "met": "glutamine",
+   "name": "[15N2]glutamine",
+   "label": {
+    "N": "all"
+   },
+   "item": "NLM-1328",
+   "use": "nitrogen",
+   "refs": []
+  },
+  {
+   "id": "gln_na",
+   "met": "glutamine",
+   "name": "[α-15N]glutamine",
+   "label": {
+    "N": [
+     "N2"
+    ]
+   },
+   "item": "NLM-1016",
+   "use": "transamination",
+   "refs": []
+  },
+  {
+   "id": "gln_nam",
+   "met": "glutamine",
+   "name": "[amide-15N]glutamine",
+   "label": {
+    "N": [
+     "N5"
+    ]
+   },
+   "item": "NLM-557",
+   "use": "nucleotideN",
+   "refs": []
+  },
+  {
+   "id": "lac_u",
+   "met": "L-lactate",
+   "name": "[U-13C3]lactate",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-1579",
+   "use": "lactate",
+   "refs": [
+    "hui2017",
+    "faubert2017"
+   ]
+  },
+  {
+   "id": "lac_3",
+   "met": "L-lactate",
+   "name": "[3-13C]lactate",
+   "label": {
+    "C": [
+     "C3"
+    ]
+   },
+   "item": "CLM-1578",
+   "use": "lactate",
+   "refs": []
+  },
+  {
+   "id": "pyr_u",
+   "met": "pyruvate",
+   "name": "[U-13C3]pyruvate",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-2440",
+   "use": "lactate",
+   "refs": []
+  },
+  {
+   "id": "ace_u",
+   "met": "acetate",
+   "name": "[1,2-13C2]acetate",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-440",
+   "use": "lipogenesis",
+   "refs": [
+    "comerford2014"
+   ]
+  },
+  {
+   "id": "pal_u",
+   "met": "palmitate",
+   "name": "[U-13C16]palmitate",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-409",
+   "use": "fao",
+   "refs": []
+  },
+  {
+   "id": "ole_u",
+   "met": "oleate",
+   "name": "[U-13C18]oleate",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-460",
+   "use": "fao",
+   "refs": []
+  },
+  {
+   "id": "ser_u",
+   "met": "serine",
+   "name": "[U-13C3]serine",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-1574-H",
+   "use": "onecarbon",
+   "refs": [
+    "labuschagne2014"
+   ]
+  },
+  {
+   "id": "ser_un",
+   "met": "serine",
+   "name": "[U-13C3,15N]serine",
+   "label": {
+    "C": "all",
+    "N": "all"
+   },
+   "item": "CNLM-474-H",
+   "use": "onecarbon",
+   "refs": [
+    "labuschagne2014"
+   ]
+  },
+  {
+   "id": "gly_u",
+   "met": "glycine",
+   "name": "[1,2-13C2]glycine",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-1017",
+   "use": "onecarbon",
+   "refs": [
+    "labuschagne2014"
+   ]
+  },
+  {
+   "id": "glyc_u",
+   "met": "glycerol",
+   "name": "[U-13C3]glycerol",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-1510",
+   "use": "gng",
+   "refs": []
+  },
+  {
+   "id": "bhb_u",
+   "met": "(R)-3-hydroxybutanoate",
+   "name": "[U-13C4]β-hydroxybutyrate",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-3853",
+   "use": "ketone",
+   "refs": []
+  },
+  {
+   "id": "fru_u",
+   "met": "fructose",
+   "name": "[U-13C6]fructose",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-1553",
+   "use": "sugars",
+   "refs": []
+  },
+  {
+   "id": "gal_u",
+   "met": "galactose",
+   "name": "[U-13C6]galactose",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-1570",
+   "use": "sugars",
+   "refs": []
+  },
+  {
+   "id": "hco3",
+   "met": "HCO3-",
+   "name": "[13C]bicarbonate",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-441",
+   "use": "carboxylation",
+   "refs": []
+  },
+  {
+   "id": "asp_u",
+   "met": "aspartate",
+   "name": "[U-13C4]aspartate",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-1801-H",
+   "use": "aminoacid",
+   "refs": []
+  },
+  {
+   "id": "glu_u",
+   "met": "glutamate",
+   "name": "[U-13C5]glutamate",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-1800-H",
+   "use": "aminoacid",
+   "refs": []
+  },
+  {
+   "id": "ala_u",
+   "met": "alanine",
+   "name": "[U-13C3]alanine",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-2184-H",
+   "use": "aminoacid",
+   "refs": []
+  },
+  {
+   "id": "leu_u",
+   "met": "leucine",
+   "name": "[U-13C6]leucine",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-2262-H",
+   "use": "bcaa",
+   "refs": []
+  },
+  {
+   "id": "ile_u",
+   "met": "isoleucine",
+   "name": "[U-13C6]isoleucine",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-2248-H",
+   "use": "bcaa",
+   "refs": []
+  },
+  {
+   "id": "val_u",
+   "met": "valine",
+   "name": "[U-13C5]valine",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-2249-H",
+   "use": "bcaa",
+   "refs": []
+  },
+  {
+   "id": "arg_u",
+   "met": "arginine",
+   "name": "[U-13C6]arginine",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-2265-H",
+   "use": "aminoacid",
+   "refs": []
+  },
+  {
+   "id": "met_u",
+   "met": "methionine",
+   "name": "[U-13C5]methionine",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-893-H",
+   "use": "aminoacid",
+   "refs": []
+  },
+  {
+   "id": "pro_u",
+   "met": "proline",
+   "name": "[U-13C5]proline",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-2260-H",
+   "use": "aminoacid",
+   "refs": []
+  },
+  {
+   "id": "trp_u",
+   "met": "tryptophan",
+   "name": "[U-13C11]tryptophan",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-4290-H",
+   "use": "aminoacid",
+   "refs": []
+  },
+  {
+   "id": "suc_u",
+   "met": "succinate",
+   "name": "[U-13C4]succinate",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-1571",
+   "use": "tcaint",
+   "refs": []
+  },
+  {
+   "id": "akg_u",
+   "met": "AKG",
+   "name": "[U-13C5]α-ketoglutarate",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-2411",
+   "use": "tcaint",
+   "refs": []
+  },
+  {
+   "id": "prop_u",
+   "met": "propanoate",
+   "name": "[U-13C3]propionate",
+   "label": {
+    "C": "all"
+   },
+   "item": "CLM-1865",
+   "use": "anaplerosis",
+   "refs": []
+  }
+ ],
+ "general": [
+  "jang2018",
+  "buescher2015"
+ ]
+}

@@ -1,0 +1,32 @@
+/* Alternative surfaces and accent colours (Appearance dialog). Set on <html> as data-palette / data-accent, on top
+   of the dark (default) or light (data-theme="light") theme. Shared by the app, the catalogue and the docs. */
+
+/* dark surfaces */
+:root[data-palette="black"]:not([data-theme="light"]) {
+  --bg: #000000; --panel: #0b0b0f; --panel2: #16171d; --line: #2a2c36; --muted: #9ba1b2; --field: #060608;
+  --overlay: rgba(10, 10, 14, .86); --overlay-strong: rgba(10, 10, 14, .95); --line-soft: rgba(42, 44, 54, .6);
+  --hover: #1e2029; --stage-hi: #0c0c11; --tip: rgba(12, 12, 16, .97); --loading-bg: rgba(0, 0, 0, .92); --scroll: #34363f;
+}
+:root[data-palette="slate"]:not([data-theme="light"]) {
+  --bg: #17191e; --panel: #1f2229; --panel2: #282c35; --line: #383d49; --muted: #a2a9b8; --field: #1b1e24;
+  --overlay: rgba(31, 34, 41, .86); --overlay-strong: rgba(31, 34, 41, .95); --line-soft: rgba(56, 61, 73, .6);
+  --hover: #2e333e; --stage-hi: #1c1f25; --tip: rgba(27, 30, 36, .97); --loading-bg: rgba(18, 20, 24, .92); --scroll: #414755;
+}
+/* light surfaces */
+:root[data-theme="light"][data-palette="white"] {
+  --bg: #ffffff; --panel: #ffffff; --panel2: #f1f3f6; --line: #dce0e7; --field: #ffffff;
+  --overlay: rgba(255, 255, 255, .92); --overlay-strong: rgba(255, 255, 255, .97); --line-soft: rgba(220, 224, 231, .7);
+  --hover: #edf0f5; --stage-hi: #fafbfc; --tip: rgba(255, 255, 255, .98); --loading-bg: rgba(255, 255, 255, .94); --scroll: #c9cfda;
+}
+:root[data-theme="light"][data-palette="paper"] {
+  --bg: #f3efe6; --panel: #faf7f0; --panel2: #ece6d8; --line: #d9d0bd; --text: #2f2a22; --muted: #6f6656; --field: #fffdf8;
+  --overlay: rgba(250, 247, 240, .9); --overlay-strong: rgba(250, 247, 240, .96); --line-soft: rgba(217, 208, 189, .7);
+  --hover: #efe8d8; --stage-hi: #f8f4ec; --tip: rgba(255, 253, 248, .97); --loading-bg: rgba(243, 239, 230, .94); --scroll: #cfc4ad;
+}
+
+/* accent colours: one shade for each theme */
+:root[data-accent="teal"] { --accent: #3fd0c9; } :root[data-theme="light"][data-accent="teal"] { --accent: #1f8a84; }
+:root[data-accent="violet"] { --accent: #b48cff; } :root[data-theme="light"][data-accent="violet"] { --accent: #7650c4; }
+:root[data-accent="orange"] { --accent: #ff9f5a; } :root[data-theme="light"][data-accent="orange"] { --accent: #b45a1a; }
+:root[data-accent="green"] { --accent: #5fd38d; } :root[data-theme="light"][data-accent="green"] { --accent: #2f8a52; }
+:root[data-accent="pink"] { --accent: #ff7eb6; } :root[data-theme="light"][data-accent="pink"] { --accent: #b8467c; }

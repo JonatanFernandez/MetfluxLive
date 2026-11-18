@@ -106,8 +106,17 @@ export class FbaProblem {
     let status = M.getModelStatus();
     if (status !== optimal) return { status: this._statusName(status), objective: 0, v: new Float64Array(nRxns), sourceFlux: new Float64Array(sources.length) };
     const objective = sign * M.getObjectiveValue() || 0;
-    const limits = this._limits(M, lo, up, sign, o, n2, sources);
-    if (p.fva !== undefined) return { status: "optimal", objective, range: this._range(M, p.fva, objective, sign), v: new Float64Array(nRxns), sourceFlux: new Float64Array(sources.length) };
+    let sol1 = null;
+    try { sol1 = M.getSolution(); } catch { /* no duals */ }
+    const limits = this._limits(sol1, lo, up, sign, o, n2, sources);
+    // value of each metabolite for the objective: objective gained per mmol/gDW/h of it supplied for free
+    // (minus the shadow price of its mass balance; degenerate LPs have several valid sets of prices)
+    const metValue = new Float32Array(this.net.nMets);
+    if (sol1?.rowDual) for (let i = 0; i < this.net.nMets; i++) { const y = -sign * sol1.rowDual[i]; metValue[i] = Math.abs(y) < 1e-9 ? 0 : y; }
+    if (p.fva !== undefined) {
+      const many = Array.isArray(p.fva), r = this._ranges(M, many ? p.fva : [p.fva], objective, sign, p.fvaFrac ?? 1, !!p.fvaSolutions, p.fvaCycles ?? null);
+      return { status: "optimal", objective, range: many ? undefined : r.ranges[0], ranges: r.ranges, solutions: r.solutions, v: new Float64Array(nRxns), sourceFlux: new Float64Array(sources.length) };
+    }
 
     if (p.parsimonious !== false) {
       const slack = Math.max(1e-9, Math.abs(objective) * 1e-6);
@@ -129,7 +138,7 @@ export class FbaProblem {
       const val = x[j] - x[nRxns + j];
       v[j] = Math.abs(val) < 1e-9 ? 0 : val;
     }
-    return { status: "optimal", objective, v, sourceFlux: Float64Array.from(sources, (_, i) => x[n2 + i]), limits };
+    return { status: "optimal", objective, v, sourceFlux: Float64Array.from(sources, (_, i) => x[n2 + i]), limits, metValue };
   }
 
   /**
@@ -139,9 +148,8 @@ export class FbaProblem {
    * solutions: the list is one valid explanation, not the only one.
    * @returns [{ j (reaction, or -1 - i for injection i), half: 1 forward / -1 reverse, kind: "ub" | "lb" | "closed", gain }]
    */
-  _limits(M, lo, up, sign, o, n2, sources, top = 12) {
-    let sol;
-    try { sol = M.getSolution(); } catch { return []; }
+  _limits(sol, lo, up, sign, o, n2, sources, top = 12) {
+    if (!sol) return [];
     const d = sol.colDual, x = sol.colValue, nR = this.net.nRxns, out = [];
     if (!d) return [];
     for (let c = 0; c < this.numCols; c++) {
@@ -166,20 +174,56 @@ export class FbaProblem {
     return out.slice(0, top);
   }
 
-  /** Flux variability of one reaction: min and max of v_j with the objective held at its optimum (within 1e-6). */
-  _range(M, j, objective, sign) {
+  /**
+   * Flux variability: min and max of v_j for each j with the objective held at frac of its optimum (frac = 1: at
+   * the optimum within 1e-6). Warm starts between the LPs, with a cold retry if HiGHS fails.
+   * @returns { ranges: [[min, max]], solutions?: [[vmin, vmax]] (full flux vectors, when asked) }
+   */
+  _ranges(M, list, objective, sign, frac = 1, withSolutions = false, cycleSlack = null) {
     const { nRxns } = this.net, H = this.highs, all = { kind: "range", from: 0, to: this.numCols - 1 };
+    const opt = H.constants.modelStatus.optimal;
     const slack = Math.max(1e-9, Math.abs(objective) * 1e-6);
-    if (sign < 0) M.changeRowBounds(this.objRow, objective - slack, INF); else M.changeRowBounds(this.objRow, -INF, objective + slack);
-    const out = [];
-    for (const dir of [1, -1]) { // minimise v_j, then maximise it
-      const cost = new Float64Array(this.numCols);
-      cost[j] = dir; cost[nRxns + j] = -dir;
+    const target = frac < 1 ? objective * frac : objective;
+    if (sign < 0) M.changeRowBounds(this.objRow, (frac < 1 ? target : objective - slack), INF);
+    else M.changeRowBounds(this.objRow, -INF, (frac < 1 ? target : objective + slack));
+    const ranges = [], solutions = withSolutions ? [] : null;
+    const cost = new Float64Array(this.numCols);
+    // Without cycles: internal loops (thermodynamically impossible cycles) can carry any flux without changing the
+    // objective and make FVA ranges look wide. Optionally the total flux (the pFBA measure) is capped at its minimum
+    // + cycleSlack, which removes them; the extra row is deleted afterwards.
+    let extraRow = -1;
+    if (cycleSlack !== null) {
+      const pc = this.net.pcost;
+      for (let j = 0; j < nRxns; j++) cost[j] = cost[nRxns + j] = pc ? pc[j] : 1;
       M.changeColsCost(all, cost); M.clearSolver(); M.run();
-      const st = M.getModelStatus();
-      out.push(st === H.constants.modelStatus.optimal ? dir * M.getObjectiveValue() : -dir * Infinity);
+      if (M.getModelStatus() === opt) {
+        const T = M.getObjectiveValue(), idx = new Int32Array(2 * nRxns), val = new Float64Array(2 * nRxns);
+        for (let j = 0; j < nRxns; j++) { idx[j] = j; idx[nRxns + j] = nRxns + j; val[j] = val[nRxns + j] = pc ? pc[j] : 1; }
+        M.addRow(-Infinity, T * (1 + cycleSlack) + 1e-9, { indices: idx, values: val });
+        extraRow = this.net.nMets + 1;
+      }
     }
-    return out;
+    M.options.set({ presolve: "off", simplex_strategy: 4 }); // only the cost changes: primal simplex from the last basis is fast
+    for (const j of list) {
+      const r = [], sol = [];
+      for (const dir of [1, -1]) { // minimise v_j, then maximise it
+        cost.fill(0); cost[j] = dir; cost[nRxns + j] = -dir;
+        M.changeColsCost(all, cost);
+        let st;
+        try { M.run(); st = M.getModelStatus(); } catch { st = -1; }
+        if (st !== opt) { try { M.clearSolver(); M.run(); st = M.getModelStatus(); } catch { st = -1; } }
+        r.push(st === opt ? dir * M.getObjectiveValue() : -dir * Infinity);
+        if (withSolutions) {
+          if (st === opt) { const x = M.getSolution().colValue, v = new Float64Array(nRxns); for (let k = 0; k < nRxns; k++) v[k] = x[k] - x[nRxns + k]; sol.push(v); }
+          else sol.push(null);
+        }
+      }
+      ranges.push(r);
+      if (withSolutions) solutions.push(sol);
+    }
+    M.options.set({ presolve: "on", simplex_strategy: 1 }); // back to the default (dual) for the next FBA
+    if (extraRow >= 0) M.deleteRows({ kind: "range", from: extraRow, to: extraRow });
+    return { ranges, solutions };
   }
 
   _statusName(code) {

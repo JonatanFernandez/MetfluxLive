@@ -4,8 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MetfluxLive</title>
-  <script>try { if (localStorage.getItem("metflux.theme") === "light") document.documentElement.dataset.theme = "light"; } catch { /* storage unavailable */ }</script>
+  <script>try { const d = document.documentElement; if (localStorage.getItem("metflux.theme") === "light") d.dataset.theme = "light"; const L = JSON.parse(localStorage.getItem("metflux.look") || "{}") || {}, s = d.dataset.theme === "light" ? L.surfaceLight : L.surfaceDark; if (s && s !== "default") d.dataset.palette = s; if (L.accent && L.accent !== "default") d.dataset.accent = L.accent; } catch { /* storage unavailable */ }</script>
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/palettes.css">
 </head>
 <body>
   <header id="topbar">
@@ -29,6 +30,7 @@
       </div>
     </div>
     <div class="tb-side right">
+      <button id="tourBtn" data-i18n="h.tour" data-i18n-title="h.tourTitle"></button>
       <a id="docsBtn" class="btn" href="docs.html" target="_blank" rel="noopener" data-i18n="h.docs" data-i18n-title="h.docsTitle"></a>
       <button id="editBtn" class="toggle" data-i18n="h.edit" data-i18n-title="h.editTitle"></button>
       <button id="importBtn" data-i18n="h.import" data-i18n-title="h.importTitle"></button>
@@ -38,6 +40,7 @@
         <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1Z"/></svg>
         <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
       </button>
+      <button id="lookBtn" class="icon" data-i18n-title="look.title" data-i18n-aria="look.title"><svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5C21 6.6 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10" cy="7" r="1.2" fill="currentColor"/><circle cx="14.5" cy="7" r="1.2" fill="currentColor"/><circle cx="17" cy="11" r="1.2" fill="currentColor"/></svg></button>
       <select id="langSel" data-i18n-title="h.lang"></select>
     </div>
   </header>
@@ -68,6 +71,7 @@
           <div id="ctxResults" class="dropdown" hidden></div>
         </div>
         <div id="ctxCurrent"></div>
+        <div class="row"><button id="rnaOpen" class="link" data-i18n="rna.open" data-i18n-title="rna.openTitle"></button></div>
         <div class="row medium-bar">
           <select id="ctxMode" class="grow" data-i18n-title="ctx.modeTitle"><option value="block" data-i18n="ctx.mode.block"></option><option value="penalty" data-i18n="ctx.mode.penalty"></option></select>
         </div>
@@ -86,6 +90,7 @@
           <input id="addSupply" type="search" data-i18n-ph="h.addSupply" autocomplete="off" spellcheck="false">
           <div id="addResults" class="dropdown" hidden></div>
         </div>
+        <div class="row trl-row"><select id="trLib" class="grow" data-i18n-title="trl.title"></select><button id="designBtn" class="link" data-i18n="des.open" data-i18n-title="des.openTitle"></button></div>
         <div id="tracerList"></div>
         <div id="supplyList"></div>
       </section>
@@ -165,7 +170,8 @@
 
     <section id="stage">
       <canvas id="map"></canvas>
-      <nav id="crumbs"></nav>
+      <div id="navBar"><button id="navBack" class="navbtn" disabled data-i18n-title="nav.back" data-i18n-aria="nav.back">‹</button><button id="navFwd" class="navbtn" disabled data-i18n-title="nav.fwd" data-i18n-aria="nav.fwd">›</button><nav id="crumbs"></nav></div>
+      <div id="ctxMenu" class="ctxmenu" hidden role="menu"></div>
       <div id="badges"><span id="editBadge" class="badge-chip edit" hidden></span><span id="compareBadge" class="badge-chip cmp" hidden data-i18n-title="cmp.badgeTitle"></span></div>
       <div id="viewOpts">
         <select id="groupSel" data-i18n-title="h.groupTitle">
@@ -181,6 +187,7 @@
         </select>
         <label class="check" data-i18n-title="h.inactiveTitle"><input id="optInactive" type="checkbox" checked> <span data-i18n="h.inactive"></span></label>
         <label class="check"><input id="optParticles" type="checkbox" checked> <span data-i18n="h.particles"></span></label>
+        <label class="check" data-i18n-title="h.adaptiveTitle"><input id="optAdaptive" type="checkbox"> <span data-i18n="h.adaptive"></span></label>
         <button id="fitBtn" class="icon" data-i18n-title="h.fit">⤢</button>
       </div>
       <div id="legendBox">
@@ -202,7 +209,7 @@
       <div id="listView" hidden></div>
       <div id="emptyNote" data-i18n="empty.filter" hidden></div>
       <div id="tooltip" hidden></div>
-      <div id="status"></div>
+      <div id="statusBox"><div id="progress" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100"><i></i></div><div id="status"></div></div>
     </section>
 
     <div class="resizer" id="resRight" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-title="h.resize"></div>
@@ -317,6 +324,25 @@
     </form>
   </dialog>
 
+  <dialog id="rnaDialog" class="editor">
+    <form method="dialog" id="rnaForm">
+      <header><h3 data-i18n="rna.title"></h3><button class="icon" value="cancel" data-i18n-aria="h.close">✕</button></header>
+      <details class="rna-how"><summary data-i18n="rna.howH"></summary><div data-i18n-html="rna.how"></div></details>
+      <label class="rna-file"><span data-i18n="rna.file"></span> <input id="rnaFile" type="file" accept=".tsv,.tab,.txt,.csv,text/plain,text/csv,text/tab-separated-values"></label>
+      <div id="rnaParsed" hidden>
+        <div class="rna-grid">
+          <label><span data-i18n="rna.idCol"></span><select id="rnaIdCol"></select></label>
+          <label><span data-i18n="rna.valCol"></span><select id="rnaValCol"></select></label>
+          <label><span data-i18n="rna.thr"></span><input id="rnaThr" type="number" min="0" step="any" value="1"></label>
+          <label><span data-i18n="rna.name"></span><input id="rnaName" type="text" maxlength="60"></label>
+        </div>
+        <label class="rna-log"><input id="rnaLog" type="checkbox"> <span data-i18n="rna.log"></span></label>
+        <p class="hint" id="rnaInfo"></p>
+      </div>
+      <p class="hint" id="rnaStatus"></p>
+      <footer><span style="flex:1"></span><button type="button" id="rnaBuild" class="primary" data-i18n="rna.build" disabled></button></footer>
+    </form>
+  </dialog>
   <dialog id="methodsDialog">
     <form method="dialog">
       <header><h3 data-i18n="h.methods"></h3><button class="icon" value="cancel" data-i18n-aria="h.close">✕</button></header>

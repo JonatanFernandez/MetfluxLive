@@ -45,6 +45,20 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
   [Bgee](https://www.bgee.org). The reactions left without a detected enzyme are blocked or, as an option,
   only made costlier in pFBA. Genes that the 57 essential metabolic tasks of Human-GEM need are switched back
   on. Off by default. Sources, cut-off and preprocessing: Docs › Cell types.
+  Your own RNA-seq table (TPM or similar, one row per gene) can be turned into a cell type with the same
+  procedure, in the browser; the data never leave the computer (Docs › Cell types › Your own RNA-seq data).
+- **Reading the result** — a plain-language summary, what limits the objective (reduced costs), the value of
+  each metabolite (shadow prices), the ATP/NADH/NADPH balance by pathway, phase planes of a nutrient, flux ranges
+  (FVA) of a reaction and of a whole pathway (cycle-free, with "what can replace it"), an essential-gene screen,
+  and a comparator of two cell types in the catalogue. Docs › Flux balance analysis.
+- **Moving around and appearance** — back/forward (‹ ›, Alt+←/→), reactions of other pathways around a selected
+  metabolite, a map centred on any metabolite or reaction (right-click menu, or "adaptive" on click), and an
+  Appearance dialog (backgrounds, accent, flux colour, colour scales, colour-blind safe compartments).
+  Docs › The interface; units are explained in Docs › Glossary › Units.
+- **Tracers and experiment design** — 40 commercial tracers (Cambridge Isotope Laboratories catalogue numbers,
+  grouped by use, with references) can label a nutrient with one click; "Design a tracer experiment" ranks
+  tracers and measurable metabolites to tell saved scenarios apart or to resolve one flux. Natural abundance
+  can be added to isotopologue distributions. Docs › Isotope tracing.
 - **Measured exchange fluxes** — by default the uptake and secretion of glucose, lactate, glutamine and
   15 more metabolites are pinned (±20 %) to the median of 59 NCI-60 tumour cell lines (Jain et al. 2012),
   together with a measured ATP maintenance cost; unmeasured organic products may only leave in traces.
@@ -117,6 +131,8 @@ tools/                       preprocessing (Python) and tests (Node)
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), with attribution to the Human Protein Atlas;
 its cell line descriptions come from Cellosaurus 57.0 (CC BY 4.0). `data/mouse-gem/contexts.json` is derived
 from Bgee 15.2 and is CC0. The licence is also written inside each file (`meta.license`).
+`data/tasks/metabolicTasks_Essential.txt` is copied unchanged from Human-GEM 2.1.1 (CC BY 4.0, Robinson et al. 2020);
+it is used to build cell types from the user's RNA-seq data in the browser.
 
 To share or host the app you only need `index.html`, `docs.html`, `css/`, `js/`, `vendor/` and `data/` (about 31 MB, 7 MB of it RDKit).
 Python is used only for preprocessing, never at run time.
@@ -267,6 +283,20 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
   bloquean o, como opción, sólo se encarecen en el pFBA. Los genes que necesitan las 57 tareas metabólicas
   esenciales de Human-GEM se vuelven a encender. Desactivado por defecto. Fuentes, umbral y preprocesado:
   Docs › Tipos celulares.
+  Tu propia tabla de RNA-seq (TPM o similar, una fila por gen) se puede convertir en un tipo celular con el
+  mismo procedimiento, en el navegador; los datos no salen del ordenador (Docs › Tipos celulares › Tus propios datos).
+- **Leer el resultado** — un resumen en frases, qué limita el objetivo (costes reducidos), el valor de cada
+  metabolito (precios sombra), el balance de ATP/NADH/NADPH por ruta, planos de fase de un nutriente, rangos de
+  flujo (FVA) de una reacción y de una ruta entera (sin ciclos, con «qué puede sustituirla»), un cribado de
+  genes esenciales y un comparador de dos tipos celulares en el catálogo. Docs › Análisis de balance de flujos.
+- **Navegación y apariencia** — atrás/adelante (‹ ›, Alt+←/→), reacciones de otras rutas alrededor de un
+  metabolito seleccionado, mapa centrado en cualquier metabolito o reacción (menú del clic derecho, o
+  «adaptable» al hacer clic) y un diálogo de Apariencia (fondos, acento, color del flujo, escalas de color,
+  compartimentos aptos para daltonismo). Docs › La interfaz; las unidades en Docs › Glosario › Unidades.
+- **Trazadores y diseño de experimentos** — 40 trazadores comerciales (números de catálogo de Cambridge Isotope
+  Laboratories, agrupados por uso, con referencias) marcan un nutriente con un clic; «Diseñar un experimento con
+  trazadores» ordena trazadores y metabolitos medibles para distinguir escenarios guardados o resolver un flujo.
+  La abundancia natural se puede añadir a las distribuciones de isotopólogos. Docs › Trazado isotópico.
 - **Flujos de intercambio medidos** — por defecto, la captación y excreción de glucosa, lactato, glutamina y
   otros 15 metabolitos se fijan (±20 %) a la mediana de 59 líneas tumorales del NCI-60 (Jain et al. 2012),
   junto con un gasto de ATP de mantenimiento medido; los productos orgánicos no medidos solo salen en trazas.
@@ -343,6 +373,8 @@ tools/                       preprocesado (Python) y pruebas (Node)
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), con atribución al Human Protein Atlas; la
 descripción de las líneas celulares sale de Cellosaurus 57.0 (CC BY 4.0). `data/mouse-gem/contexts.json`
 deriva de Bgee 15.2 y es CC0. La licencia también va escrita dentro de cada archivo (`meta.license`).
+`data/tasks/metabolicTasks_Essential.txt` se copia sin cambios de Human-GEM 2.1.1 (CC BY 4.0, Robinson et al. 2020);
+se usa para construir tipos celulares a partir del RNA-seq del usuario en el navegador.
 
 Para compartir o alojar la app basta con `index.html`, `docs.html`, `css/`, `js/`, `vendor/` y `data/` (unos 31 MB, 7 de ellos RDKit).
 Python solo se usa en el preprocesado, nunca en ejecución.

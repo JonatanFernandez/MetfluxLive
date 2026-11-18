@@ -300,11 +300,45 @@ const NATURAL = {
  * Mass isotopologue distribution of an unlabelled molecule, from its formula.
  * @returns null (no usable formula) or { dist: [p(M+0), ...], ignored: [elements left out] }
  */
+const formulaCounts = (formula) => {
+  const counts = new Map();
+  for (const m of (formula || "").matchAll(/([A-Z][a-z]?)(\d*)/g)) counts.set(m[1], (counts.get(m[1]) || 0) + (m[2] ? parseInt(m[2], 10) : 1));
+  return counts;
+};
+
 export function naturalMid(formula, maxShift = 12) {
   if (!formula) return null;
-  const counts = new Map(), ignored = [];
-  for (const m of formula.matchAll(/([A-Z][a-z]?)(\d*)/g)) counts.set(m[1], (counts.get(m[1]) || 0) + (m[2] ? parseInt(m[2], 10) : 1));
+  const counts = formulaCounts(formula);
   if (!counts.size) return null;
+  return naturalFromCounts(counts, maxShift);
+}
+
+/**
+ * What a mass spectrometer would see: the tracer's distribution (M+k = k labelled atoms) combined with natural
+ * isotope abundance in the atoms the tracer did not label. For M+k the k labelled atoms of the traced element
+ * are removed from the formula before the natural distribution is added, then the result is shifted by k.
+ * Exact for one traced element with a +1 shift per atom (13C, 15N); with two traced elements the labelled atoms
+ * are all taken from the most abundant one (an approximation). Tracer purity is not modelled.
+ */
+export function withNaturalAbundance(dist, formula, elements) {
+  const counts = formulaCounts(formula);
+  if (!counts.size) return null;
+  const traced = [...elements].filter((e) => counts.has(e)).sort((a, b) => counts.get(b) - counts.get(a))[0];
+  const n = dist.length + 6, out = new Float64Array(n);
+  dist.forEach((p, k) => {
+    if (!(p > 0)) return;
+    const c = new Map(counts);
+    if (traced) c.set(traced, Math.max(0, c.get(traced) - k));
+    const nat = naturalFromCounts(c, n - 1 - k)?.dist;
+    if (!nat) return;
+    nat.forEach((q, i) => { if (k + i < n) out[k + i] += p * q; });
+  });
+  let last = n - 1; while (last > 0 && out[last] < 1e-5) last--;
+  return Array.from(out.subarray(0, last + 1));
+}
+
+function naturalFromCounts(counts, maxShift) {
+  const ignored = [];
   let dist = new Float64Array(maxShift + 1);
   dist[0] = 1;
   for (const [el, n] of counts) {

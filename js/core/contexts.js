@@ -24,11 +24,12 @@ export async function loadContexts(slug) {
 }
 
 /** Gene symbols switched off in a context (genes of the published model, as used in the GPR rules). */
+const offCache = new WeakMap(); // not a property of the context: contexts are saved to sessions as JSON
 export function offGenes(ctx, baseGenes) {
-  if (ctx.offSet) return ctx.offSet;
+  if (offCache.has(ctx)) return offCache.get(ctx);
   const bin = atob(ctx.off), out = new Set();
   for (let i = 0; i < baseGenes.length; i++) if (bin.charCodeAt(i >> 3) & (1 << (i & 7))) out.add(baseGenes[i][1]);
-  ctx.offSet = out;
+  offCache.set(ctx, out);
   return out;
 }
 
@@ -59,7 +60,7 @@ export function offGenesOf(rule, off) {
 /** Name of a metabolic task, stored as an index into data.taskNames (older files kept the text). */
 export const taskName = (data, x) => (typeof x === "number" ? data.taskNames?.[x] ?? String(x) : x);
 
-export const CONTEXT_GROUPS = ["consensus", "lineCancer", "lineOther", "cellType", "tissue"];
+export const CONTEXT_GROUPS = ["user", "consensus", "lineCancer", "lineOther", "cellType", "tissue"];
 
 /** Search over contexts, in the shape attachSearch() expects. Empty query: the contexts with measured data first. */
 export class ContextIndex {
