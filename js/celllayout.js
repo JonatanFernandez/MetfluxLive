@@ -3,9 +3,9 @@
 
 const GAP = 0.42;
 const rad = (n) => 0.13 + 0.04 * Math.sqrt(Math.min(n, 450));
-const ASPECT = { mito: 1.6, er: 1.9, golgi: 1.7, nuc: 1.1, lyso: 1, perox: 1 };
+const ASPECT = { mito: 1.6, er: 1.9, golgi: 1.7, nuc: 1.1, lyso: 1, perox: 1, vac: 1.1, lipid: 1 };
 // preferred organelle centres, as fractions of the cell semi-axes (y grows downwards)
-const PREF = { nuc: [-0.42, -0.12], mito: [0.42, -0.26], er: [-0.3, 0.52], golgi: [0.24, 0.55], perox: [0.7, 0.22], lyso: [-0.72, 0.3] };
+const PREF = { nuc: [-0.42, -0.12], mito: [0.42, -0.26], er: [-0.3, 0.52], golgi: [0.24, 0.55], perox: [0.7, 0.22], lyso: [-0.72, 0.3], vac: [-0.72, 0.3], lipid: [0.1, -0.55] };
 const SPARE = [[0, -0.6], [0.75, -0.1], [-0.05, 0.1], [-0.7, -0.4], [0.6, 0.6]];
 
 const inEllipse = (x, y, E, grow = 0) => {
@@ -110,9 +110,12 @@ function buildOrganelle(inside, ring, aspect, innerRing) {
  *   regions: [{ loc, x, y, rx, ry, lx, ly, comp, wavy?, dash? }]
  */
 export function buildCellLayout(model, index) {
-  const role = index.compRole, C = index.roleComp;
+  const role = index.compRole, C = index.roleComp, memOf = index.membraneOf || {};
   if (!C.cyt) return null;
   const hasInner = !!(C.inner && C.mito);
+  // a layer between the plasma membrane and the outside (bacterial periplasm, yeast cell envelope): the cell is drawn
+  // with two membranes, the layer between them
+  const peri = C.peri && C.ext ? C.peri : null;
 
   // ---- location of every reaction
   const groups = [], byKey = new Map();
@@ -122,7 +125,12 @@ export function buildCellLayout(model, index) {
     const comps = [...new Set(r.m.map((m) => model.mets[m].c))].sort();
     if (!comps.length) return;
     let loc;
-    if (hasInner && comps.includes(C.inner)) loc = "mem:" + C.inner;
+    const memb = comps.find((c) => memOf[c]);
+    if (memb) loc = "mem:" + memOf[memb];
+    else if (hasInner && comps.includes(C.inner)) loc = "mem:" + C.inner;
+    else if (peri && comps.length === 1 && comps[0] === C.ext) loc = C.ext;
+    else if (peri && comps.includes(C.ext) && !comps.includes(C.cyt)) loc = "mem:" + C.ext; // outer membrane / cell wall
+    else if (peri && comps.length > 1 && (comps.includes(peri) || comps.includes(C.ext))) loc = "mem:" + peri; // plasma (inner) membrane
     else if (comps.length === 1) loc = comps[0];
     else {
       const org = comps.filter((c) => c !== C.cyt && c !== C.ext);
@@ -140,7 +148,7 @@ export function buildCellLayout(model, index) {
   // ---- organelles
   const orgs = [];
   for (const c of Object.keys(model.compartments)) {
-    if (c === C.cyt || c === C.ext || (hasInner && c === C.inner)) continue;
+    if (c === C.cyt || c === C.ext || (hasInner && c === C.inner) || c === peri || memOf[c]) continue;
     const inside = at(c), ring = at("mem:" + c);
     const isMito = hasInner && c === C.mito;
     const innerRing = isMito ? at("mem:" + C.inner) : null;
@@ -153,8 +161,13 @@ export function buildCellLayout(model, index) {
   orgs.sort((a, b) => b.bound.rx * b.bound.ry - a.bound.rx * a.bound.ry);
 
   // ---- the cell
-  const cyt = at(C.cyt), plasma = C.ext ? at("mem:" + C.ext) : [], ext = C.ext ? at(C.ext) : [];
-  const padE = maxR(plasma), dOut = padE + maxR(ext) + GAP + 0.3;
+  const cyt = at(C.cyt), ext = C.ext ? at(C.ext) : [];
+  // with a periplasm: inner membrane (cytosol <-> periplasm), periplasm, outer membrane (periplasm <-> outside)
+  const plasma = peri ? at("mem:" + peri) : C.ext ? at("mem:" + C.ext) : [];
+  const periIn = peri ? at(peri) : [], outer = peri ? at("mem:" + C.ext) : [];
+  const padE = maxR(plasma);
+  const dPeri = peri ? padE + maxR(periIn) + GAP + 0.25 : 0, dOuter = peri ? dPeri + maxR(periIn) + maxR(outer) + GAP + 0.25 : 0;
+  const dOut = (peri ? dOuter + maxR(outer) : padE) + maxR(ext) + GAP + 0.3;
   let area = 0;
   for (const o of orgs) area += Math.PI * o.bound.rx * o.bound.ry;
   for (const n of cyt) area += Math.PI * (n.r + GAP) ** 2;
@@ -180,6 +193,10 @@ export function buildCellLayout(model, index) {
     if (!ok) continue;
     if (!packInside(cyt, E, padE + 0.3, placed.map((p) => p.B))) continue;
     if (!placeRing(plasma, E)) continue;
+    if (peri) {
+      if (!placeRing(periIn, { x: 0, y: 0, rx: E.rx + dPeri, ry: E.ry + dPeri }, 0.3)) continue;
+      if (!placeRing(outer, { x: 0, y: 0, rx: E.rx + dOuter, ry: E.ry + dOuter }, -0.2)) continue;
+    }
     const O = { x: 0, y: 0, rx: E.rx + dOut, ry: E.ry + dOut };
     if (!placeRing(ext, O, -Math.PI / 2 + 0.15)) continue;
     cell = { E, O };
@@ -187,7 +204,12 @@ export function buildCellLayout(model, index) {
   if (!cell) return null;
 
   // ---- regions (draw order: back to front)
-  const regions = [{ loc: C.cyt, comp: C.cyt, ...cell.E, lx: 0, ly: -cell.E.ry + padE + 0.75, cell: true }];
+  const regions = [];
+  if (peri) { // the outer membrane encloses the periplasm; the cytoplasm is drawn on top of it
+    const R = dOuter + 0.1;
+    regions.push({ loc: peri, comp: peri, x: 0, y: 0, rx: cell.E.rx + R, ry: cell.E.ry + R, lx: 0, ly: -cell.E.ry - R + 0.55, cell: true });
+  }
+  regions.push({ loc: C.cyt, comp: C.cyt, ...cell.E, lx: 0, ly: -cell.E.ry + padE + 0.75, cell: true });
   if (C.ext) regions.push({ loc: C.ext, comp: C.ext, x: 0, y: 0, rx: 0, ry: 0, lx: 0, ly: -cell.O.ry - maxR(ext) - 0.7, labelOnly: true });
   for (const { o, B } of placed) {
     for (const n of o.members) { n.x += B.x; n.y += B.y; }

@@ -7,7 +7,7 @@
 ## English
 
 Local viewer for metabolic fluxes and isotope tracing on genome-scale metabolic models
-(Human-GEM 2.1.1, Mouse-GEM 1.8.0 and Rat-GEM 1.8.0 included, already preprocessed). Everything runs in the browser.
+(Human-GEM 2.1.1, Mouse-GEM 1.8.0, Rat-GEM 1.8.0, Zebrafish-GEM 1.6.0, Fruitfly-GEM 1.7.0, Worm-GEM 1.8.0, yeast-GEM 9.1.1 and E. coli iML1515 included, already preprocessed). Everything runs in the browser.
 
 ### Open
 
@@ -89,7 +89,9 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
 - **Lines** (selector below the map, left) — what the lines between groups carry: transferable carbon or
   nitrogen atoms (carrier moieties such as CoA, UDP or thiamine diphosphate are left out by tracing them through
   the atom maps), all redox carriers together (electron pairs), NADH, NADPH, ubiquinol, ATP (with GTP/UTP/CTP), or no lines and the free energy (ΔG′m)
-  dissipated by each group. In a pathway map, ΔG′m colours each reaction. Details in Docs › The interface.
+  dissipated by each group. In a pathway map, ΔG′m colours each reaction, and the reaction card warns when the
+  only direction a reaction is allowed (or the direction of its flux) is thermodynamically impossible
+  (ΔG′m above +100 kJ/mol even at the low end of the estimate). Details in Docs › The interface.
 - **Compare** — save the current situation as a scenario, change anything (medium, pulse, knockout, tracer,
   model edits) and pick the scenario: the map ("Changed flux" / "Changed label"), the summary (exchanges,
   pathways, labelling) and the metabolite panel (paired isotopologue bars) show scenario → now.
@@ -106,8 +108,14 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
 - **Steady state / Dynamic** — the `?` button explains both methods.
 - **Simulate / Auto** — Simulate solves the model with the current inputs; the Auto switch next to it re-runs after
   every change (on by default in Steady state, off in Dynamic, remembered per mode).
-- **Cellular objective** — built-in objectives (growth, maximum ATP, glutathione, and cell functions: urea, gluconeogenesis, ketone bodies, bile acids, lipogenesis, neurotransmitters, cortisol, NO, heme, creatine), any
+- **Cellular objective** — built-in objectives (growth, maximum ATP, glutathione, and cell functions: urea, gluconeogenesis, ketone bodies, bile acids, lipogenesis, neurotransmitters, cortisol, NO, heme, creatine;
+  kidney (ammonia, guanidinoacetate, arginine), muscle (glutamine and alanine release, oxidative ATP), immune cells (protein
+  secretion, nitric oxide, itaconate, prostaglandin E2, leukotriene B4, thromboxane A2, histamine, spermidine) and microbial
+  products (ethanol, glycerol, acetate, succinate, lactate, formate, butanediol, fusel alcohols, lysine)), any
   reaction from the search box, and objectives you save yourself. Docs › Flux balance analysis › Choosing the objective.
+- **Secondary objective** — optimise a second objective while keeping the first at a chosen fraction of its
+  optimum (epsilon-constraint, no weighted sums), and draw the trade-off curve between the two (11 points).
+  Docs › Flux balance analysis › Secondary objective and trade-off curve.
 - **Light / dark mode** — the moon/sun button at the top right (dark by default; also applies to the Docs).
 
 ### Structure
@@ -144,16 +152,16 @@ Python is used only for preprocessing, never at run time.
 
 Preprocessing converts a repository in [standard-GEM](https://github.com/MetabolicAtlas/standard-GEM)
 format (`model/*.yml` + `model/*.tsv`) into the JSON files the app reads. The source zips are not in this
-repository: download `Human-GEM-2.1.1.zip`, `Mouse-GEM-1.8.0.zip` and `Rat-GEM-1.8.0.zip` from the
+repository: download `Human-GEM-2.1.1.zip`, `Mouse-GEM-1.8.0.zip`, `Rat-GEM-1.8.0.zip`, `Zebrafish-GEM-1.6.0.zip`, `Fruitfly-GEM-1.7.0.zip` and `Worm-GEM-1.8.0.zip` from the
 [Human-GEM](https://github.com/SysBioChalmers/Human-GEM),
-[Mouse-GEM](https://github.com/SysBioChalmers/Mouse-GEM) and [Rat-GEM](https://github.com/SysBioChalmers/Rat-GEM) releases and put them in the project root.
+[Mouse-GEM](https://github.com/SysBioChalmers/Mouse-GEM), [Rat-GEM](https://github.com/SysBioChalmers/Rat-GEM), [Zebrafish-GEM](https://github.com/SysBioChalmers/Zebrafish-GEM), [Fruitfly-GEM](https://github.com/SysBioChalmers/Fruitfly-GEM) and [Worm-GEM](https://github.com/SysBioChalmers/Worm-GEM) releases and put them in the project root.
 
 ```bash
 python3 -m venv --without-pip tools/.venv
 python3 -m pip --python tools/.venv/bin/python install rdkit pyyaml igraph rxnmapper \
     torch --extra-index-url https://download.pytorch.org/whl/cpu
 
-tools/build_all.sh                      # Human-GEM, Mouse-GEM, Rat-GEM
+tools/build_all.sh                      # all six models
 
 # another model (zip or folder):
 tools/.venv/bin/python tools/build_model.py   Other-GEM.zip other-gem [--structures-from human-gem]
@@ -241,13 +249,24 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # show the atom
 - Mouse-GEM 1.8.0 and Rat-GEM 1.8.0 ship `MAR00021` as their objective, which is not a growth rate (about 0.00016). The default
   objective, "Growth (generic biomass)", is therefore MAR13082, Human-GEM's biomass reaction, present but closed in
   both models and opened only while it is the objective: 0.0370 h⁻¹ in the standard medium, as Human-GEM.
+- Zebrafish-, Fruitfly- and Worm-GEM use the human cell biomass, mammalian uptake kinetics and ΔG at 37 °C,
+  with no measured fluxes and short Bgee tissue lists. Fruitfly-GEM defaults to Schneider's medium (S2 cells).
+  Worm-GEM is built without 2,3-bisphosphoglycerate in the biomass metabolite pool (C. elegans lacks the mutase).
+- yeast-GEM and iML1515 are read through Human-GEM names (`tools/convert_foreign.py`: MetaNetX, BiGG,
+  ChEBI, KEGG, name); about half of their metabolites match. Their media (M9, Verduyn, YNB, SC), measured
+  fluxes (Jouhten 2008; Zampieri 2019; Castaño-Cerezo 2009) and laboratory strains are in the docs. Yeast-GEM
+  overestimates aerobic batch growth (0.66 against about 0.37 h⁻¹).
+- The models are used as published. A few reactions can only run in a thermodynamically impossible direction
+  (cytochrome P450 and CMP-Neu5Ac hydroxylase reactions written backwards in Human-GEM 2.1.1 and the animal
+  models, already fixed in its development branch; a pyridoxal oxidase in yeast-GEM); the reaction card flags
+  them. None carries flux in the default runs.
 
 ---
 
 ## Español
 
 Visualizador local de flujos metabólicos y trazado isotópico sobre modelos metabólicos de escala
-genómica (Human-GEM 2.1.1, Mouse-GEM 1.8.0 y Rat-GEM 1.8.0 incluidos, ya preprocesados). Todo se ejecuta en el navegador.
+genómica (Human-GEM 2.1.1, Mouse-GEM 1.8.0, Rat-GEM 1.8.0, Zebrafish-GEM 1.6.0, Fruitfly-GEM 1.7.0, Worm-GEM 1.8.0, yeast-GEM 9.1.1 y E. coli iML1515 incluidos, ya preprocesados). Todo se ejecuta en el navegador.
 
 ### Abrir
 
@@ -331,8 +350,9 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
 - **Líneas** (selector abajo a la izquierda del mapa) — qué llevan las líneas entre grupos: átomos de carbono
   o nitrógeno transferibles (los restos transportadores como CoA, UDP o tiamina difosfato se excluyen
   trazándolos por los mapas atómicos), todos los transportadores redox juntos (pares de electrones), NADH, NADPH, ubiquinol, ATP (con GTP/UTP/CTP), o ninguna línea y la
-  energía libre (ΔG′m) que disipa cada grupo. En el mapa de una ruta, ΔG′m colorea cada reacción. Detalles en
-  Docs › La interfaz.
+  energía libre (ΔG′m) que disipa cada grupo. En el mapa de una ruta, ΔG′m colorea cada reacción, y la ficha de
+  la reacción avisa cuando el único sentido permitido (o el sentido de su flujo) es termodinámicamente imposible
+  (ΔG′m por encima de +100 kJ/mol incluso en el extremo bajo de la estimación). Detalles en Docs › La interfaz.
 - **Comparar** — guarda la situación actual como escenario, cambia lo que quieras (medio, pulso, knockout,
   trazador, ediciones del modelo) y elige el escenario: el mapa («Flujo cambiado» / «Marcaje cambiado»), el
   resumen (intercambios, rutas, marcaje) y la ficha del metabolito (barras pareadas de isotopólogos) muestran
@@ -351,8 +371,14 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
 - **Estacionario / Dinámico** — el botón `?` explica ambos métodos.
 - **Simular / Auto** — Simular resuelve el modelo con las entradas actuales; el interruptor Auto, a su lado, lo repite
   tras cada cambio (activado por defecto en Estacionario, desactivado en Dinámico, se recuerda por modo).
-- **Objetivo celular** — objetivos predefinidos (crecimiento, máximo ATP, glutatión y funciones celulares: urea, gluconeogénesis, cuerpos cetónicos, ácidos biliares, lipogénesis, neurotransmisores, cortisol, NO, hemo, creatina),
+- **Objetivo celular** — objetivos predefinidos (crecimiento, máximo ATP, glutatión y funciones celulares: urea, gluconeogénesis, cuerpos cetónicos, ácidos biliares, lipogénesis, neurotransmisores, cortisol, NO, hemo, creatina;
+  riñón (amonio, guanidinoacetato, arginina), músculo (liberación de glutamina y alanina, ATP oxidativo), células inmunes
+  (secreción de proteína, óxido nítrico, itaconato, prostaglandina E2, leucotrieno B4, tromboxano A2, histamina, espermidina) y
+  productos microbianos (etanol, glicerol, acetato, succinato, lactato, formiato, butanodiol, alcoholes de fusel, lisina)),
   cualquier reacción del buscador y objetivos que guardes tú. Docs › Balance de flujos › Elegir el objetivo.
+- **Objetivo secundario** — optimiza un segundo objetivo manteniendo el primero en una fracción elegida de su
+  óptimo (restricción épsilon, sin sumas ponderadas), y dibuja la curva de compromiso entre ambos (11 puntos).
+  Docs › Balance de flujos › Objetivo secundario y curva de compromiso.
 - **Modo claro / oscuro** — el botón de luna/sol arriba a la derecha (oscuro por defecto; también se aplica a los Docs).
 
 ### Estructura
@@ -389,16 +415,16 @@ Python solo se usa en el preprocesado, nunca en ejecución.
 
 El preprocesado convierte un repositorio en formato [standard-GEM](https://github.com/MetabolicAtlas/standard-GEM)
 (`model/*.yml` + `model/*.tsv`) en los JSON que lee la app. Los zip de origen no están en este
-repositorio: descarga `Human-GEM-2.1.1.zip`, `Mouse-GEM-1.8.0.zip` y `Rat-GEM-1.8.0.zip` de las publicaciones de
+repositorio: descarga `Human-GEM-2.1.1.zip`, `Mouse-GEM-1.8.0.zip`, `Rat-GEM-1.8.0.zip`, `Zebrafish-GEM-1.6.0.zip`, `Fruitfly-GEM-1.7.0.zip` y `Worm-GEM-1.8.0.zip` de las publicaciones de
 [Human-GEM](https://github.com/SysBioChalmers/Human-GEM) y
-[Mouse-GEM](https://github.com/SysBioChalmers/Mouse-GEM) y [Rat-GEM](https://github.com/SysBioChalmers/Rat-GEM) y ponlos en la raíz del proyecto.
+[Mouse-GEM](https://github.com/SysBioChalmers/Mouse-GEM), [Rat-GEM](https://github.com/SysBioChalmers/Rat-GEM), [Zebrafish-GEM](https://github.com/SysBioChalmers/Zebrafish-GEM), [Fruitfly-GEM](https://github.com/SysBioChalmers/Fruitfly-GEM) y [Worm-GEM](https://github.com/SysBioChalmers/Worm-GEM) y ponlos en la raíz del proyecto.
 
 ```bash
 python3 -m venv --without-pip tools/.venv
 python3 -m pip --python tools/.venv/bin/python install rdkit pyyaml igraph rxnmapper \
     torch --extra-index-url https://download.pytorch.org/whl/cpu
 
-tools/build_all.sh                      # Human-GEM, Mouse-GEM, Rat-GEM
+tools/build_all.sh                      # all six models
 
 # otro modelo (zip o carpeta):
 tools/.venv/bin/python tools/build_model.py   Otro-GEM.zip otro-gem [--structures-from human-gem]
@@ -487,3 +513,14 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # ver el mapa a
 - Mouse-GEM 1.8.0 y Rat-GEM 1.8.0 traen como objetivo `MAR00021`, cuyo valor no es una tasa de crecimiento (unos 0,00016). Por eso el
   objetivo por defecto, «Crecimiento (biomasa genérica)», es MAR13082, la reacción de biomasa de Human-GEM,
   presente pero cerrada en ambos modelos y abierta sólo mientras es el objetivo: 0,0370 h⁻¹ en el medio estándar, como Human-GEM.
+- Zebrafish-, Fruitfly- y Worm-GEM usan la biomasa de célula humana, cinética de captación de mamífero y ΔG a
+  37 °C, sin flujos medidos y con listas cortas de tejidos de Bgee. Fruitfly-GEM usa por defecto el medio de Schneider
+  (células S2). Worm-GEM se construye sin 2,3-bisfosfoglicerato en la reserva de metabolitos (a C. elegans le falta la mutasa).
+- yeast-GEM e iML1515 se leen a través de los nombres de Human-GEM (`tools/convert_foreign.py`: MetaNetX,
+  BiGG, ChEBI, KEGG, nombre); se emparejan cerca de la mitad de sus metabolitos. Sus medios (M9, Verduyn, YNB,
+  SC), flujos medidos (Jouhten 2008; Zampieri 2019; Castaño-Cerezo 2009) y cepas de laboratorio están en la
+  documentación. Yeast-GEM sobrestima el crecimiento en discontinuo aerobio (0,66 frente a unos 0,37 h⁻¹).
+- Los modelos se usan tal como se publicaron. Algunas reacciones sólo pueden ir en un sentido termodinámicamente
+  imposible (citocromos P450 y CMP-Neu5Ac hidroxilasa escritos al revés en Human-GEM 2.1.1 y los modelos animales,
+  ya corregidos en su rama de desarrollo; una piridoxal oxidasa en yeast-GEM); la ficha de la reacción lo avisa.
+  Ninguna lleva flujo en las ejecuciones por defecto.

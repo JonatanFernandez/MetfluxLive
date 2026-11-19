@@ -132,6 +132,13 @@
         </div>
         <div id="objCurrent" class="chip"></div>
         <label class="check"><input id="pfba" type="checkbox" checked> <span data-i18n="h.pfba"></span></label>
+        <details id="secBox" class="sec2"><summary data-i18n="sec.title"></summary>
+          <div class="row"><select id="secPreset" class="grow" data-i18n-title="sec.pickTitle"></select></div>
+          <div class="row sec-keep"><label for="secFrac" data-i18n="sec.keep"></label><input id="secFrac" type="range" min="0" max="100" step="5" value="90" class="grow"><b id="secFracVal">90 %</b></div>
+          <p class="hint" data-i18n-html="sec.hint"></p>
+          <button id="secCurveBtn" class="link" data-i18n="sec.curve" data-i18n-title="sec.curveTitle"></button>
+          <div id="secCurve"></div>
+        </details>
       </section>
       <section id="secPerturb" class="fold">
         <h2><span data-i18n="h.perturb"></span> <button id="clearPerturb" class="link" data-i18n="h.clearPerturb" hidden></button></h2>

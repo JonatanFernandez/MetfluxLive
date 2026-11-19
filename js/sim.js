@@ -3,7 +3,7 @@ import { packNetwork } from "./core/fba.js";
 import { applyMedium, findExchanges, uptakeCapacity, UNLIMITED } from "./core/medium.js";
 import { TRACE_SECRETION, FREE_SECRETION, atpMaintenanceRxn } from "./core/measured.js";
 import { CONTEXT_PENALTY } from "./core/contexts.js";
-import { OPEN_AS_OBJECTIVE, isGrowthRxn } from "./core/objectives.js";
+import { OPEN_AS_OBJECTIVE, MAINT_AS_OBJECTIVE, isGrowthRxn } from "./core/objectives.js";
 import { Tracer } from "./core/tracer.js";
 import { t } from "./i18n.js";
 
@@ -69,7 +69,7 @@ export class Simulator {
   }
 
   _key(cfg, supplies) {
-    return JSON.stringify([cfg.objective, cfg.maximize, cfg.parsimonious, cfg.measured || null, cfg.context ? [cfg.context.id, cfg.context.mode, cfg.context.block.length] : null, supplies.map((it) => [it.met, it.conc, it.vmax, it.km, it.unlimited ? 1 : 0, it.hold ? 1 : 0])]);
+    return JSON.stringify([cfg.objective, cfg.maximize, cfg.parsimonious, cfg.secondary || null, cfg.measured || null, cfg.context ? [cfg.context.id, cfg.context.mode, cfg.context.block.length] : null, supplies.map((it) => [it.met, it.conc, it.vmax, it.km, it.unlimited ? 1 : 0, it.hold ? 1 : 0])]);
   }
 
   /**
@@ -105,12 +105,27 @@ export class Simulator {
    * @returns [{ x, objective, status, relaxed, limit }] (limit: the bound that limits the objective most there)
    */
   async phasePlane(cfg, supplies, met, xs, onProgress) {
-    const base = { ...cfg, parsimonious: false, perturb: [], noRelax: true, measured: cfg.measured ? { ...cfg.measured, items: cfg.measured.items.filter((x) => x.met !== met) } : undefined };
+    const base = { ...cfg, secondary: null, parsimonious: false, perturb: [], noRelax: true, measured: cfg.measured ? { ...cfg.measured, items: cfg.measured.items.filter((x) => x.met !== met) } : undefined };
     const out = [];
     for (let i = 0; i < xs.length; i++) {
       const r = await this._solve(base, supplies, null, new Map([[met, xs[i]]]), null);
       out.push({ x: xs[i], objective: r.status === "optimal" ? r.objective : 0, status: r.status, relaxed: !!r.relaxed, limit: r.status === "optimal" ? r.limits?.[0] : null, srcItems: r.srcItems });
       if (onProgress && onProgress(i + 1, xs.length) === false) break;
+    }
+    return out;
+  }
+
+  /**
+   * Trade-off curve between the objective and cfg.secondary: for each fraction of the objective's optimum, the best
+   * secondary (FBA only), with the same medium, measured fluxes and cell type; perturbations are left out.
+   * @returns [{ frac, primary, secondary, status }]
+   */
+  async tradeoff(cfg, supplies, fracs, onProgress) {
+    const out = [];
+    for (let i = 0; i < fracs.length; i++) {
+      const r = await this._solve({ ...cfg, parsimonious: false, perturb: [], noRelax: true, secondary: { ...cfg.secondary, frac: fracs[i] } }, supplies);
+      out.push({ frac: fracs[i], primary: r.status === "optimal" ? r.objective : 0, secondary: r.secondary?.value ?? 0, status: r.status });
+      if (onProgress && onProgress(i + 1, fracs.length) === false) break;
     }
     return out;
   }
@@ -159,16 +174,23 @@ export class Simulator {
       }
     }
     // a reaction closed in the published model but usable as objective (Mouse-GEM's MAR13082): open while it is the objective
-    const or = this.model.rxns[cfg.objective];
-    if (or && !or.removed && OPEN_AS_OBJECTIVE.has(or.id) && lb[cfg.objective] === 0 && ub[cfg.objective] === 0) ub[cfg.objective] = 1000;
+    const sec = cfg.secondary && cfg.secondary.rxn !== cfg.objective && this.model.rxns[cfg.secondary.rxn] && !this.model.rxns[cfg.secondary.rxn].removed ? cfg.secondary : null;
+    for (const j of sec ? [cfg.objective, sec.rxn] : [cfg.objective]) {
+      const or = this.model.rxns[j];
+      if (or && !or.removed && OPEN_AS_OBJECTIVE.has(or.id) && lb[j] === 0 && ub[j] === 0) ub[j] = 1000;
+      if (or && !or.removed && MAINT_AS_OBJECTIVE.has(or.id)) ub[j] = 1000;
+    }
     const measured = cfg.measured?.items?.length || cfg.measured?.ngam > 0 ? cfg.measured : null;
     // a perturbed cell keeps the measured phenotype of the reference; only if that becomes impossible are the
     // measured fluxes relaxed (below), as in any other case
-    if (measured) this._applyMeasured(measured, medium, lb, ub, capLimit, !!cfg.relaxed, cfg.objective);
+    if (measured) this._applyMeasured(measured, medium, lb, ub, capLimit, !!cfg.relaxed, cfg.objective, sec?.rxn);
     // Maximising the release of a metabolite asks the cell to make it: its uptake is closed, otherwise a medium
     // that contains it (glucose, urea, lactate, GSH in Plasmax...) would just be passed through.
+    const goals = [[cfg.objective, cfg.maximize]];
+    if (sec) goals.push([sec.rxn, sec.maximize !== false]);
     for (const [, e] of this.exchanges) {
-      if (e.rxn !== cfg.objective || (cfg.maximize ? 1 : -1) !== -e.dir) continue;
+      const g = goals.find(([j]) => j === e.rxn);
+      if (!g || (g[1] ? 1 : -1) !== -e.dir) continue;
       if (e.dir < 0) lb[e.rxn] = Math.max(lb[e.rxn], 0); else ub[e.rxn] = Math.min(ub[e.rxn], 0); // uptake = dir * v <= 0
       if (lb[e.rxn] > ub[e.rxn]) lb[e.rxn] = ub[e.rxn] = 0;
     }
@@ -185,7 +207,7 @@ export class Simulator {
     await this.ready;
     let res = await this._call({
       type: "solve",
-      params: { lb, ub, objective: cfg.objective, maximize: cfg.maximize, parsimonious: cfg.parsimonious, sources,
+      params: { lb, ub, objective: cfg.objective, maximize: cfg.maximize, parsimonious: cfg.parsimonious, sources, secondary: cfg.fva === undefined ? sec : null,
         penalty: ctx && ctx.mode === "penalty" ? { rxns: ctx.block, w: CONTEXT_PENALTY } : undefined, fva: cfg.fva, fvaFrac: cfg.fvaFrac, fvaSolutions: cfg.fvaSolutions, fvaCycles: cfg.fvaCycles },
     });
     // the measured fluxes belong to cells in a rich medium: when they cannot be met (a nutrient removed or
@@ -205,19 +227,20 @@ export class Simulator {
    * (dynamic mode). Relaxed (when the pinned problem has no solution): uptakes keep only their measured
    * maximum and secretions are left free. The objective's own exchange is never capped as a trace nor pinned to a measurement.
    */
-  _applyMeasured(meas, medium, lb, ub, capLimit, perturbed, objective) {
+  _applyMeasured(meas, medium, lb, ub, capLimit, perturbed, objective, objective2 = -1) {
     const tol = Math.max(0, meas.tol ?? 0.2), present = new Map(medium.map((it) => [it.met, it]));
     // unmeasured organic products: traces only
     if (meas.ngam > 0 && this.ngamRxn >= 0) lb[this.ngamRxn] = Math.max(lb[this.ngamRxn], Math.min(meas.ngam, ub[this.ngamRxn]));
     const measuredMets = new Set(meas.items.map((x) => x.met));
     for (const [met, e] of this.exchanges) {
       // exchanges added by a model edit are left free: the user put them there to be used
-      if (measuredMets.has(met) || e.rxn === objective || this.model.rxns[e.rxn].user || FREE_SECRETION.has(this.model.bases[this.model.mets[met].b].n)) continue;
-      if (e.dir < 0) ub[e.rxn] = Math.min(ub[e.rxn], TRACE_SECRETION); else lb[e.rxn] = Math.max(lb[e.rxn], -TRACE_SECRETION);
+      if (measuredMets.has(met) || e.rxn === objective || e.rxn === objective2 || this.model.rxns[e.rxn].user || FREE_SECRETION.has(this.model.bases[this.model.mets[met].b].n)) continue;
+      const trace = meas.trace ?? TRACE_SECRETION;
+      if (e.dir < 0) ub[e.rxn] = Math.min(ub[e.rxn], trace); else lb[e.rxn] = Math.max(lb[e.rxn], -trace);
     }
     for (const { met, rate } of meas.items) {
       const e = this.exchanges.get(met);
-      if (!e || !rate || e.rxn === objective) continue; // the objective's own exchange is left to the objective
+      if (!e || !rate || e.rxn === objective || e.rxn === objective2) continue; // the objectives' own exchanges are left to them
       let lo, hi; // range of uptake (positive) or secretion (negative), in "uptake" terms
       if (rate > 0) {
         const it = present.get(met);

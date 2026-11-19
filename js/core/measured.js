@@ -71,6 +71,29 @@ const HEK293 = [
   ["glutamate", -9.6, -8.2, -11], ["ornithine", -9.0, -7.5, -10.5], ["glycine", -6.2, -5.1, -7.3], ["proline", -3.8, -3.4, -4.2],
 ];
 
+// ---- microbes (mmol/gDW/h). Each set is offered only for its own model (org).
+// S. cerevisiae CEN.PK113-1A, 13C glucose-limited chemostats, D = 0.10 1/h, pH 5, 30 °C, at five oxygen fractions of the
+// inlet gas: Jouhten et al., BMC Syst Biol 2:60 (2008), Table 1 (mean ± SEM of two cultures; here their mean, and the
+// lower / higher of the two) and Table 3 (oxygen uptake rate, one value). Products they did not report (succinate,
+// pyruvate…) were below their detection limit, about 0.02 mmol/gDW/h (trace): anaerobic yeast must release some
+// succinate to balance its redox.
+const J = (glc, etoh, o2, gly) => [["glucose", ...glc], ...(etoh ? [["ethanol", ...etoh]] : []), ["O2", o2, o2, o2], ...(gly ? [["glycerol", ...gly]] : [])];
+const YEAST_O2_209 = J([1.075, 0.87, 1.28], null, 2.7);
+const YEAST_O2_28 = J([1.32, 1.28, 1.36], [-0.085, -0.07, -0.10], 2.5);
+const YEAST_O2_10 = J([2.05, 1.97, 2.13], [-1.78, -1.56, -2.00], 1.7);
+const YEAST_O2_05 = J([2.49, 2.20, 2.78], [-2.75, -2.59, -2.91], 1.2);
+const YEAST_O2_0 = J([6.44, 6.30, 6.58], [-9.26, -9.05, -9.47], 0, [-1.08, -1.05, -1.11]);
+// E. coli BW25113 (a K-12 strain), M9 glucose, aerobic batch, mean ± SD: Zampieri et al., Nat Commun 10:3354 (2019), Table 1
+const ECOLI_ZAMPIERI = [["glucose", 9.13, 8.52, 9.74], ["acetate", -5.43, -5.27, -5.59]];
+// E. coli BW25113, glucose or acetate minimal medium, batch, mean ± SD: Castaño-Cerezo et al., Microb Cell Fact 8:54 (2009),
+// Tables 2 (glucose, aerobic) and 7 (glucose, anaerobic). Their acetate culture (Table 6: 24.7 mmol/gDW/h) is left out:
+// oxidising it needs far more O2 than the 15 mmol/gDW/h capacity of the M9 media (Varma & Palsson 1994). "Lactate" is D-lactate (LdhA).
+const ECOLI_CC_AER = [["glucose", 10.64, 9.68, 11.6], ["acetate", -7.70, -7.08, -8.32], ["ethanol", -2.63, -2.36, -2.90],
+  ["formate", -7.20, -6.62, -7.78], ["D-lactate", -0.71, -0.69, -0.73]];
+const ECOLI_CC_ANAER = [["glucose", 25.40, 24.44, 26.36], ["acetate", -19.15, -17.50, -20.80], ["ethanol", -17.13, -13.99, -20.27],
+  ["formate", -37.34, -34.20, -40.48], ["D-lactate", -0.91, -0.86, -0.96], ["succinate", -2.19, -1.73, -2.65], ["O2", 0, 0, 0]];
+const MM = (x) => x;
+
 /**
  * Built-in sets. Names and notes are in js/i18n.js under meas.name.<id> / meas.note.<id>.
  * rows: [name, value in the source unit (+ uptake, − secretion), low, high]; toGDW converts to mmol/gDW/h.
@@ -82,8 +105,18 @@ export const MEASURED_SETS = [
   { id: "fibroP", rows: FIBRO_P, ngam: NGAM, unit: "nmol/µg protein/h", spread: "± SE", toGDW: (x) => x * PROTEIN_PER_GDW },
   { id: "fibroQ", rows: FIBRO_Q, ngam: NGAM, unit: "nmol/µg protein/h", spread: "± SE", toGDW: (x) => x * PROTEIN_PER_GDW },
   { id: "liver", rows: LIVER, ngam: 0, unit: "µmol/g liver/day", spread: "range", toGDW: (x) => (x * LIVER_WET_DRY) / 24 / 1000 },
+  { id: "yeastO2_209", org: "yeast-gem", rows: YEAST_O2_209, ngam: 0, unit: "mmol/gDW/h", spread: "two cultures", trace: 0.02, toGDW: MM, medium: "verduyn" },
+  { id: "yeastO2_28", org: "yeast-gem", rows: YEAST_O2_28, ngam: 0, unit: "mmol/gDW/h", spread: "two cultures", trace: 0.02, toGDW: MM, medium: "verduyn" },
+  { id: "yeastO2_10", org: "yeast-gem", rows: YEAST_O2_10, ngam: 0, unit: "mmol/gDW/h", spread: "two cultures", trace: 0.02, toGDW: MM, medium: "verduyn" },
+  { id: "yeastO2_05", org: "yeast-gem", rows: YEAST_O2_05, ngam: 0, unit: "mmol/gDW/h", spread: "two cultures", trace: 0.02, toGDW: MM, medium: "verduyn" },
+  { id: "yeastO2_0", org: "yeast-gem", rows: YEAST_O2_0, ngam: 0, unit: "mmol/gDW/h", spread: "two cultures", trace: 0.02, toGDW: MM, medium: "verduynAnaer" },
+  { id: "ecoliZampieri", org: "ecoli-gem", rows: ECOLI_ZAMPIERI, ngam: 0, unit: "mmol/gDW/h", spread: "± SD", toGDW: MM, medium: "m9glc" },
+  { id: "ecoliGlcAer", org: "ecoli-gem", rows: ECOLI_CC_AER, ngam: 0, unit: "mmol/gDW/h", spread: "± SD", toGDW: MM, medium: "m9glc" },
+  { id: "ecoliGlcAnaer", org: "ecoli-gem", rows: ECOLI_CC_ANAER, ngam: 0, unit: "mmol/gDW/h", spread: "± SD", toGDW: MM, medium: "m9glcAnaer" },
   { id: "none", rows: [] },
 ];
+/** Sets offered for a model: its own (org), or the mammalian ones for the animal models. */
+export const measuredSetsFor = (slug, microbe) => MEASURED_SETS.filter((s) => s.id === "none" || (s.org ? s.org === slug : !microbe));
 
 /**
  * Rows of a built-in set for a model.

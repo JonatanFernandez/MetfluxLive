@@ -70,6 +70,10 @@ export class FbaProblem {
    * @param p { lb, ub: Float64Array(nRxns), objective: rxn index, maximize: bool,
    *            parsimonious: bool, sources: [{met, max}], penalty?: { rxns: Int32Array, w: number } }
    *            penalty: extra weight (1 + w) of those reactions in the parsimonious stage only
+   *            secondary?: { rxn, maximize, frac }: after the objective, optimise reaction rxn while the objective
+   *            keeps at least frac (0..1) of its optimum (an epsilon-constraint); pFBA then keeps that value.
+   *            The result's objective is then the objective's flux in that solution, and secondary =
+   *            { value, primaryOpt } (primaryOpt: the objective's optimum alone)
    * @returns { status, objective, v: Float64Array(nRxns), sourceFlux: Float64Array }
    */
   solve(p) {
@@ -118,10 +122,33 @@ export class FbaProblem {
       return { status: "optimal", objective, range: many ? undefined : r.ranges[0], ranges: r.ranges, solutions: r.solutions, v: new Float64Array(nRxns), sourceFlux: new Float64Array(sources.length) };
     }
 
+    // secondary objective: the first objective is held by a temporary row, the objective row moves to the second
+    let stageObj = objective, stageSign = sign, secondary = null, extraRow = -1;
+    const dropRow = () => { if (extraRow >= 0) { M.deleteRows({ kind: "range", from: extraRow, to: extraRow }); extraRow = -1; } };
+    if (p.secondary && p.secondary.rxn !== o && p.secondary.rxn >= 0) {
+      const s = p.secondary, f = Math.min(1, Math.max(0, s.frac ?? 1)), tol = Math.max(1e-9, Math.abs(objective) * 1e-7);
+      const keepLo = sign < 0 ? objective - (1 - f) * Math.abs(objective) - tol : -INF;
+      const keepUp = sign < 0 ? INF : objective + (1 - f) * Math.abs(objective) + tol;
+      M.addRow(keepLo, keepUp, { indices: Int32Array.of(o, nRxns + o), values: Float64Array.of(1, -1) });
+      extraRow = this.net.nMets + 1;
+      M.changeCoefficient(this.objRow, o, 0); M.changeCoefficient(this.objRow, nRxns + o, 0);
+      const q = s.rxn;
+      this.objCols = [q, nRxns + q];
+      M.changeCoefficient(this.objRow, q, 1); M.changeCoefficient(this.objRow, nRxns + q, -1);
+      stageSign = s.maximize === false ? 1 : -1;
+      cost.fill(0); cost[q] = stageSign; cost[nRxns + q] = -stageSign;
+      M.changeColsCost(all, cost);
+      M.clearSolver(); M.run();
+      status = M.getModelStatus();
+      if (status !== optimal) { dropRow(); return { status: this._statusName(status), objective, v: new Float64Array(nRxns), sourceFlux: new Float64Array(sources.length) }; }
+      stageObj = stageSign * M.getObjectiveValue() || 0;
+      secondary = { value: stageObj, primaryOpt: objective };
+    }
+
     if (p.parsimonious !== false) {
-      const slack = Math.max(1e-9, Math.abs(objective) * 1e-6);
-      if (sign < 0) M.changeRowBounds(this.objRow, objective - slack, INF);
-      else M.changeRowBounds(this.objRow, -INF, objective + slack);
+      const slack = Math.max(1e-9, Math.abs(stageObj) * 1e-6);
+      if (stageSign < 0) M.changeRowBounds(this.objRow, stageObj - slack, INF);
+      else M.changeRowBounds(this.objRow, -INF, stageObj + slack);
       const pc = this.net.pcost;
       for (let j = 0; j < nRxns; j++) cost[j] = cost[nRxns + j] = pc ? pc[j] : 1;
       if (p.penalty) for (const j of p.penalty.rxns) cost[j] = cost[nRxns + j] = cost[j] * (1 + p.penalty.w);
@@ -130,15 +157,17 @@ export class FbaProblem {
       M.clearSolver();
       M.run();
       status = M.getModelStatus();
-      if (status !== optimal) return { status: this._statusName(status), objective, v: new Float64Array(nRxns), sourceFlux: new Float64Array(sources.length) };
+      if (status !== optimal) { dropRow(); return { status: this._statusName(status), objective, v: new Float64Array(nRxns), sourceFlux: new Float64Array(sources.length) }; }
     }
     const x = M.getSolution().colValue;
+    dropRow();
     const v = new Float64Array(nRxns);
     for (let j = 0; j < nRxns; j++) {
       const val = x[j] - x[nRxns + j];
       v[j] = Math.abs(val) < 1e-9 ? 0 : val;
     }
-    return { status: "optimal", objective, v, sourceFlux: Float64Array.from(sources, (_, i) => x[n2 + i]), limits, metValue };
+    // with a secondary objective, the objective reported is the first objective's flux in this solution
+    return { status: "optimal", objective: secondary ? v[o] : objective, secondary, v, sourceFlux: Float64Array.from(sources, (_, i) => x[n2 + i]), limits, metValue };
   }
 
   /**

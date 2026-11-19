@@ -37,9 +37,18 @@ export class ModelIndex {
     this.rxnIndex = new Map(rxns.map((r, j) => [r.id, j]));
     // compartment roles, recognised by name so that other GEMs work too
     this.compRole = {}; this.roleComp = {};
+    // a compartment named "<organelle> membrane" (yeast-GEM: ER, Golgi, mitochondrial and vacuolar membranes) is
+    // drawn on the membrane of that organelle (membraneOf)
+    this.membraneOf = {};
+    const membranes = [];
     for (const [c, name] of Object.entries(model.compartments)) {
+      if (/membrane/i.test(name) && !/outer|inner|plasma/i.test(name)) { membranes.push([c, name]); continue; }
       const hit = ROLE_RX.find(([, rx]) => rx.test(name));
       if (hit && !this.roleComp[hit[0]]) { this.compRole[c] = hit[0]; this.roleComp[hit[0]] = c; }
+    }
+    for (const [c, name] of membranes) {
+      const hit = ROLE_RX.find(([, rx]) => rx.test(name.replace(/membrane/i, "")));
+      if (hit && this.roleComp[hit[0]]) this.membraneOf[c] = this.roleComp[hit[0]];
     }
     this.pathwayGroups = { key: "pathway", n: subsystems.length, groupOf: Int32Array.from(rxns, (r) => (r.removed ? -1 : r.ss)), skip: this.isTransportSub, perMet: false };
   }
@@ -167,7 +176,8 @@ export class ModelIndex {
 }
 
 const ROLE_RX = [["ext", /extracell/i], ["inner", /inner mito|intermembrane/i], ["mito", /mitochondri/i], ["cyt", /cytosol|cytoplasm/i],
-  ["nuc", /nucle/i], ["er", /reticul/i], ["golgi", /golgi/i], ["lyso", /lysos/i], ["perox", /peroxi/i]];
+  ["nuc", /nucle/i], ["er", /reticul/i], ["golgi", /golgi/i], ["lyso", /lysos/i], ["perox", /peroxi/i],
+  ["peri", /periplasm|cell envelope|cell wall/i], ["vac", /vacuol/i], ["lipid", /lipid particle|lipid droplet/i]];
 
 export function fmtCoef(c) {
   const a = Math.abs(c);

@@ -109,12 +109,86 @@ function williamsE() {
   return rows;
 }
 
+// Schneider's Drosophila Medium as sold by Gibco (cat. 21720), the medium of Drosophila S2 cells, in mM exactly as in
+// the manufacturer's formulation table (thermofisher.com, media formulation 230; Schneider 1964, J Exp Zool 156:91;
+// S2 cells: Schneider 1972, J Embryol Exp Morphol 27:353). Its 2 g/L yeastolate (a yeast extract of undefined composition) and the 10 % FBS used with S2 cells are
+// what bring vitamins, nucleobases and lipids: those are taken from the standard medium (SCHNEIDER_EXTRA), as for the
+// serum of Plasmax and HPLM. Salts are listed as ions (INORGANIC).
+const SCHNEIDER = [
+  ["glucose", 11.111111], ["trehalose", 5.8479533], ["glutamine", 12.328767],
+  ["glycine", 3.3333333], ["arginine", 2.2988505], ["aspartate", 3.0075188], ["cysteine", 0.49586776],
+  ["cystine", 0.41666666], ["glutamate", 5.442177], ["histidine", 2.580645], ["isoleucine", 1.1450381],
+  ["leucine", 1.1450381], ["lysine", 9.016394], ["methionine", 5.3691278], ["phenylalanine", 0.90909094],
+  ["proline", 14.782609], ["serine", 2.3809524], ["threonine", 2.9411764], ["tryptophan", 0.49019608],
+  ["tyrosine", 2.762431], ["valine", 2.5641026], ["beta-alanine", 5.6179776],
+  ["AKG", 1.369863], ["fumarate", 0.86206895], ["malate", 0.74626863], ["succinate", 0.84745765],
+];
+const SCHNEIDER_EXTRA = ["choline", "inositol", "thiamin", "folate", "biotin", "pantothenate", "nicotinamide", "pyridoxine",
+  "riboflavin", "hypoxanthine", "thymidine", "aquacob(III)alamin", "lipoic acid", "linoleate", "linolenate", "retinoate",
+  "alpha-tocopherol", "gamma-tocopherol"];
+function schneider() {
+  const std = new Map(DEFAULT_MEDIUM.map((d) => [d[0], d]));
+  // amino acids and sugars keep the uptake kinetics of the standard medium; the rest the fallback
+  const rows = SCHNEIDER.map(([n, c]) => [n, c, ...(std.get(n)?.slice(2, 4) || KINETICS[n] || KIN_FALLBACK)]);
+  rows.splice(3, 0, std.get("O2"));
+  for (const n of SCHNEIDER_EXTRA) rows.push(std.get(n));
+  for (const n of INORGANIC) rows.push([n, null]);
+  return rows;
+}
+
+// ---------------------------------------------------------------- microbial media ----
+// Concentrations in mM from the published recipes (sources in docs, "Media"). Uptake kinetics are the microbes' own
+// orders of magnitude, not the mammalian ones above: a glucose uptake of about 10 mmol/gDW/h for E. coli (Castaño-Cerezo
+// et al. 2009 measured 10.6) and 22 for S. cerevisiae in batch, an oxygen uptake capacity of 15 for E. coli (the value of
+// Varma & Palsson, Appl Environ Microbiol 60:3724, 1994, with which FBA reproduces acetate overflow) and
+// 8 mmol/gDW/h (S. cerevisiae, whose respiration saturates: above it the excess glucose is fermented, the Crabtree
+// effect). Salts, trace metals and the nitrogen source are not limiting (null). Both models' names for trace metals
+// are listed; a name that a model lacks is simply skipped.
+const MICRO_TRACE = ["H2O", "H+", "Pi", "sulfate", "NH4+", "K+", "Na+", "Mg2+", "Ca2+", "chloride", "Fe2+", "Fe3+", "zinc", "Cu2+",
+  "Manganese", "Mn(2+)", "Co2+", "Molybdate", "Nickel", "selenate", "selenite", "Tungstate", "CO2"];
+const microRows = (list, o2) => [...list, ...(o2 ? [["O2", 0.2, o2, 0.001, "hold"]] : []), ...MICRO_TRACE.map((n) => [n, null])];
+// M9 minimal medium (Sambrook & Russell, Molecular Cloning, 2001) with 0.4 % (w/v) of one carbon source
+const M9 = (name, mM, vmax, km, o2 = 15) => microRows([[name, mM, vmax, km]], o2);
+// Verduyn et al., Yeast 8:501 (1992) mineral medium: vitamins at the published concentrations (biotin 0.05, Ca-pantothenate 1,
+// nicotinic acid 1, myo-inositol 25, thiamine-HCl 1, pyridoxine-HCl 1, p-aminobenzoate 0.2 mg/L) and 20 g/L glucose (batch)
+const VITS_VERDUYN = [["biotin", 0.000205], ["pantothenate", 0.0021], ["nicotinate", 0.0081], ["inositol", 0.139], ["thiamin", 0.003],
+  ["pyridoxine", 0.0049], ["4-aminobenzoate", 0.00146]];
+// Difco Yeast Nitrogen Base without amino acids (Difco & BBL Manual): vitamins and 2 % glucose
+const VITS_YNB = [["biotin", 0.0000082], ["pantothenate", 0.00084], ["folate", 0.0000045], ["inositol", 0.0111], ["nicotinate", 0.00325],
+  ["4-aminobenzoate", 0.00146], ["pyridoxine", 0.00195], ["riboflavin", 0.00053], ["thiamin", 0.00119]];
+// Complete Supplement Mixture (CSM, MP Biomedicals 4500-012) added to YNB: synthetic complete (SC) medium
+const CSM = [["adenine", 0.074], ["arginine", 0.287], ["aspartate", 0.601], ["histidine", 0.129], ["isoleucine", 0.381], ["leucine", 0.762],
+  ["lysine", 0.342], ["methionine", 0.134], ["phenylalanine", 0.303], ["threonine", 0.84], ["tryptophan", 0.245], ["tyrosine", 0.276],
+  ["uracil", 0.178], ["valine", 1.195]];
+// vitamins are needed in µmol/gDW amounts: a low uptake capacity keeps the model from using them as nutrients. Nicotinate
+// is the exception: without O2 yeast cannot make NAD de novo (kynurenine pathway) and takes all of it from nicotinate.
+const yvit = (list) => list.map(([n, c]) => [n, c, n === "nicotinate" ? 0.01 : 0.001, 0.0005]);
+const yglc = (mM) => ["glucose", mM, 22, 1];
+const YEAST_O2 = 8;
+// anaerobic yeast cultures need sterols and unsaturated fatty acids, which they cannot make without O2: ergosterol 10 mg/L
+// and Tween 80 0.42 g/L (oleate). yeast-GEM's biomass also needs palmitoleate (16:1) chains, which its anaerobic setting
+// lets in as well; it is added at the same molar amount as oleate. Heme synthesis needs O2 too, and that setting takes
+// heme a (1e-6 mmol/gDW of biomass) out of the cofactor pool: here a trace of it is let in instead.
+const ANAER = [["ergosterol", 0.025, 0.01, 0.001], ["oleate", 0.32, 0.2, 0.01], ["palmitolate", 0.32, 0.2, 0.01], ["heme a", 0.0001, 0.0001, 0.00001]];
+
 /** Built-in media. Display names and notes are in js/i18n.js under medium.name.<id> / medium.note.<id>. */
 export const MEDIA = [
   { id: "default", rows: DEFAULT_MEDIUM },
   { id: "plasmax", rows: plasmaLike(1) },
   { id: "hplm", rows: plasmaLike(2) },
   { id: "williamsE", rows: williamsE() },
+  { id: "schneider", rows: schneider() },
+  // E. coli
+  { id: "m9glc", org: "ecoli-gem", rows: M9("glucose", 22.2, 10.5, 0.01) },
+  { id: "m9glcAnaer", org: "ecoli-gem", rows: M9("glucose", 22.2, 26, 0.01, 0) },
+  { id: "m9glyc", org: "ecoli-gem", rows: M9("glycerol", 43.4, 8, 0.05) },
+  { id: "m9ace", org: "ecoli-gem", rows: M9("acetate", 48.8, 25, 0.5) },
+  { id: "m9succ", org: "ecoli-gem", rows: M9("succinate", 33.9, 10, 0.5) },
+  // S. cerevisiae
+  { id: "verduyn", org: "yeast-gem", rows: microRows([yglc(111), ...yvit(VITS_VERDUYN)], YEAST_O2) },
+  { id: "verduynAnaer", org: "yeast-gem", rows: microRows([yglc(111), ...yvit(VITS_VERDUYN), ...ANAER], 0) },
+  { id: "ynb", org: "yeast-gem", rows: microRows([yglc(111), ...yvit(VITS_YNB)], YEAST_O2) },
+  { id: "sc", org: "yeast-gem", rows: microRows([yglc(111), ...yvit(VITS_YNB), ...CSM.map(([n, c]) => [n, c, 0.5, 0.05])], YEAST_O2) },
 ];
 
 export const UNLIMITED = 1000;

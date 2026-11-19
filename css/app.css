@@ -439,3 +439,12 @@ dialog.look h4 { margin: 8px 0 2px; font-size: 12px; text-transform: uppercase; 
 .lk-ramp { display: block; width: 96px; height: 10px; border-radius: 5px; }
 .lk-sw { display: flex; gap: 2px; } .lk-sw i { width: 10px; height: 10px; border-radius: 50%; display: block; }
 @media (max-width: 520px) { .lk-row { grid-template-columns: 1fr 1fr; } .lk-prev { display: none; } }
+/* secondary objective */
+details.sec2 { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 6px; }
+details.sec2 > summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+details.sec2[open] > summary { color: var(--text); margin-bottom: 6px; }
+.sec-keep { align-items: center; gap: 8px; font-size: 12.5px; }
+.sec-keep b { min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+.sec-tab { border-collapse: collapse; font-size: 12px; margin: 6px 0; }
+.sec-tab th, .sec-tab td { padding: 2px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.sec-tab td.num { text-align: right; font-variant-numeric: tabular-nums; }

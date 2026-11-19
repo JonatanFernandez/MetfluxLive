@@ -3,18 +3,78 @@
   "slug": "human-gem",
   "name": "Human-GEM",
   "version": "2.1.1",
-  "description": "Generic genome-scale metabolic model of Homo sapiens"
+  "description": "Generic genome-scale metabolic model of Homo sapiens",
+  "organism": "Homo sapiens"
  },
  {
   "slug": "mouse-gem",
   "name": "Mouse-GEM",
   "version": "1.8.0",
-  "description": ""
+  "description": "",
+  "organism": "Mus musculus"
  },
  {
   "slug": "rat-gem",
   "name": "Rat-GEM",
   "version": "1.8.0",
-  "description": ""
+  "description": "",
+  "organism": "Rattus norvegicus"
+ },
+ {
+  "slug": "zebrafish-gem",
+  "name": "Zebrafish-GEM",
+  "version": "",
+  "description": "",
+  "organism": "Danio rerio",
+  "defaults": {
+   "medium": "default",
+   "measured": "none"
+  }
+ },
+ {
+  "slug": "fruitfly-gem",
+  "name": "Fruitfly-GEM",
+  "version": "1.7.0",
+  "description": "",
+  "organism": "Drosophila melanogaster",
+  "defaults": {
+   "medium": "schneider",
+   "measured": "none"
+  }
+ },
+ {
+  "slug": "worm-gem",
+  "name": "Worm-GEM",
+  "version": "1.8.0",
+  "description": "",
+  "organism": "Caenorhabditis elegans",
+  "defaults": {
+   "medium": "default",
+   "measured": "none"
+  }
+ },
+ {
+  "slug": "yeast-gem",
+  "name": "Yeast-GEM",
+  "version": "9.1.1",
+  "description": "The Consensus Genome-Scale Metabolic Model of Yeast",
+  "organism": "Saccharomyces cerevisiae S288C",
+  "defaults": {
+   "medium": "verduyn",
+   "measured": "none",
+   "kind": "microbe"
+  }
+ },
+ {
+  "slug": "ecoli-gem",
+  "name": "E. coli iML1515",
+  "version": "(BiGG)",
+  "description": "",
+  "organism": "Escherichia coli K-12 MG1655",
+  "defaults": {
+   "medium": "m9glc",
+   "measured": "none",
+   "kind": "microbe"
+  }
  }
 ]

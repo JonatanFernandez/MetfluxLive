@@ -13,3 +13,15 @@ __pycache__/
 Human-GEM-*.zip
 Mouse-GEM-*.zip
 Rat-GEM-*.zip
+Zebrafish-GEM-*.zip
+Fruitfly-GEM-*.zip
+Worm-GEM-*.zip
+yeast-GEM-*.zip
+ecoli-src/
+
+# contributions to upstream models (issue/PR drafts, patches, verification scripts); already under tools/, listed for clarity
+tools/upstream/
+
+# supplementary tables of papers read for reference, not redistributable (e.g. Jang et al. 2019, Cell Metab)
+data/mmc*.pdf
+data/mmc*.xlsx

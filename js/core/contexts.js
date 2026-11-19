@@ -60,7 +60,7 @@ export function offGenesOf(rule, off) {
 /** Name of a metabolic task, stored as an index into data.taskNames (older files kept the text). */
 export const taskName = (data, x) => (typeof x === "number" ? data.taskNames?.[x] ?? String(x) : x);
 
-export const CONTEXT_GROUPS = ["user", "consensus", "lineCancer", "lineOther", "cellType", "tissue"];
+export const CONTEXT_GROUPS = ["user", "strain", "consensus", "lineCancer", "lineOther", "cellType", "tissue"];
 
 /** Search over contexts, in the shape attachSearch() expects. Empty query: the contexts with measured data first. */
 export class ContextIndex {
@@ -70,7 +70,7 @@ export class ContextIndex {
       const i = c.info || {};
       const sub = label.sub(c);
       return { type: "ctx", ref: c.id, title: c.name, sub, badge: label.badge(c), badgeClass: label.badgeClass?.(c), group: c.group, pairs: c.pairs || [],
-        hay: norm([c.name, i.disease, i.site, i.category, i.cellosaurus, i.entity, label.group(c)].filter(Boolean).join(" | ")), name: norm(c.name) };
+        hay: norm([c.name, i.genotype, i.disease, i.site, i.category, i.cellosaurus, i.entity, label.group(c)].filter(Boolean).join(" | ")), name: norm(c.name) };
     });
   }
 

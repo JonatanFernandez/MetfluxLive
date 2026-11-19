@@ -99,6 +99,17 @@ function applyLook() {
 }
 
 /** Switch the neutral colours of every map (and COMP_COLORS) to "dark" or "light". */
+// Compartment colours are keyed by Human-GEM's compartment letters; other models map theirs by role
+// (yeast-GEM "p" is the peroxisome, iML1515 "p" the periplasm…), set with setCompAliases().
+let COMP_ALIAS = {};
+const ROLE_KEY = { cyt: "c", ext: "e", mito: "m", inner: "i", nuc: "n", er: "r", golgi: "g", lyso: "l", perox: "x", vac: "l", peri: "s", lipid: "g" };
+export function setCompAliases(compRole, membraneOf = {}) {
+  COMP_ALIAS = {};
+  for (const [c, role] of Object.entries(compRole)) if (ROLE_KEY[role]) COMP_ALIAS[c] = ROLE_KEY[role];
+  for (const [c, parent] of Object.entries(membraneOf)) COMP_ALIAS[c] = COMP_ALIAS[parent] || parent;
+}
+export const compColor = (c) => COMP_COLORS[COMP_ALIAS[c] ?? c] || COMP_COLORS.c;
+
 export function setMapTheme(name) {
   themeName = THEMES[name] ? name : "dark";
   applyLook();
@@ -584,7 +595,7 @@ export class MapView {
         ctx.fillStyle = n.s ? (this.dlabel ? this._dc(n.de) : this.tracerOn ? enrichColor(n.e) : TH.metOn) : TH.metOff;
         ctx.fill();
         ctx.lineWidth = n.s ? 2 : 1.2;
-        ctx.strokeStyle = COMP_COLORS[n.comp] || COMP_COLORS.c;
+        ctx.strokeStyle = compColor(n.comp);
         if (n.unc) ctx.setLineDash([3, 2.5]);
         ctx.globalAlpha = a * (n.s ? 1 : 0.5); ctx.stroke(); ctx.setLineDash([]);
       } else {

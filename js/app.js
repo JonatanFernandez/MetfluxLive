@@ -1,11 +1,11 @@
 // MetfluxLive — application shell: state, panels, navigation and simulation control.
 import { Simulator } from "./sim.js";
 import { MEDIA, presetMedium, exportMedium, importMedium, uptakeCapacity, kineticsFor } from "./core/medium.js";
-import { MEASURED_SETS, DEFAULT_TOL, measuredPreset, measuredNgam } from "./core/measured.js";
+import { MEASURED_SETS, DEFAULT_TOL, measuredPreset, measuredNgam, measuredSetsFor } from "./core/measured.js";
 import { gprActivity } from "./core/gpr.js";
 import { loadContexts, offGenes, blockedReactions, offGenesOf, ContextIndex, taskName } from "./core/contexts.js";
 import { ModelIndex, fmtFlux, fmtTime, escapeHtml as esc } from "./modelindex.js";
-import { MapView, COMP_COLORS, enrichColor, deltaColor, energyColor, setMapTheme } from "./ui/mapview.js";
+import { MapView, compColor, setCompAliases, enrichColor, deltaColor, energyColor, setMapTheme } from "./ui/mapview.js";
 import { loadLook, applyLook, openLookDialog } from "./ui/look.js";
 import { OBJECTIVES, OBJECTIVE_GROUPS, objectiveIndex, isGrowthRxn } from "./core/objectives.js";
 import { SearchIndex, attachSearch } from "./ui/search.js";
@@ -43,6 +43,8 @@ const S = {
 };
 let map, editor, compare;
 const small = (s) => ` <small style="color:var(--muted);font-weight:400">${s}</small>`;
+// dG'm (kJ/mol, low end of the estimate) above which a direction is impossible in any cell
+const IMPOSSIBLE_DG = 100;
 
 // ------------------------------------------------------------------ boot ----
 async function boot() {
@@ -70,6 +72,7 @@ async function boot() {
   let models;
   try {
     models = await (await fetch("data/models.json")).json();
+    S.models = models;
   } catch {
     $("loadingText").textContent = t("load.missing");
     return;
@@ -128,11 +131,12 @@ async function loadModel(slug, opts = {}) {
     loadMeasured(storedMeasuredId(), false);
     S.cfg = { objective: Math.max(0, S.index.biomassRxn), maximize: true, parsimonious: true };
     S.scenes = {}; S.subScenes = new Map(); S.cell = undefined; S.depth = null;
+    setCompAliases(S.index.compRole, S.index.membraneOf);
     try { localStorage.setItem("metflux.model", slug); } catch { /* ignore */ }
     $("groupSel").querySelector('[value="cell"]').disabled = !cellLayout();
     if (!cellLayout() && S.grouping === "cell") S.grouping = "pathway";
     $("groupSel").value = S.grouping;
-    renderContext(); renderSupplies(); renderMeasured(); renderPerturb(); renderEvents(); renderObjective(); openGlobal(); renderDetails();
+    renderContext(); renderSupplies(); renderMeasured(); renderPerturb(); renderEvents(); renderObjective(); renderSecondary(); openGlobal(); renderDetails();
     editor.render(); compare.render();
     loading.classList.add("done");
     navReset();
@@ -225,7 +229,8 @@ function capture() {
     measured: { set: S.measured.set, tol: S.measured.tol, ngam: S.measured.ngam, edited: S.measured.edited, items: S.measured.items.map((x) => ({ met: mid(x.met), rate: x.rate })) },
     context: { id: S.context.id, mode: S.context.mode, user: S.context.id?.startsWith("user:") ? currentContext() : undefined },
     perturbations: S.perturb.map((p) => ({ type: p.type, target: p.type === "gene" ? p.ref : M.rxns[p.ref].id, activity: p.a })),
-    objective: { reaction: M.rxns[S.cfg.objective].id, maximize: S.cfg.maximize, parsimonious: S.cfg.parsimonious },
+    objective: { reaction: M.rxns[S.cfg.objective].id, maximize: S.cfg.maximize, parsimonious: S.cfg.parsimonious,
+      secondary: S.cfg.secondary ? { reaction: M.rxns[S.cfg.secondary.rxn].id, maximize: S.cfg.secondary.maximize !== false, keep: S.cfg.secondary.frac } : null },
     dynamic: { hours: +$("dynHours").value || 24, biomass: +$("dynBiomass").value || 0.5, pool: +$("dynPool").value || 0.5 },
     events: S.events.map((ev) => (ev.type === "medium" ? { t: ev.t, type: "medium", medium: ev.mediumId, saved: savedMedium(ev.mediumId) } : { t: ev.t, type: "add", met: mid(ev.met), conc: ev.conc, label: labelIdx(ev.label), fraction: ev.fraction ?? 1 })),
   };
@@ -250,7 +255,7 @@ function applySettings(o) {
   };
   setMode(o.mode === "dynamic" ? "dynamic" : "steady", false);
   S.mediumId = ensureMedium(o.medium.id, o.medium.saved);
-  try { localStorage.setItem("metflux.medium", S.mediumId); } catch { /* ignore */ }
+  savePref("medium", S.mediumId);
   S.supplies = [];
   for (const c of o.medium.components) {
     const m = met(c.met);
@@ -271,6 +276,8 @@ function applySettings(o) {
   const oj = L.rxn.get(o.objective.reaction);
   if (oj === undefined || S.model.rxns[oj].removed) lost++;
   S.cfg = { objective: oj !== undefined && !S.model.rxns[oj].removed ? oj : Math.max(0, S.index.biomassRxn), maximize: o.objective.maximize !== false, parsimonious: o.objective.parsimonious !== false };
+  { const s2 = o.objective.secondary, sj = s2 ? L.rxn.get(s2.reaction) : undefined;
+    S.cfg.secondary = sj !== undefined && !S.model.rxns[sj].removed && sj !== S.cfg.objective ? { rxn: sj, maximize: s2.maximize !== false, frac: Math.min(1, Math.max(0, +s2.keep || 0)) } : null; }
   $("dynHours").value = o.dynamic.hours; $("dynBiomass").value = o.dynamic.biomass; $("dynPool").value = o.dynamic.pool;
   S.events = [];
   for (const ev of o.events) {
@@ -278,7 +285,7 @@ function applySettings(o) {
     const m = met(ev.met);
     if (m !== undefined) S.events.push({ type: "add", t: +ev.t, met: m, conc: +ev.conc, label: label(m, ev.label), fraction: +ev.fraction || 1 });
   }
-  renderContext(); renderMediumSel(); renderSupplies(); renderMeasured(); renderPerturb(); renderEvents(); renderObjective();
+  renderContext(); renderMediumSel(); renderSupplies(); renderMeasured(); renderPerturb(); renderEvents(); renderObjective(); renderSecondary();
   return lost;
 }
 
@@ -333,13 +340,17 @@ function setMode(mode, rerun = true) {
 // ------------------------------------------------- compartments and groups ----
 function compName(c) {
   const role = S.index.compRole[c];
+  if (role === "peri" && !/periplasm/i.test(S.model.compartments[c])) return t("comp.wall"); // yeast cell envelope
   return role ? t("comp." + role) : S.index.compName(c);
 }
 
 /** Name of a location in the cell view: a compartment, or the membrane of one. */
 function locName(loc) {
   if (!loc.startsWith("mem:")) return compName(loc);
-  const c = loc.slice(4), role = S.index.compRole[c];
+  const c = loc.slice(4), role = S.index.compRole[c], peri = S.index.roleComp.peri;
+  // with a periplasm or cell wall the plasma membrane is the inner one (drawn as "mem:" + that layer)
+  if (peri && role === "ext") return t(/periplasm/i.test(S.model.compartments[peri]) ? "loc.outer" : "loc.wall");
+  if (peri && role === "peri") return t("loc.plasma");
   if (role === "ext") return t("loc.plasma");
   if (role === "inner") return t("loc.mitoInner");
   return t("loc.membrane", { c: compName(c) });
@@ -399,7 +410,7 @@ function globalScene() {
   if (key === "cell") {
     const c = cellLayout();
     const nodes = c.nodes.map((n) => ({ ...n, label: S.model.subsystems[n.ss], listOnly: listOnly.has(n.ss) }));
-    const regions = c.regions.map((r) => ({ ...r, label: locName(r.loc), color: COMP_COLORS[r.comp] || COMP_COLORS.c }));
+    const regions = c.regions.map((r) => ({ ...r, label: locName(r.loc), color: compColor(r.comp) }));
     sc = { kind: "global", cell: true, nodes, edges: [], regions };
   } else {
     const g = S.layout.global;
@@ -656,7 +667,7 @@ function openCtxMenu(node, x, y) {
     items.push(["cm.details", () => { S.sel = { type: "rxn", rxn: j }; renderDetails(); }]);
     items.push(["cm.fva", () => { S.sel = { type: "rxn", rxn: j }; renderDetails(); fluxRange(j); }]);
     items.push(["cm.ko", () => addPerturb("rxn", j)]);
-    items.push(["cm.objective", () => { S.cfg.objective = j; renderObjective(); changed(); }]);
+    items.push(["cm.objective", () => { S.cfg.objective = j; renderObjective(); renderSecondary(); changed(); }]);
     items.push(["cm.copy", () => navigator.clipboard?.writeText(model.rxns[j].id)]);
   } else {
     head = node.label;
@@ -899,7 +910,7 @@ async function run() {
   stopPlay();
   const t0 = performance.now();
   const pert = perturbActivities();
-  const cfg = { ...S.cfg, perturb: [...pert], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+  const cfg = { ...S.cfg, perturb: [...pert], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam, trace: S.measured.trace },
     context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
   const mode = S.mode;
   try {
@@ -1051,7 +1062,7 @@ function renderLegend(mode) {
   if (S.view.kind === "focus") h += `<div style="margin-top:4px">${t("legend.focus")}</div>`;
   if (sub && S.flex && S.flex.result === S.result && S.view.ss === S.flex.ss) h += `<div style="margin-top:4px">${t("flex.legend", { frac: Math.round(S.flex.frac * 100) })}<br>${["fixed", "required", "optional", "loop"].map((c) => `<span class="fx-dot fx-${c}"></span>${t("flex.c." + c)}`).join(" ")}</div>`;
   if (sub && S.ctxBlock?.length) h += `<div><svg width="26" height="10" style="vertical-align:middle;margin-right:4px"><line x1="1" y1="5" x2="25" y2="5" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 3"/></svg>${t(S.context.mode === "penalty" ? "legend.ctxPenal" : "legend.ctxBlocked", { ctx: esc(currentContext()?.name || "") })}</div>`;
-  if (comps.length) h += `<div class="comps">${comps.map((c) => `<span><i style="border-color:${COMP_COLORS[c] || COMP_COLORS.c}"></i>${esc(compName(c))}</span>`).join("")}</div>`;
+  if (comps.length) h += `<div class="comps">${comps.map((c) => `<span><i style="border-color:${compColor(c)}"></i>${esc(compName(c))}</span>`).join("")}</div>`;
   h += `<div style="margin-top:4px">${sub ? t("legend.subHint") : t("legend.globalHint") + (map.scene.cell ? "<br>" + t("legend.cellHint") : "")}</div>`;
   if (map.scene.guides) h += `<div>${t(sub ? "legend.cascadeSub" : "legend.cascadeHint")}</div>`;
   $("legend").innerHTML = h;
@@ -1064,10 +1075,17 @@ function userMedia() {
   try { const o = JSON.parse(localStorage.getItem("metflux.media") || "{}"); return o && typeof o === "object" && !Array.isArray(o) ? o : {}; } catch { return {}; }
 }
 const mediumExists = (id) => (id.startsWith(USER) ? Array.isArray(userMedia()[id.slice(USER.length)]) : MEDIA.some((m) => m.id === id));
+// Medium and measured set are remembered per model. A model with its own defaults in data/models.json (the
+// organisms other than human and mouse) starts from them; human and mouse also read the older key they shared.
+const modelDefaults = () => S.models?.find((m) => m.slug === S.slug)?.defaults || {};
+const isMicrobe = () => modelDefaults().kind === "microbe";
+function storedPref(k) {
+  try { return localStorage.getItem(`metflux.${k}.${S.slug}`) ?? (modelDefaults()[k] ? null : localStorage.getItem("metflux." + k)); } catch { return null; }
+}
+function savePref(k, v) { try { localStorage.setItem(`metflux.${k}.${S.slug}`, v); } catch { /* ignore */ } }
 function storedMediumId() {
-  let id = null;
-  try { id = localStorage.getItem("metflux.medium"); } catch { /* storage unavailable */ }
-  return id && mediumExists(id) ? id : "default";
+  const id = storedPref("medium");
+  return id && mediumExists(id) ? id : modelDefaults().medium || "default";
 }
 const mediumName = (id) => (id.startsWith(USER) ? id.slice(USER.length) : t("medium.name." + id));
 
@@ -1078,7 +1096,7 @@ function loadMedium(id, rerun = true) {
   const old = new Map(S.supplies.map((it) => [it.met, it]));
   S.supplies = items.map((it) => { const o = old.get(it.met); return { ...it, label: o?.label ?? null, fraction: o?.fraction ?? 1 }; });
   S.mediumId = id;
-  try { localStorage.setItem("metflux.medium", id); } catch { /* ignore */ }
+  savePref("medium", id);
   renderMediumSel(); renderSupplies();
   if (rerun) changed();
 }
@@ -1092,7 +1110,7 @@ function renderMediumSel() {
     for (const id of ids) g.appendChild(new Option(mediumName(id), id));
     sel.appendChild(g);
   };
-  group(t("medium.builtin"), MEDIA.map((m) => m.id));
+  group(t("medium.builtin"), MEDIA.filter((m) => (m.org ? m.org === S.slug : !isMicrobe())).map((m) => m.id)); // each organism its own media
   group(t("medium.saved"), Object.keys(userMedia()).sort((a, b) => a.localeCompare(b)).map((n) => USER + n));
   sel.value = S.mediumId;
   const mine = S.mediumId.startsWith(USER);
@@ -1112,7 +1130,7 @@ function saveMedium() {
   try { localStorage.setItem("metflux.media", JSON.stringify(all)); } catch { alert(t("medium.storageError")); return; }
   for (const it of S.supplies) it.conc0 = it.conc;
   S.mediumId = USER + name;
-  try { localStorage.setItem("metflux.medium", S.mediumId); } catch { /* ignore */ }
+  savePref("medium", S.mediumId);
   renderMediumSel(); renderSupplies();
 }
 
@@ -1156,7 +1174,7 @@ const ctxLabels = {
     const i = c.info || {};
     if (c.id === "nci60") return t("ctx.nci60Sub", { n: (i.lines || []).length });
     if (c.group === "user") return [t("ctx.src.user"), i.file].filter(Boolean).join(" · ");
-    return [i.disease || (c.group === "lineOther" ? i.category : ""), i.site, t("ctx.src." + c.src)].filter(Boolean).join(" · ");
+    return [i.genotype || i.disease || (c.group === "lineOther" ? i.category : ""), i.site, t("ctx.src." + c.src)].filter(Boolean).join(" · ");
   },
 };
 const currentContext = () => (S.context.id && S.ctxData ? S.ctxData.byId.get(S.context.id) || null : null);
@@ -1230,10 +1248,10 @@ function renderContext() {
   if (ctx.pairs.length && !ctx.pairs.includes(S.measured.set)) parts.push(t("ctx.pair", { sets: ctx.pairs.map((p) => `<button class="link" data-pair="${p}">${esc(t("meas.name." + p))}</button>`).join(", ") }));
   else if (!ctx.pairs.includes(S.measured.set) && S.measured.set !== "none") parts.push(`<span class="warn">${t("ctx.measOther", { set: esc(t("meas.name." + S.measured.set)) })}</span>`);
   if (S.context.mode === "penalty" && !S.cfg.parsimonious) parts.push(`<span class="warn">${t("ctx.penaltyNoPfba")}</span>`);
-  parts.push(`<span class="ctx-src">${t("ctx.license." + (S.slug === "human-gem" ? "hpa" : "bgee"), { lang: docsLang() })}</span>`);
+  parts.push(`<span class="ctx-src">${t("ctx.license." + (S.slug === "human-gem" ? "hpa" : ctx.src === "genotype" ? "genotype" : "bgee"), { lang: docsLang() })}</span>`);
   note.innerHTML = parts.join("<br>");
   $("rnaDelete")?.addEventListener("click", () => { if (confirm(t("rna.deleteConfirm", { name: ctx.name }))) { deleteUserContext(ctx.id); setContext(null, S.context.mode); } });
-  note.querySelectorAll("[data-pair]").forEach((b) => { b.onclick = () => { loadMeasured(b.dataset.pair); renderObjective(); renderContext(); }; });
+  note.querySelectorAll("[data-pair]").forEach((b) => { b.onclick = () => { loadMeasured(b.dataset.pair); renderObjective(); renderSecondary(); renderContext(); }; });
 }
 const ctxBadgeClass = (g) => ({ user: "sub", lineCancer: "cancer", lineOther: "gene", cellType: "met", tissue: "rxn", consensus: "sub" }[g] || "sub");
 
@@ -1404,14 +1422,16 @@ function contextExport() {
 
 // ------------------------------------------------- measured exchange fluxes ----
 function storedMeasuredId() {
-  let id = null;
-  try { id = localStorage.getItem("metflux.measured"); } catch { /* storage unavailable */ }
-  return MEASURED_SETS.some((x) => x.id === id) ? id : "nci60";
+  const id = storedPref("measured");
+  return measuredSetsFor(S.slug, isMicrobe()).some((x) => x.id === id) ? id : modelDefaults().measured || "nci60";
 }
 
 function loadMeasured(id, rerun = true) {
-  S.measured = { set: id, tol: S.measured.tol ?? DEFAULT_TOL, items: measuredPreset(S.model, S.sim.exchanges, id), ngam: measuredNgam(id), edited: false };
-  try { localStorage.setItem("metflux.measured", id); } catch { /* ignore */ }
+  // a microbial set belongs to one cultivation: its medium (aerobic / anaerobic, carbon source) comes with it
+  const setMedium = MEASURED_SETS.find((x) => x.id === id)?.medium;
+  if (setMedium && setMedium !== S.mediumId && S.model && mediumExists(setMedium)) loadMedium(setMedium, false);
+  S.measured = { set: id, tol: S.measured.tol ?? DEFAULT_TOL, items: measuredPreset(S.model, S.sim.exchanges, id), ngam: measuredNgam(id), trace: MEASURED_SETS.find((x) => x.id === id)?.trace, edited: false };
+  savePref("measured", id);
   renderMeasured(); renderSupplies();
   if (rerun) changed();
 }
@@ -1422,7 +1442,7 @@ const inMedium = (met) => S.supplies.some((it) => it.met === met && (it.unlimite
 function renderMeasured() {
   const sel = $("measuredSel");
   sel.textContent = "";
-  for (const x of MEASURED_SETS) sel.add(new Option(t("meas.name." + x.id), x.id));
+  for (const x of measuredSetsFor(S.slug, isMicrobe())) sel.add(new Option(t("meas.name." + x.id), x.id));
   sel.value = S.measured.set;
   $("measTol").value = Math.round(100 * S.measured.tol);
   $("measuredNote").innerHTML = t("meas.note." + S.measured.set, { lang: docsLang() }) + (S.measured.edited ? " " + t("meas.note.edited") : "") + (S.measured.items.length && S.perturb.length ? t("meas.perturbNote") : "");
@@ -1752,11 +1772,76 @@ function renderObjective() {
     + (cur?.cellType && S.measured.items.length ? `<br><b>${t("obj.measHint")}</b>` : "");
 }
 
+// ---- secondary objective: optimised while the objective keeps a fraction of its optimum (epsilon-constraint)
+function renderSecondary() {
+  const sel = $("secPreset"), sec = S.cfg.secondary, choices = objectiveChoices().filter((c) => c.j !== S.cfg.objective);
+  sel.textContent = "";
+  sel.appendChild(new Option(t("sec.none"), ""));
+  for (const g of OBJECTIVE_GROUPS) {
+    const list = choices.filter((c) => c.preset && c.group === g);
+    if (!list.length) continue;
+    const og = document.createElement("optgroup"); og.label = t("obj.group." + g);
+    for (const c of list) og.appendChild(new Option(c.name, c.key));
+    sel.appendChild(og);
+  }
+  const saved = choices.filter((c) => !c.preset);
+  if (saved.length) { const og = document.createElement("optgroup"); og.label = t("obj.saved"); for (const c of saved) og.appendChild(new Option(c.name, c.key)); sel.appendChild(og); }
+  const cur = sec ? choices.find((c) => c.j === sec.rxn && c.max === (sec.maximize !== false)) : null;
+  if (sec && !cur) S.cfg.secondary = null; // the objective changed to the secondary's reaction, or it was removed
+  sel.value = cur ? cur.key : "";
+  const frac = Math.round(100 * (S.cfg.secondary?.frac ?? S.secFrac ?? 0.9));
+  $("secFrac").value = frac; $("secFracVal").textContent = frac + " %";
+  $("secFrac").disabled = $("secCurveBtn").disabled = !S.cfg.secondary;
+  if (S.cfg.secondary) $("secBox").open = true;
+}
+
+function pickSecondary(key) {
+  const c = objectiveChoices().find((x) => x.key === key);
+  S.secFrac = S.cfg.secondary?.frac ?? S.secFrac ?? 0.9;
+  S.cfg.secondary = c ? { rxn: c.j, maximize: c.max, frac: S.secFrac } : null;
+  $("secCurve").innerHTML = "";
+  renderSecondary(); changed();
+}
+
+/** Trade-off curve (Pareto front): the best secondary at each fraction of the first objective's optimum. */
+async function tradeoffCurve() {
+  const out = $("secCurve"), sec = S.cfg.secondary;
+  if (!sec) return;
+  if (S.mode !== "steady") { out.innerHTML = `<div class="note">${t("scr.needSteady")}</div>`; return; }
+  const cfg = { ...S.cfg, measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam, trace: S.measured.trace },
+    context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
+  const fracs = Array.from({ length: 11 }, (_, i) => 1 - i / 10);
+  out.innerHTML = `<p class="meta">${t("pp.busy")}</p>`;
+  const pts = await S.sim.tradeoff(cfg, S.supplies, fracs, (i, n) => { out.innerHTML = `<p class="meta">${t("sec.progress", { i, n })}</p>`; setProgress(i / n); });
+  setProgress(null);
+  const ok = pts.filter((p) => p.status === "optimal");
+  if (!ok.length) { out.innerHTML = `<div class="note">${t("sec.noCurve")}</div>`; return; }
+  const M = S.model, o = M.rxns[S.cfg.objective], s = M.rxns[sec.rxn];
+  const unit = (r) => (isGrowthRxn(r) ? "h⁻¹" : "mmol/gDW/h");
+  const xmax = Math.max(1e-12, ...ok.map((p) => p.primary)) * 1.05, ymax = Math.max(1e-12, ...ok.map((p) => p.secondary)) * 1.05;
+  const W = 300, H = 160, P = { l: 44, r: 8, t: 8, b: 28 };
+  const X = (x) => P.l + ((W - P.l - P.r) * x) / xmax, Y = (y) => H - P.b - ((H - P.t - P.b) * y) / ymax;
+  const path = ok.map((p, i) => `${i ? "L" : "M"}${X(p.primary).toFixed(1)},${Y(p.secondary).toFixed(1)}`).join("");
+  const dots = ok.map((p) => `<circle cx="${X(p.primary).toFixed(1)}" cy="${Y(p.secondary).toFixed(1)}" r="${Math.abs(p.frac - sec.frac) < 1e-6 ? 5 : 3}" fill="${Math.abs(p.frac - sec.frac) < 1e-6 ? "var(--hot)" : "var(--accent)"}"><title>${Math.round(100 * p.frac)} %: ${esc(o.n)} ${fmtFlux(p.primary)}, ${esc(s.n)} ${fmtFlux(p.secondary)}</title></circle>`).join("");
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(t("sec.curve"))}" style="font-size:10px">
+    <line x1="${P.l}" y1="${H - P.b}" x2="${W - P.r}" y2="${H - P.b}" stroke="var(--line)"/><line x1="${P.l}" y1="${P.t}" x2="${P.l}" y2="${H - P.b}" stroke="var(--line)"/>
+    <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2"/>${dots}
+    <text x="${P.l - 4}" y="${P.t + 8}" text-anchor="end" fill="var(--muted)">${fmtFlux(ymax / 1.05)}</text><text x="${P.l - 4}" y="${H - P.b}" text-anchor="end" fill="var(--muted)">0</text>
+    <text x="${P.l}" y="${H - 14}" fill="var(--muted)">0</text><text x="${W - P.r}" y="${H - 14}" text-anchor="end" fill="var(--muted)">${fmtFlux(xmax / 1.05)}</text>
+    <text x="${(P.l + W - P.r) / 2}" y="${H - 2}" text-anchor="middle" fill="var(--muted)">${esc(o.n)} (${unit(o)})</text></svg>`;
+  // where giving up the first objective buys the most of the second: the steepest stretch of the front
+  let best = null;
+  for (let i = 1; i < ok.length; i++) { const dx = ok[i - 1].primary - ok[i].primary, dy = ok[i].secondary - ok[i - 1].secondary; if (dx > 1e-12) { const r = dy / dx; if (!best || r > best.r) best = { r, a: ok[i - 1], b: ok[i] }; } }
+  out.innerHTML = `<h4>${t("sec.curveHead")}<small> · ${esc(s.n)} (${unit(s)})</small></h4>${svg}
+    <table class="sec-tab"><tr><th>%</th><th>${esc(o.n)}</th><th>${esc(s.n)}</th></tr>${ok.filter((_, i) => i % 2 === 0 || i === ok.length - 1).map((p) => `<tr><td>${Math.round(100 * p.frac)}</td><td class="num">${fmtFlux(p.primary)}</td><td class="num">${fmtFlux(p.secondary)}</td></tr>`).join("")}</table>
+    ${best && best.r > 0 ? `<p class="meta">${t("sec.steep", { a: Math.round(100 * best.a.frac), b: Math.round(100 * best.b.frac), r: fmtFlux(best.r) })}</p>` : ""}<p class="meta">${t("sec.curveNote")}</p>`;
+}
+
 function pickObjective(key) {
   const c = objectiveChoices().find((x) => x.key === key);
   if (!c) return;
   S.cfg.objective = c.j; S.cfg.maximize = c.max;
-  renderObjective(); changed();
+  renderObjective(); renderSecondary(); changed();
 }
 
 function saveObjective() {
@@ -1768,7 +1853,7 @@ function saveObjective() {
   if (name in all && !confirm(t("medium.overwrite", { name }))) return;
   all[name] = { rxn: r.id, max: S.cfg.maximize };
   try { localStorage.setItem("metflux.objectives", JSON.stringify(all)); } catch { alert(t("medium.storageError")); return; }
-  renderObjective();
+  renderObjective(); renderSecondary();
 }
 
 function deleteObjective() {
@@ -1779,7 +1864,7 @@ function deleteObjective() {
   const all = userObjectives();
   delete all[name];
   try { localStorage.setItem("metflux.objectives", JSON.stringify(all)); } catch { /* ignore */ }
-  renderObjective();
+  renderObjective(); renderSecondary();
 }
 
 // ---------------------------------------------------------------- details ----
@@ -1854,7 +1939,7 @@ async function fluxRange(j) {
   if (!box) return;
   if (S.mode !== "steady") { box.innerHTML = `<div class="note">${t("rxn.fvaSteady")}</div>`; return; }
   box.innerHTML = `<p class="meta">${t("rxn.fvaBusy")}</p>`; setProgress(true);
-  const cfg = { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+  const cfg = { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam, trace: S.measured.trace },
     context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
   try {
     const r = await S.sim.fluxRange(cfg, S.supplies, j, frame()?.ref?.v, S.flexCycles === false ? null : 0.05).finally(() => setProgress(null));
@@ -1893,7 +1978,7 @@ async function geneScreen() {
     groups.get(key).genes.push(sym);
   }
   const list = [...groups.values()];
-  const cfg = { ...S.cfg, measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+  const cfg = { ...S.cfg, measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam, trace: S.measured.trace },
     context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
   S.screening = { stop: false };
   $("geneScreen").textContent = t("scr.stop");
@@ -1939,7 +2024,7 @@ async function phasePlane(m) {
   const it = S.supplies.find((x) => x.met === m), e = S.sim.exchanges.get(m);
   const cap = it.unlimited ? Infinity : uptakeCapacity(it.conc, it.vmax, it.km), now = Math.max(0, f.v[e.rxn] * e.dir);
   const xmax = Math.min(cap, Math.max(3 * now, 0.05)), N = 24, xs = Array.from({ length: N + 1 }, (_, i) => (xmax * i) / N);
-  const cfg = { ...S.cfg, measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+  const cfg = { ...S.cfg, measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam, trace: S.measured.trace },
     context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
   out.innerHTML = `<p class="meta">${t("pp.busy")}</p>`;
   const seq = (S.ppSeq = (S.ppSeq || 0) + 1), sel = S.sel; // stop if the details panel moves on
@@ -2100,7 +2185,7 @@ function plainSummaryHtml(f) {
 
 /** The configuration of a steady-state run with everything in the left panel (shared by FVA, scans, design). */
 function runCfg() {
-  return { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+  return { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam, trace: S.measured.trace },
     context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
 }
 const design = createDesign({ S, frame: () => frame(), opsKey: () => opsKey(), runCfg, fmtFlux, setProgress: (x) => setProgress(x),
@@ -2157,6 +2242,7 @@ function summaryHtml() {
   let h = `<div class="kind">${t("sum.title")}${S.result.frames.length > 1 ? " · t = " + fmtTime(f.t) : ""}</div><h3>${esc($("modelSelect").selectedOptions[0]?.text || model.meta.id || "")}</h3><div class="meta">${esc(model.meta.name || "")}</div>
     <div class="cards">
       <div class="card"><div class="lbl">${t(isGrowthRxn(obj) ? "sum.growth" : "sum.objective")}</div><div class="big">${fmtFlux(f.objective)}<small><a class="unitlink" target="_blank" href="docs.html?lang=${docsLang()}#${docsLang()}-units" title="${esc(t(isGrowthRxn(obj) ? "unit.growthTip" : "unit.fluxTip"))}">${isGrowthRxn(obj) ? "h⁻¹" : "mmol/gDW/h"}</a></small></div>${vs}</div>
+      ${S.cfg.secondary && f.status === "optimal" ? `<div class="card"><div class="lbl">${t("sum.secondary")}</div><div class="big">${fmtFlux(f.v[S.cfg.secondary.rxn])}<small>${isGrowthRxn(model.rxns[S.cfg.secondary.rxn]) ? "h⁻¹" : "mmol/gDW/h"}</small></div><div class="delta">${esc(model.rxns[S.cfg.secondary.rxn].n)} · ${t("sum.secKeep", { p: Math.round(100 * S.cfg.secondary.frac) })}</div></div>` : ""}
       <div class="card"><div class="lbl">${t("sum.active")}</div><div class="big">${active}<small>${t("sum.of", { n: model.rxns.length })}</small></div></div>
       ${f.biomass ? `<div class="card"><div class="lbl">${t("sum.biomass")}</div><div class="big">${f.biomass.toFixed(2)}<small>gDW/L</small></div></div>` : ""}
     </div>`;
@@ -2381,6 +2467,15 @@ function dgHtml(j, v) {
   let h = `${g > 0 ? "+" : ""}${g.toFixed(1)} ± ${sd.toFixed(1)} kJ/mol${small(t("dg.forward"))}`;
   if (run !== null) h += `<br>${t(run > 5 ? "dg.runUp" : run < -5 ? "dg.runDown" : "dg.runEq", { x: (run > 0 ? "+" : "") + run.toFixed(1), w: fmtFlux(-v * g) })}`;
   if (sd > 20) h += `<br><span style="color:var(--muted)">${t("dg.uncertain")}</span>`;
+  // impossible directions: more than +100 kJ/mol even at the low end of the estimate, which no concentrations
+  // can overcome. Either the only direction the model allows (written backwards or with a wrong stoichiometry in the source
+  // model, or written with free FAD as the acceptor), or the direction the flux takes.
+  const only = r.lb >= 0 && r.ub > 0 ? 1 : r.ub <= 0 && r.lb < 0 ? -1 : 0, bad = (s) => s * g - 2 * sd > IMPOSSIBLE_DG;
+  const warn = (k, s) => `<br><span class="err">⚠ ${t(k, { x: "+" + (s * g).toFixed(0) })}</span>`;
+  if (only && bad(only)) {
+    const names = new Set(r.m.map((m) => S.model.bases[S.model.mets[m].b].n));
+    h += warn(names.has("FAD") && names.has("FADH2") ? "dg.impossibleFad" : "dg.impossible", only);
+  } else if (run !== null && bad(Math.sign(v))) h += warn("dg.runImpossible", Math.sign(v));
   return `<dt>ΔG′<sub>m</sub></dt><dd>${h}</dd>`;
 }
 
@@ -2469,7 +2564,7 @@ async function computeFlex(ss) {
   if (!out) return;
   if (S.mode !== "steady" || !f || f.status !== "optimal") { out.innerHTML = `<div class="note">${t("rxn.fvaSteady")}</div>`; return; }
   const frac = S.flexFrac || 1, rxns = S.index.rxnsOfSub[ss].filter((j) => !S.model.rxns[j].removed), result = S.result;
-  const cfg = { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+  const cfg = { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam, trace: S.measured.trace },
     context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
   const map = new Map(), t0 = performance.now(), B = 20;
   for (let i = 0; i < rxns.length; i += B) {
@@ -2490,7 +2585,7 @@ async function fvaAlternatives(j) {
   const box = $("fvaAlt");
   if (!box) return;
   box.innerHTML = `<p class="meta">${t("flex.altBusy")}</p>`; setProgress(true);
-  const f = frame(), cfg = { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam },
+  const f = frame(), cfg = { ...S.cfg, perturb: [...perturbActivities()], measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam, trace: S.measured.trace },
     context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
   const r = await S.sim.fluxRanges(cfg, S.supplies, [j], f.ref?.v, { frac: S.flexFrac || 1, solutions: true, cycles: S.flexCycles === false ? null : 0.05 }).finally(() => setProgress(null));
   if (!$("fvaAlt") || S.sel?.rxn !== j) return;
@@ -2553,7 +2648,7 @@ function renderDetails() {
     const cmpBox = box.querySelector("#detCmp");
     if (cmpBox) compare.fillMetCompare(cmpBox, f, m, () => (f.e ? currentMid(f, m) : null));
   } else if (sel?.type === "rxn") {
-    on("objective", () => { S.cfg.objective = sel.rxn; renderObjective(); changed(); });
+    on("objective", () => { S.cfg.objective = sel.rxn; renderObjective(); renderSecondary(); changed(); });
     on("perturb", () => addPerturb("rxn", sel.rxn));
     on("fva", () => fluxRange(sel.rxn));
     on("editRxn", () => { const r = S.model.rxns[sel.rxn]; if (r.user) { const i = S.edits.findIndex((op) => op.op === "addRxn" && op.id === r.id); editor.openRxnDialog({ op: S.edits[i], index: i }); } else { const i = S.edits.findIndex((op) => op.op === "editRxn" && op.id === r.id); editor.openRxnDialog(i >= 0 ? { op: S.edits[i], index: i, j: sel.rxn } : { j: sel.rxn }); } });
@@ -2795,7 +2890,7 @@ function changeLanguage(lang) {
   else if (S.view.kind === "sub" && isCascade()) map.setScene(subScene(S.view.ss), true);
   if (S.ctxData) S.ctxIndex = new ContextIndex(S.ctxData, ctxLabels);
   design.reset(); renderTracerLib();
-  renderContext(); renderMediumSel(); renderSupplies(); renderMeasured(); renderPerturb(); renderEvents(); renderObjective(); renderCrumbs(); applyFrame(); renderDetails();
+  renderContext(); renderMediumSel(); renderSupplies(); renderMeasured(); renderPerturb(); renderEvents(); renderObjective(); renderSecondary(); renderCrumbs(); applyFrame(); renderDetails();
   editor.render(); compare.render(); renderEditBadge();
   if (S.statusFn) setStatus(S.statusFn, S.statusErr, S.statusKind);
   if ($("runBtn").classList.contains("running")) $("runBtn").textContent = t("h.running");
@@ -2812,7 +2907,7 @@ function bindUi() {
   $("rnaBuild").onclick = buildRnaContext;
   $("ctxMode").onchange = (ev) => setContext(S.context.id, ev.target.value);
   $("clearContext").onclick = () => setContext(null, S.context.mode);
-  attachSearch($("objInput"), $("objResults"), () => S.search, (it) => { S.cfg.objective = it.ref; renderObjective(); changed(); }, { filter: (it) => it.type === "rxn", limit: 120 });
+  attachSearch($("objInput"), $("objResults"), () => S.search, (it) => { S.cfg.objective = it.ref; renderObjective(); renderSecondary(); changed(); }, { filter: (it) => it.type === "rxn", limit: 120 });
   window.addEventListener("keydown", (ev) => {
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") { ev.preventDefault(); $("search").focus(); $("search").select(); }
     else if (ev.key === "Escape" && S.view.kind !== "global" && document.activeElement === document.body && !document.querySelector("dialog[open]")) { S.sel = null; openGlobal(); renderDetails(); }
@@ -2846,6 +2941,10 @@ function bindUi() {
     applyFrame(); renderDetails();
   });
   $("objPreset").onchange = (ev) => pickObjective(ev.target.value);
+  $("secPreset").onchange = (ev) => pickSecondary(ev.target.value);
+  $("secFrac").oninput = (ev) => { $("secFracVal").textContent = ev.target.value + " %"; };
+  $("secFrac").onchange = (ev) => { S.secFrac = ev.target.value / 100; if (S.cfg.secondary) { S.cfg.secondary.frac = S.secFrac; changed(); } };
+  $("secCurveBtn").onclick = tradeoffCurve;
   $("saveObjective").onclick = saveObjective;
   $("deleteObjective").onclick = deleteObjective;
   $("methodsBtn").onclick = () => $("methodsDialog").showModal();
@@ -2858,7 +2957,7 @@ function bindUi() {
   $("ctxExplore").ontoggle = () => { if ($("ctxExplore").open) renderCtxExplore(); };
   $("geneScreen").onclick = () => (S.screening ? (S.screening.stop = true) : geneScreen());
   $("clearPerturb").onclick = () => { S.perturb = []; renderPerturb(); renderMeasured(); changed(); };
-  $("measuredSel").onchange = (ev) => { loadMeasured(ev.target.value); renderObjective(); renderContext(); };
+  $("measuredSel").onchange = (ev) => { loadMeasured(ev.target.value); renderObjective(); renderSecondary(); renderContext(); };
   $("resetMeasured").onclick = () => loadMeasured(S.measured.set);
   $("measTol").onchange = (ev) => { S.measured.tol = Math.min(1, Math.max(0, (+ev.target.value || 0) / 100)); renderMeasured(); changed(); };
   attachSearch($("addMeasured"), $("measuredResults"), () => S.search, (it) => addMeasured(it.ref), { filter: (it) => it.type === "met" && S.index.metsOfBase[it.ref].some((m) => S.sim.exchanges.has(m)), limit: 80 });
@@ -2866,7 +2965,7 @@ function bindUi() {
   $("addMediumEvent").onclick = () => { S.events.push({ type: "medium", t: newEventTime(), mediumId: "default" }); renderEvents(); changed(); };
   $("clearEvents").onclick = () => { S.events = []; renderEvents(); changed(); };
   $("dynHours").addEventListener("change", renderEvents);
-  $("objSense").onchange = (ev) => { S.cfg.maximize = ev.target.value === "max"; renderObjective(); changed(); };
+  $("objSense").onchange = (ev) => { S.cfg.maximize = ev.target.value === "max"; renderObjective(); renderSecondary(); changed(); };
   $("pfba").onchange = (ev) => { S.cfg.parsimonious = ev.target.checked; renderContext(); changed(); };
   for (const id of ["dynHours", "dynBiomass", "dynPool"]) $(id).onchange = changed;
   $("groupSel").onchange = (ev) => {
