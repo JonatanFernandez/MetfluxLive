@@ -253,13 +253,40 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # show the atom
   with no measured fluxes and short Bgee tissue lists. Fruitfly-GEM defaults to Schneider's medium (S2 cells).
   Worm-GEM is built without 2,3-bisphosphoglycerate in the biomass metabolite pool (C. elegans lacks the mutase).
 - yeast-GEM and iML1515 are read through Human-GEM names (`tools/convert_foreign.py`: MetaNetX, BiGG,
-  ChEBI, KEGG, name); about half of their metabolites match. Their media (M9, Verduyn, YNB, SC), measured
-  fluxes (Jouhten 2008; Zampieri 2019; Castaño-Cerezo 2009) and laboratory strains are in the docs. Yeast-GEM
-  overestimates aerobic batch growth (0.66 against about 0.37 h⁻¹).
+  ChEBI, KEGG, name); about half of their metabolites match. The others take their structure from the model
+  or from MetaNetX 4.5 (`tools/fetch_mnx_structures.py`, only structures MNXref takes from ChEBI, SwissLipids
+  or LIPID MAPS), so atom maps cover 92 % (E. coli) and 89 % (yeast) of the internal reactions. Their media
+  (M9, Verduyn, YNB, SC), measured fluxes (Jouhten 2008; Zampieri 2019; Castaño-Cerezo 2009) and laboratory
+  strains are in the docs. Yeast-GEM overestimates aerobic batch growth (0.66 against about 0.37 h⁻¹).
+- Validation (docs › Data sources): 96.5 % of the Human-GEM atom maps agree with the 479 comparable curated
+  Recon 3D mappings (Preciat Gonzalez 2017); with the fluxes of a published ¹³C flux analysis, predicted
+  isotopologues of E. coli amino acids match 14 tracer experiments to 0.9 mol% (Crown 2015). In human liver
+  tissue a single FBA solution does not reproduce measured labelling (unlabelled endogenous sources and
+  exchange fluxes are missing): read predicted isotopologues as consequences of the model.
 - The models are used as published. A few reactions can only run in a thermodynamically impossible direction
   (cytochrome P450 and CMP-Neu5Ac hydroxylase reactions written backwards in Human-GEM 2.1.1 and the animal
   models, already fixed in its development branch; a pyridoxal oxidase in yeast-GEM); the reaction card flags
   them. None carries flux in the default runs.
+
+
+### Licence and citation
+
+Copyright © 2026 Jonatan Fernández-García.
+
+The code of MetfluxLive is free software, released under the GNU General Public License version 3 or
+(at your option) any later version (GPL-3.0-or-later, see `LICENSE`).
+
+The files in `data/` are derived from public resources and keep their licences:
+- Human-GEM, Mouse-GEM, Rat-GEM, Zebrafish-GEM, Fruitfly-GEM, Worm-GEM and yeast-GEM: CC BY 4.0;
+- iML1515: as distributed by [BiGG Models](http://bigg.ucsd.edu) (University of California terms;
+  commercial use may need their permission);
+- human cell-type contexts: CC BY-SA 4.0 (Human Protein Atlas); other animal contexts: CC0 (Bgee);
+- metabolite structures from MetaNetX/MNXref: CC BY 4.0, used only when their source is ChEBI, SwissLipids
+  or LIPID MAPS (CC BY 4.0).
+
+Third-party libraries in `vendor/` keep their own licences: HiGHS (MIT) and RDKit MinimalLib (BSD-3-Clause).
+
+To cite MetfluxLive, see `CITATION.cff` (GitHub shows it as "Cite this repository").
 
 ---
 
@@ -517,10 +544,38 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # ver el mapa a
   37 °C, sin flujos medidos y con listas cortas de tejidos de Bgee. Fruitfly-GEM usa por defecto el medio de Schneider
   (células S2). Worm-GEM se construye sin 2,3-bisfosfoglicerato en la reserva de metabolitos (a C. elegans le falta la mutasa).
 - yeast-GEM e iML1515 se leen a través de los nombres de Human-GEM (`tools/convert_foreign.py`: MetaNetX,
-  BiGG, ChEBI, KEGG, nombre); se emparejan cerca de la mitad de sus metabolitos. Sus medios (M9, Verduyn, YNB,
-  SC), flujos medidos (Jouhten 2008; Zampieri 2019; Castaño-Cerezo 2009) y cepas de laboratorio están en la
-  documentación. Yeast-GEM sobrestima el crecimiento en discontinuo aerobio (0,66 frente a unos 0,37 h⁻¹).
+  BiGG, ChEBI, KEGG, nombre); se emparejan cerca de la mitad de sus metabolitos. Los demás toman su estructura
+  del modelo o de MetaNetX 4.5 (`tools/fetch_mnx_structures.py`, solo estructuras que MNXref toma de ChEBI,
+  SwissLipids o LIPID MAPS), así que los mapas atómicos cubren el 92 % (E. coli) y el 89 % (levadura) de las
+  reacciones internas. Sus medios (M9, Verduyn, YNB, SC), flujos medidos (Jouhten 2008; Zampieri 2019;
+  Castaño-Cerezo 2009) y cepas de laboratorio están en la documentación. Yeast-GEM sobrestima el crecimiento en
+  discontinuo aerobio (0,66 frente a unos 0,37 h⁻¹).
+- Validación (documentación › Fuentes de datos): el 96,5 % de los mapas atómicos de Human-GEM coincide con los
+  479 mapas curados comparables de Recon 3D (Preciat Gonzalez 2017); con los flujos de un análisis de flujos con
+  ¹³C publicado, los isotopólogos predichos de aminoácidos de E. coli reproducen 14 experimentos con trazadores
+  con un error de 0,9 % molar (Crown 2015). En tejido hepático humano una única solución de FBA no reproduce el
+  marcaje medido (faltan fuentes endógenas sin marcar y flujos de intercambio): lee los isotopólogos predichos
+  como consecuencias del modelo.
 - Los modelos se usan tal como se publicaron. Algunas reacciones sólo pueden ir en un sentido termodinámicamente
   imposible (citocromos P450 y CMP-Neu5Ac hidroxilasa escritos al revés en Human-GEM 2.1.1 y los modelos animales,
   ya corregidos en su rama de desarrollo; una piridoxal oxidasa en yeast-GEM); la ficha de la reacción lo avisa.
   Ninguna lleva flujo en las ejecuciones por defecto.
+
+### Licencia y cita
+
+Copyright © 2026 Jonatan Fernández-García.
+
+El código de MetfluxLive es software libre, publicado bajo la Licencia Pública General de GNU versión 3 o, a tu
+elección, cualquier versión posterior (GPL-3.0-or-later, ver `LICENSE`).
+
+Los ficheros de `data/` derivan de recursos públicos y conservan sus licencias:
+- Human-GEM, Mouse-GEM, Rat-GEM, Zebrafish-GEM, Fruitfly-GEM, Worm-GEM y yeast-GEM: CC BY 4.0;
+- iML1515: tal como lo distribuye [BiGG Models](http://bigg.ucsd.edu) (condiciones de la Universidad de
+  California; el uso comercial puede requerir su permiso);
+- contextos de tipos celulares humanos: CC BY-SA 4.0 (Human Protein Atlas); los demás contextos animales: CC0 (Bgee);
+- estructuras de metabolitos de MetaNetX/MNXref: CC BY 4.0, usadas solo cuando su fuente es ChEBI, SwissLipids o
+  LIPID MAPS (CC BY 4.0).
+
+Las bibliotecas de terceros en `vendor/` conservan sus licencias: HiGHS (MIT) y RDKit MinimalLib (BSD-3-Clause).
+
+Para citar MetfluxLive, ver `CITATION.cff` (GitHub lo muestra como «Cite this repository»).

@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use MetfluxLive, please cite it as below."
+title: "MetfluxLive: interactive genome-scale flux balance analysis and isotope-tracing simulation in the web browser"
+type: software
+authors:
+  - family-names: "Fernández-García"
+    given-names: "Jonatan"
+    orcid: "https://orcid.org/0000-0003-3676-7855"
+license: GPL-3.0-or-later
+repository-code: "https://github.com/JonatanFernandez/MetfluxLive"
+url: "https://metflux.live"
+keywords:
+  - flux balance analysis
+  - genome-scale metabolic model
+  - isotope tracing
+  - atom mapping
+  - mass isotopologue distribution
