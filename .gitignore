@@ -25,3 +25,6 @@ tools/upstream/
 # supplementary tables of papers read for reference, not redistributable (e.g. Jang et al. 2019, Cell Metab)
 data/mmc*.pdf
 data/mmc*.xlsx
+
+# manuscript draft (not published with the web app)
+paper/
