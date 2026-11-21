@@ -43,7 +43,7 @@
   <li><b>L'épaisseur des lignes et la vitesse des particules</b> montrent le flux sur une échelle logarithmique, pour que les petits flux restent visibles.</li>
   <li><b>Dans la carte d'une voie</b>, les cercles sont des métabolites et les losanges des réactions. La couleur de l'anneau d'un métabolite est son compartiment. Les cofacteurs comme l'ATP ou l'eau sont masqués pour que la carte reste lisible.</li>
   <li><b>Avec un traceur</b>, la couleur passe du gris (non marqué) à l'ambre puis au magenta (entièrement marqué).</li>
-  <li><b>Avec un knockout</b>, choisir « Flux modifié seulement » colore selon la hausse (orange) ou la baisse (bleu) par rapport à la cellule non perturbée ; un anneau rouge signale les réactions perturbées.</li>
+  <li><b>Avec un knockout</b>, un sélecteur en haut de la carte passe de la cellule non perturbée (A) à la cellule perturbée (B) et au changement A → B : bleu = moins de flux, orange = plus, pointillé avec ⇄ magenta = tourne dans l'autre sens (<a href="#fr-compare">section 12</a>). Un anneau rouge marque les réactions perturbées.</li>
 </ul>
 <h3 id="fr-carbonflow">Ce que portent les lignes entre groupes</h3>
 <p>Dans les vues Cellule, Voies et Cascade, une ligne relie deux groupes (bulles) quand l'un d'eux <b>fabrique quelque chose que l'autre utilise</b>. Le sélecteur <b>Lignes</b>, en bas à gauche de la carte, choisit ce qu'est ce quelque chose :</p>
@@ -101,7 +101,7 @@
 <ul>
   <li><b>Vue Cellule</b> : le pool de chaque compartiment est séparé, et les transporteurs sont des groupes à part posés sur les membranes, si bien qu'une ligne va de la glycolyse cytosolique au transporteur mitochondrial du pyruvate puis au cycle de Krebs. <b>Voies et Cascade</b> : les pools de tous les compartiments sont fusionnés et les réactions de transport ignorées, si bien que le même carbone va directement de la glycolyse au cycle de Krebs.</li>
   <li>Seules les 220 plus grandes lignes sont conservées (320 dans la vue Cellule). L'épaisseur et la vitesse des particules sont logarithmiques, relatives à la plus grande ligne : les lignes en dessous d'environ 1/350 de celle-ci sont masquées, et les particules ne bougent que sur les lignes au-dessus d'environ 1/90. Sélectionner une bulle garde ses propres lignes vives et atténue les autres.</li>
-  <li><b>Couleur</b> : flux simple en cyan. Avec un traceur du même élément (un traceur <sup>13</sup>C et les lignes Carbone, un traceur <sup>15</sup>N et les lignes Azote), la couleur est la fraction marquée de ce que porte la ligne, pondérée par la production. En « Flux modifié seulement », la couleur est la variation moyenne des deux groupes reliés.</li>
+  <li><b>Couleur</b> : flux simple en cyan. Avec un traceur du même élément (un traceur <sup>13</sup>C et les lignes Carbone, un traceur <sup>15</sup>N et les lignes Azote), la couleur est la fraction marquée de ce que porte la ligne, pondérée par la production. Dans la vue A → B d’une comparaison, la couleur est la variation moyenne des deux groupes reliés.</li>
   <li>Dans la carte d'une voie, les lignes sont des flux de réaction ; avec un cofacteur choisi (NADH, NADPH, ubiquinol, nucléosides triphosphates ou tous les transporteurs redox), seules les réactions qui le produisent ou le consomment gardent leurs lignes, aussi épaisses que le cofacteur produit ou consommé. Pour l'énergie libre, le sélecteur colore chaque réaction.</li>
   <li><b>Télécharger</b> › <i>pathway_flows.csv</i> liste les lignes de chaque grandeur entre voies, et <i>fluxes.csv</i> gagne des colonnes de ΔG′<sub>m</sub>.</li>
 </ul>
@@ -580,7 +580,16 @@
 <p>Sous la liste, <b>Afficher [X] comparé à [Y]</b> rend les deux côtés explicites. « Afficher » est la situation dessinée sur la carte et dans les panneaux : l'actuelle ou n'importe quel scénario enregistré, dont le résultat conservé est réaffiché sans recalcul (s'il a été obtenu avec d'autres modifications du modèle, il est chargé et recalculé). « Comparé à » est la référence : chaque variation se mesure d'elle vers la situation affichée, si bien que « Variation de flux de « B » à « A » » signifie A par rapport à B. ⇅ échange les deux. Si vous changez ensuite quoi que ce soit, le côté affiché redevient la situation actuelle, non enregistrée.</p>
 <p>Dès lors, le scénario remplace partout la « référence » :</p>
 <ul>
-  <li><b>Carte.</b> « Afficher : Flux modifié seulement » colore les réactions selon la variation de flux (bleu = moins, orange = plus). « Marquage modifié » colore les métabolites selon la variation de leur enrichissement moyen et masque le reste. Dans les vues globale et cellule, chaque groupe est coloré selon la variation de son marquage pondéré par le flux.</li>
+  <li><b>Carte : A, B ou A → B.</b> Un sélecteur en haut de la carte choisit ce qu'elle dessine : <b>A</b> (la référence, « comparé avec »), <b>B</b> (la situation affichée) ou <b>A → B</b>, le changement entre les deux. Les touches 1, 2 et 3 passent de l'une à l'autre sans bouger la vue ni la sélection, pour alterner et voir ce qui change. Choisir un scénario ouvre A → B. Le panneau de droite décrit toujours B ; les info-bulles donnent le flux dans les deux.</li>
+  <li><b>La vue A → B</b> sépare la taille et le sens, pour qu'une inversion ne soit jamais prise pour un grand changement :
+    <ul>
+      <li><b>Couleur</b> : combien de fois le flux est plus grand ou plus petit dans B, quel que soit son sens (bleu = plus petit, orange = plus grand, saturé à 8 fois). C'est asinh(|B|/ε) − asinh(|A|/ε) avec ε = 0,001 mmol/gDW/h : bien au-dessus de ε c'est le logarithme du rapport, et près de zéro il reste fini, donc une réaction qui s'allume ne donne pas l'infini. Le log(x + 1) habituel ne convient pas ici : les flux sont presque toujours entre 0,001 et 1 mmol/gDW/h, et le +1 les écrase.</li>
+      <li><b>Épaisseur</b> : quelle quantité de flux se déplace, |B − A|. Un flux inchangé reste une fine ligne grise, et les particules ne bougent que sur les flux qui changent, dans le sens de B.</li>
+      <li><b>Marques</b> : une réaction qui tourne dans l'autre sens dans B est en pointillé, avec un anneau magenta et ⇄ ; une réaction active seulement dans B a un anneau ; une réaction active seulement dans A est creuse.</li>
+      <li>Un flux compte comme modifié s'il diffère de plus de 2 % et qu'au moins un des deux côtés dépasse ε (sous ε il compte comme zéro). La même règle donne « Réactions les plus modifiées », les échanges et voies qui changent, et les filtres « Flux modifié seulement » et « Flux inversé seulement », qui ouvrent aussi A → B.</li>
+      <li>Dans les vues globale et cellule, chaque groupe est coloré selon le changement de son flux total. Ouvrez une voie pour voir les inversions et les réactions qui s'allument ou s'éteignent.</li>
+    </ul></li>
+  <li><b>Marquage.</b> « Marquage modifié » colore les métabolites selon la variation de leur enrichissement moyen et masque le reste. Dans les vues globale et cellule, chaque groupe est coloré selon la variation de son marquage pondéré par le flux.</li>
   <li><b>Panneau de résumé.</b> L'objectif et sa variation, les réactions les plus modifiées, les échanges qui changent, les voies qui changent le plus (somme des flux absolus) et les métabolites dont le marquage change le plus. Chaque ligne se lit « scénario → maintenant » ; cliquez dessus pour y aller.</li>
   <li><b>Panneau du métabolite.</b> Renouvellement et enrichissement moyen dans les deux situations, et les deux <b>distributions d'isotopologues en barres appariées</b> (gris : scénario, ambre : maintenant). Une situation sans traceur apparaît comme 100 % M+0.</li>
   <li><b>Panneau de la réaction et info-bulles.</b> Le flux dans le scénario à côté du flux actuel.</li>
@@ -662,7 +671,7 @@
   <li>Réglez « Afficher » sur « Flux modifié seulement ».</li>
 </ol>
 <p class="res"><b>Résultat.</b> La croissance ne baisse que légèrement, de 0,0341 à 0,0333 h⁻¹ (−2 %) : les cellules mesurées absorbent déjà de l'asparagine du milieu, ce qui couvre l'essentiel du besoin. Réglez les flux mesurés sur « Aucun » et comparez.</p>
-<p class="res"><b>Comparez avec :</b> <code>PDHB</code> (pyruvate déshydrogénase) : croissance inchangée, mais environ 220 réactions sont réorientées. <code>FASN</code>, <code>HMGCR</code> ou <code>CAD</code> : la croissance s'arrête, il n'y a pas de contournement. <code>GAPDH</code> : aucun effet, car le modèle a une isoenzyme (GAPDHS).</p>
+<p class="res"><b>Comparez avec :</b> <code>PDHB</code> (pyruvate déshydrogénase) : croissance inchangée, mais environ 150 réactions sont réorientées. <code>FASN</code>, <code>HMGCR</code> ou <code>CAD</code> : la croissance s'arrête, il n'y a pas de contournement. <code>GAPDH</code> : aucun effet, car le modèle a une isoenzyme (GAPDHS).</p>
 </div>
 
 <div class="exp">
@@ -940,4 +949,7 @@
   <li>Richelle A et al. Model-based assessment of mammalian cell metabolic functionalities using omics data. <i>Cell Rep. Methods</i> 2021; 1:100040. <a href="https://doi.org/10.1016/j.crmeth.2021.100040" target="_blank" rel="noopener">doi:10.1016/j.crmeth.2021.100040</a></li>
   <li>Huangfu Q, Hall JAJ. Parallelizing the dual revised simplex method. <i>Math. Program. Comput.</i> 2018; 10:119–142 (HiGHS). <a href="https://doi.org/10.1007/s12532-017-0130-5" target="_blank" rel="noopener">doi:10.1007/s12532-017-0130-5</a></li>
 </ul>
+<h2 id="fr-cite">20. Citation et contact</h2>
+<p>MetfluxLive est en attente de publication. Une fois l'article publié, sa référence sera indiquée ici.</p>
+<p>Pour toute question, demande ou suggestion, merci d'écrire à <a href="mailto:jonifg@usal.es">jonifg@usal.es</a>.</p>
 </article>

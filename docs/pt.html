@@ -43,7 +43,7 @@
   <li><b>A largura da linha e a velocidade das partículas</b> mostram o fluxo em escala logarítmica, para que os fluxos pequenos continuem visíveis.</li>
   <li><b>No mapa de uma via</b>, os círculos são metabólitos e os losangos são reações. A cor do anel de um metabólito é o seu compartimento. Cofatores como ATP ou água ficam ocultos para que o mapa seja legível.</li>
   <li><b>Com um traçador</b>, a cor passa de cinza (sem marcação) por âmbar até magenta (totalmente marcado).</li>
-  <li><b>Com um knockout</b>, ao escolher «Só fluxo alterado» a cor indica aumento (laranja) ou diminuição (azul) em relação à célula sem perturbar; um anel vermelho marca as reações perturbadas.</li>
+  <li><b>Com um knockout</b>, um seletor no topo do mapa alterna entre a célula sem perturbação (A), a perturbada (B) e a mudança A → B: azul = menos fluxo, laranja = mais, tracejado com ⇄ magenta = corre no sentido contrário (<a href="#pt-compare">secção 12</a>). Um anel vermelho assinala as reações perturbadas.</li>
 </ul>
 <h3 id="pt-carbonflow">O que levam as linhas entre grupos</h3>
 <p>Nas vistas Célula, Vias e Cascata, uma linha une dois grupos (bolhas) quando um deles <b>produz algo que o outro usa</b>. O seletor <b>Linhas</b>, embaixo à esquerda do mapa, escolhe o que é esse algo:</p>
@@ -101,7 +101,7 @@
 <ul>
   <li><b>Vista Célula</b>: o pool de cada compartimento é separado, e os transportadores são grupos próprios situados nas membranas, de modo que uma linha vai da glicólise citosólica ao transportador mitocondrial de piruvato e daí ao ciclo de Krebs. <b>Vias e Cascata</b>: os pools de todos os compartimentos são juntados e as reações de transporte ignoradas, de modo que o mesmo carbono vai diretamente da glicólise ao ciclo de Krebs.</li>
   <li>Só se mantêm as 220 linhas maiores (320 na vista Célula). A largura e a velocidade das partículas são logarítmicas, relativas à linha maior: as linhas abaixo de cerca de 1/350 dela ficam ocultas, e as partículas só se movem nas linhas acima de cerca de 1/90 dela. Selecionar uma bolha mantém brilhantes as suas linhas e esmaece as demais.</li>
-  <li><b>Cor</b>: fluxo simples em ciano. Com um traçador do mesmo elemento (um traçador de <sup>13</sup>C e as linhas de Carbono, um traçador de <sup>15</sup>N e as de Nitrogênio), a cor é a fração marcada do que a linha leva, ponderada pela produção. Em «Só fluxo alterado», a cor é a alteração média dos dois grupos que une.</li>
+  <li><b>Cor</b>: fluxo simples em ciano. Com um traçador do mesmo elemento (um traçador de <sup>13</sup>C e as linhas de Carbono, um traçador de <sup>15</sup>N e as de Nitrogênio), a cor é a fração marcada do que a linha leva, ponderada pela produção. Na vista A → B de uma comparação, a cor é a alteração média dos dois grupos que une.</li>
   <li>No mapa de uma via as linhas são fluxos de reação; com um cofator escolhido (NADH, NADPH, ubiquinol, nucleosídeos trifosfato ou todos os portadores redox), só mantêm as linhas as reações que o produzem ou consomem, com largura igual ao cofator que produzem ou consomem. Para a energia livre, o seletor colore cada reação.</li>
   <li><b>Baixar</b> › <i>pathway_flows.csv</i> lista as linhas de cada grandeza entre vias, e <i>fluxes.csv</i> ganha colunas de ΔG′<sub>m</sub>.</li>
 </ul>
@@ -580,7 +580,16 @@
 <p>Abaixo da lista, <b>Mostrar [X] comparado com [Y]</b> torna explícitos os dois lados. «Mostrar» é a situação desenhada no mapa e nos painéis: a atual ou qualquer cenário salvo, cujo resultado guardado é mostrado de novo sem recalcular (se foi feito com outras edições do modelo, é carregado e recalculado). «Comparado com» é a referência: cada alteração mede-se dela para a situação mostrada, de modo que «Alteração de fluxo de «B» para «A»» significa A em relação a B. ⇅ troca os dois. Se depois você mudar qualquer coisa, o lado mostrado volta a ser a situação atual, não salva.</p>
 <p>A partir daí, o cenário ocupa o lugar da «referência» em todo lado:</p>
 <ul>
-  <li><b>Mapa.</b> «Mostrar: Só fluxo alterado» colore as reações pela alteração de fluxo (azul = menos, laranja = mais). «Marcação alterada» colore os metabólitos pela alteração do seu enriquecimento médio e oculta o resto. Nas vistas global e de célula, cada grupo é colorido pela alteração da sua marcação ponderada pelo fluxo.</li>
+  <li><b>Mapa: A, B ou A → B.</b> Um seletor no topo do mapa escolhe o que ele desenha: <b>A</b> (a referência, «comparado com»), <b>B</b> (a situação mostrada) ou <b>A → B</b>, a mudança entre as duas. As teclas 1, 2 e 3 alternam entre elas sem mover a vista nem a seleção, para comparar indo e voltando. Ao escolher um cenário abre-se A → B. O painel da direita descreve sempre B; as dicas flutuantes dão o fluxo nas duas.</li>
+  <li><b>A vista A → B</b> separa tamanho e sentido, para que uma inversão não se confunda com uma mudança grande:
+    <ul>
+      <li><b>Cor</b>: quantas vezes o fluxo é maior ou menor em B, seja qual for o seu sentido (azul = menor, laranja = maior, satura a 8 vezes). É asinh(|B|/ε) − asinh(|A|/ε) com ε = 0,001 mmol/gDW/h: bem acima de ε é o logaritmo da razão, e perto de zero continua finito, por isso uma reação que liga não dá infinito. O habitual log(x + 1) não serve aqui: os fluxos estão quase sempre entre 0,001 e 1 mmol/gDW/h, e o +1 achata-os.</li>
+      <li><b>Espessura</b>: quanto fluxo se move, |B − A|. Um fluxo sem mudança fica como uma linha cinza fina, e as partículas só se movem nos fluxos que mudam, no sentido de B.</li>
+      <li><b>Marcas</b>: uma reação que corre no sentido contrário em B é tracejada, com anel magenta e ⇄; uma ativa só em B tem um anel; uma ativa só em A fica oca.</li>
+      <li>Um fluxo conta como alterado se difere mais de 2 % e pelo menos um dos lados está acima de ε (abaixo de ε conta como zero). A mesma regra dá «Reações que mais mudam», as trocas e vias que mudam e os filtros «Só fluxo alterado» e «Só fluxo invertido», que também abrem A → B.</li>
+      <li>Nas vistas global e de célula, cada grupo é colorido pela mudança do seu fluxo total. Abra uma via para ver as inversões e as reações que ligam ou desligam.</li>
+    </ul></li>
+  <li><b>Marcação.</b> «Marcação alterada» colore os metabólitos pela alteração do seu enriquecimento médio e oculta o resto. Nas vistas global e de célula, cada grupo é colorido pela alteração da sua marcação ponderada pelo fluxo.</li>
   <li><b>Painel de resumo.</b> O objetivo com a sua alteração, as reações que mais mudam, as trocas que mudam, as vias que mais mudam (soma dos fluxos absolutos) e os metabólitos cuja marcação mais muda. Cada linha se lê «cenário → agora»; clique para ir até lá.</li>
   <li><b>Painel do metabólito.</b> Renovação e enriquecimento médio nas duas situações, e as duas <b>distribuições de isotopólogos como barras emparelhadas</b> (cinza: cenário, âmbar: agora). Uma situação sem traçador aparece como 100 % M+0.</li>
   <li><b>Painel da reação e dicas.</b> O fluxo no cenário ao lado do atual.</li>
@@ -662,7 +671,7 @@
   <li>Ponha «Mostrar» em «Só fluxo alterado».</li>
 </ol>
 <p class="res"><b>Resultado.</b> O crescimento cai só ligeiramente, de 0,0341 para 0,0333 h⁻¹ (−2 %): as células medidas já captam asparagina do meio, o que cobre a maior parte da necessidade. Ponha os fluxos medidos em «Nenhum» e compare.</p>
-<p class="res"><b>Compare com:</b> <code>PDHB</code> (piruvato desidrogenase): crescimento inalterado, mas cerca de 220 reações são redirecionadas. <code>FASN</code>, <code>HMGCR</code> ou <code>CAD</code>: o crescimento para, não há desvio. <code>GAPDH</code>: sem efeito, porque o modelo tem uma isoenzima (GAPDHS).</p>
+<p class="res"><b>Compare com:</b> <code>PDHB</code> (piruvato desidrogenase): crescimento inalterado, mas cerca de 150 reações são redirecionadas. <code>FASN</code>, <code>HMGCR</code> ou <code>CAD</code>: o crescimento para, não há desvio. <code>GAPDH</code>: sem efeito, porque o modelo tem uma isoenzima (GAPDHS).</p>
 </div>
 
 <div class="exp">
@@ -940,4 +949,7 @@
   <li>Richelle A et al. Model-based assessment of mammalian cell metabolic functionalities using omics data. <i>Cell Rep. Methods</i> 2021; 1:100040. <a href="https://doi.org/10.1016/j.crmeth.2021.100040" target="_blank" rel="noopener">doi:10.1016/j.crmeth.2021.100040</a></li>
   <li>Huangfu Q, Hall JAJ. Parallelizing the dual revised simplex method. <i>Math. Program. Comput.</i> 2018; 10:119–142 (HiGHS). <a href="https://doi.org/10.1007/s12532-017-0130-5" target="_blank" rel="noopener">doi:10.1007/s12532-017-0130-5</a></li>
 </ul>
+<h2 id="pt-cite">20. Citação e contacto</h2>
+<p>O MetfluxLive está pendente de publicação. Quando o artigo for publicado, a sua referência aparecerá aqui.</p>
+<p>Para dúvidas, pedidos ou sugestões, escreva por favor para <a href="mailto:jonifg@usal.es">jonifg@usal.es</a>.</p>
 </article>

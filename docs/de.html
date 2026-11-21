@@ -43,7 +43,7 @@
   <li><b>Linienbreite und Partikelgeschwindigkeit</b> zeigen den Fluss auf logarithmischer Skala, damit kleine Flüsse sichtbar bleiben.</li>
   <li><b>In der Karte eines Wegs</b> sind Kreise Metaboliten und Rauten Reaktionen. Die Ringfarbe eines Metaboliten ist sein Kompartiment. Kofaktoren wie ATP oder Wasser sind ausgeblendet, damit die Karte lesbar bleibt.</li>
   <li><b>Mit einem Tracer</b> wechselt die Farbe von Grau (unmarkiert) über Bernstein zu Magenta (vollständig markiert).</li>
-  <li><b>Mit einem Knockout</b> färbt „Nur veränderter Fluss“ nach Zunahme (orange) oder Abnahme (blau) gegenüber der ungestörten Zelle; ein roter Ring kennzeichnet die gestörten Reaktionen.</li>
+  <li><b>Mit einem Knockout</b> wechselt ein Umschalter oben auf der Karte zwischen der ungestörten Zelle (A), der gestörten (B) und der Änderung A → B: blau = weniger Fluss, orange = mehr, gestrichelt mit magenta ⇄ = läuft in die andere Richtung (<a href="#de-compare">Abschnitt 12</a>). Ein roter Ring kennzeichnet die gestörten Reaktionen.</li>
 </ul>
 <h3 id="de-carbonflow">Was die Linien zwischen Gruppen tragen</h3>
 <p>In den Ansichten Zelle, Wege und Kaskade verbindet eine Linie zwei Gruppen (Blasen), wenn eine von ihnen <b>etwas herstellt, das die andere verwendet</b>. Die Auswahl <b>Linien</b> unten links auf der Karte bestimmt, was dieses Etwas ist:</p>
@@ -101,7 +101,7 @@
 <ul>
   <li><b>Ansicht Zelle</b>: Der Pool jedes Kompartiments ist getrennt, und Transporter sind eigene Gruppen auf den Membranen, sodass eine Linie von der zytosolischen Glykolyse zum mitochondrialen Pyruvatcarrier und weiter zum Citratzyklus läuft. <b>Wege und Kaskade</b>: Die Pools aller Kompartimente werden zusammengelegt und Transportreaktionen ignoriert, sodass derselbe Kohlenstoff direkt von der Glykolyse zum Citratzyklus geht.</li>
   <li>Nur die 220 größten Linien werden behalten (320 in der Ansicht Zelle). Breite und Partikelgeschwindigkeit sind logarithmisch, relativ zur größten Linie: Linien unter etwa 1/350 davon werden ausgeblendet, und Partikel bewegen sich nur auf Linien über etwa 1/90 davon. Die Auswahl einer Blase lässt ihre eigenen Linien hell und dämpft die übrigen.</li>
-  <li><b>Farbe</b>: einfacher Fluss in Cyan. Mit einem Tracer desselben Elements (ein <sup>13</sup>C-Tracer und die Kohlenstofflinien, ein <sup>15</sup>N-Tracer und die Stickstofflinien) ist die Farbe der markierte Anteil dessen, was die Linie trägt, gewichtet nach der Bildung. Bei „Nur veränderter Fluss“ ist die Farbe die mittlere Änderung der beiden verbundenen Gruppen.</li>
+  <li><b>Farbe</b>: einfacher Fluss in Cyan. Mit einem Tracer desselben Elements (ein <sup>13</sup>C-Tracer und die Kohlenstofflinien, ein <sup>15</sup>N-Tracer und die Stickstofflinien) ist die Farbe der markierte Anteil dessen, was die Linie trägt, gewichtet nach der Bildung. In der Ansicht A → B eines Vergleichs ist die Farbe die mittlere Änderung der beiden verbundenen Gruppen.</li>
   <li>In der Karte eines Stoffwechselwegs sind die Linien Reaktionsflüsse; ist ein Cofaktor gewählt (NADH, NADPH, Ubichinol, Nukleosidtriphosphate oder alle Redoxträger), behalten nur die Reaktionen ihre Linien, die ihn bilden oder verbrauchen, so breit wie der gebildete oder verbrauchte Cofaktor. Für die freie Enthalpie färbt der Wähler jede Reaktion.</li>
   <li><b>Herunterladen</b> › <i>pathway_flows.csv</i> listet die Linien jeder Größe zwischen Wegen auf, und <i>fluxes.csv</i> erhält ΔG′<sub>m</sub>-Spalten.</li>
 </ul>
@@ -580,7 +580,16 @@
 <p>Unter der Liste macht <b>Zeigen [X] verglichen mit [Y]</b> beide Seiten ausdrücklich. „Zeigen“ ist die Situation, die auf der Karte und in den Bereichen gezeichnet wird: die aktuelle oder ein beliebiges gespeichertes Szenario, dessen gespeichertes Ergebnis ohne Neuberechnung wieder angezeigt wird (wurde es mit anderen Modelländerungen erstellt, wird es geladen und neu berechnet). „Verglichen mit“ ist die Referenz: Jede Änderung wird von ihr zur gezeigten Situation gemessen, „Flussänderung von „B“ zu „A““ bedeutet also A relativ zu B. ⇅ tauscht beide. Ändern Sie danach irgendetwas, wird die gezeigte Seite wieder zur aktuellen, nicht gespeicherten Situation.</p>
 <p>Ab dann tritt das Szenario überall an die Stelle der „Referenz“:</p>
 <ul>
-  <li><b>Karte.</b> „Zeigen: Nur veränderter Fluss“ färbt Reaktionen nach Flussänderung (blau = weniger, orange = mehr). „Veränderte Markierung“ färbt Metaboliten nach der Änderung ihrer mittleren Anreicherung und blendet den Rest aus. In der Gesamt- und der Zellansicht wird jede Gruppe nach der Änderung ihrer flussgewichteten Markierung gefärbt.</li>
+  <li><b>Karte: A, B oder A → B.</b> Ein Umschalter oben auf der Karte wählt, was sie zeigt: <b>A</b> (die Referenz, „verglichen mit“), <b>B</b> (die angezeigte Situation) oder <b>A → B</b>, die Änderung dazwischen. Die Tasten 1, 2 und 3 wechseln zwischen ihnen, ohne Ansicht und Auswahl zu verändern, sodass man hin- und herschalten kann. Die Wahl eines Szenarios öffnet A → B. Das rechte Feld beschreibt immer B; die Tooltips zeigen den Fluss in beiden.</li>
+  <li><b>Die Ansicht A → B</b> trennt Größe und Richtung, damit eine Umkehr nie mit einer großen Änderung verwechselt wird:
+    <ul>
+      <li><b>Farbe</b>: wie viel Mal größer oder kleiner der Fluss in B ist, unabhängig von seiner Richtung (blau = kleiner, orange = größer, gesättigt bei 8-fach). Sie ist asinh(|B|/ε) − asinh(|A|/ε) mit ε = 0,001 mmol/gDW/h: weit über ε ist das der Logarithmus des Verhältnisses, und nahe null bleibt es endlich, sodass eine Reaktion, die angeht, nicht unendlich wird. Das übliche log(x + 1) funktioniert hier nicht: Die Flüsse liegen meist zwischen 0,001 und 1 mmol/gDW/h, und +1 macht sie flach.</li>
+      <li><b>Breite</b>: wie viel Fluss sich verschiebt, |B − A|. Ein unveränderter Fluss bleibt eine dünne graue Linie, und Partikel bewegen sich nur auf Flüssen, die sich ändern, in Richtung von B.</li>
+      <li><b>Markierungen</b>: Eine Reaktion, die in B in die andere Richtung läuft, ist gestrichelt, mit magenta Ring und ⇄; eine nur in B aktive hat einen Ring; eine nur in A aktive ist hohl.</li>
+      <li>Ein Fluss gilt als verändert, wenn er sich um mehr als 2 % unterscheidet und mindestens eine Seite über ε liegt (unter ε zählt er als null). Dieselbe Regel gilt für „Am stärksten veränderte Reaktionen“, die sich ändernden Austausche und Wege sowie die Filter „Nur veränderter Fluss“ und „Nur umgekehrter Fluss“, die ebenfalls A → B öffnen.</li>
+      <li>In der Gesamt- und der Zellansicht wird jede Gruppe nach der Änderung ihres Gesamtflusses gefärbt. Öffne einen Stoffwechselweg, um Umkehrungen und Reaktionen zu sehen, die an- oder ausgehen.</li>
+    </ul></li>
+  <li><b>Markierung.</b> „Veränderte Markierung“ färbt Metaboliten nach der Änderung ihrer mittleren Anreicherung und blendet den Rest aus. In der Gesamt- und der Zellansicht wird jede Gruppe nach der Änderung ihrer flussgewichteten Markierung gefärbt.</li>
   <li><b>Übersichtsbereich.</b> Das Ziel mit seiner Änderung, die am stärksten veränderten Reaktionen, die sich ändernden Austausche, die am stärksten veränderten Wege (Summe der Absolutflüsse) und die Metaboliten, deren Markierung sich am meisten ändert. Jede Zeile liest sich „Szenario → jetzt“; ein Klick führt dorthin.</li>
   <li><b>Metabolitbereich.</b> Umsatz und mittlere Anreicherung in beiden Situationen sowie die beiden <b>Isotopologverteilungen als gepaarte Balken</b> (grau: Szenario, bernstein: jetzt). Eine Situation ohne Tracer erscheint als 100 % M+0.</li>
   <li><b>Reaktionsbereich und Tooltips.</b> Der Fluss im Szenario neben dem aktuellen.</li>
@@ -662,7 +671,7 @@
   <li>Stellen Sie „Zeigen“ auf „Nur veränderter Fluss“.</li>
 </ol>
 <p class="res"><b>Ergebnis.</b> Das Wachstum sinkt nur leicht, von 0,0341 auf 0,0333 h⁻¹ (−2 %): Die gemessenen Zellen nehmen bereits Asparagin aus dem Medium auf, was den größten Teil des Bedarfs deckt. Stellen Sie die gemessenen Flüsse auf „Keine“ und vergleichen Sie.</p>
-<p class="res"><b>Vergleichen Sie mit:</b> <code>PDHB</code> (Pyruvatdehydrogenase): Wachstum unverändert, aber etwa 220 Reaktionen werden umgeleitet. <code>FASN</code>, <code>HMGCR</code> oder <code>CAD</code>: Das Wachstum stoppt, es gibt keine Umgehung. <code>GAPDH</code>: keine Wirkung, weil das Modell ein Isoenzym hat (GAPDHS).</p>
+<p class="res"><b>Vergleichen Sie mit:</b> <code>PDHB</code> (Pyruvatdehydrogenase): Wachstum unverändert, aber etwa 150 Reaktionen werden umgeleitet. <code>FASN</code>, <code>HMGCR</code> oder <code>CAD</code>: Das Wachstum stoppt, es gibt keine Umgehung. <code>GAPDH</code>: keine Wirkung, weil das Modell ein Isoenzym hat (GAPDHS).</p>
 </div>
 
 <div class="exp">
@@ -940,4 +949,7 @@
   <li>Richelle A et al. Model-based assessment of mammalian cell metabolic functionalities using omics data. <i>Cell Rep. Methods</i> 2021; 1:100040. <a href="https://doi.org/10.1016/j.crmeth.2021.100040" target="_blank" rel="noopener">doi:10.1016/j.crmeth.2021.100040</a></li>
   <li>Huangfu Q, Hall JAJ. Parallelizing the dual revised simplex method. <i>Math. Program. Comput.</i> 2018; 10:119–142 (HiGHS). <a href="https://doi.org/10.1007/s12532-017-0130-5" target="_blank" rel="noopener">doi:10.1007/s12532-017-0130-5</a></li>
 </ul>
+<h2 id="de-cite">20. Zitieren und Kontakt</h2>
+<p>MetfluxLive ist noch nicht veröffentlicht. Sobald der Artikel erschienen ist, wird seine Referenz hier angegeben.</p>
+<p>Für Fragen, Wünsche oder Anregungen schreiben Sie bitte an <a href="mailto:jonifg@usal.es">jonifg@usal.es</a>.</p>
 </article>

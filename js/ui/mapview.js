@@ -1,6 +1,8 @@
 // Canvas renderer for the global (subsystem) map and the per-pathway maps.
 // Flux is encoded as edge width, particle speed and node size; isotope enrichment as colour.
 
+import { fluxChange } from "../core/change.js";
+
 const UNIT = 64; // px per layout unit at zoom 1
 const COMP_DARK = {
   c: "#8fa3c8", m: "#ff9f5a", e: "#5fd38d", s: "#5fd38d", r: "#b48cff", x: "#3fd0c9",
@@ -19,7 +21,7 @@ const THEMES = {
     inactiveEdge: "rgba(125,145,190,0.13)", structEdge: "rgba(125,145,190,0.10)", guide: "rgba(125,145,190,0.25)", guideText: "rgba(147,162,198,0.9)",
     metOn: "#1d3350", metOff: "#141c30", rxnOn: "#e8eefc", rxnTransport: "#9fb4d8", rxnOff: "#2a3552",
     labelOn: "#eef3ff", labelOff: "rgba(170,185,215,0.6)", rxnLabelOn: "#b8c6e6", rxnLabelOff: "rgba(140,155,190,0.5)", groupLabelOff: "rgba(165,180,212,0.62)",
-    hover: "rgba(255,255,255,0.55)", selected: "#ffffff", pulse: [255, 255, 255], gene: "#b48cff", ko: "#ff5d6c", blocked: "#6b768f", flexFix: "#5fd38d", flexOpt: "#ffbe3c",
+    hover: "rgba(255,255,255,0.55)", selected: "#ffffff", pulse: [255, 255, 255], gene: "#b48cff", ko: "#ff5d6c", blocked: "#6b768f", flexFix: "#5fd38d", flexOpt: "#ffbe3c", rev: "#e15bd8",
     groupOff: "#151d33", groupRing: "rgba(235,242,255,0.9)", groupRingOff: "rgba(130,148,190,0.45)", groupListOnly: "rgba(160,175,210,0.45)",
     groupFill: (s) => `rgb(${28 + 30 * s},${60 + 90 * s},${92 + 110 * s})`, unknown: [70, 80, 108],
   },
@@ -28,7 +30,7 @@ const THEMES = {
     inactiveEdge: "rgba(90,105,140,0.18)", structEdge: "rgba(90,105,140,0.13)", guide: "rgba(90,105,140,0.3)", guideText: "rgba(95,108,135,0.95)",
     metOn: "#d3e3f0", metOff: "#eef1f6", rxnOn: "#3a4560", rxnTransport: "#7f8fb2", rxnOff: "#c9d0dd",
     labelOn: "#263046", labelOff: "rgba(90,102,128,0.65)", rxnLabelOn: "#4a5672", rxnLabelOff: "rgba(110,122,148,0.55)", groupLabelOff: "rgba(95,108,135,0.7)",
-    hover: "rgba(40,50,70,0.45)", selected: "#283044", pulse: [40, 60, 90], gene: "#8d68d6", ko: "#d04452", blocked: "#9aa3b4", flexFix: "#2f8a52", flexOpt: "#b26f0e",
+    hover: "rgba(40,50,70,0.45)", selected: "#283044", pulse: [40, 60, 90], gene: "#8d68d6", ko: "#d04452", blocked: "#9aa3b4", flexFix: "#2f8a52", flexOpt: "#b26f0e", rev: "#b0309f",
     groupOff: "#e6eaf1", groupRing: "rgba(45,62,92,0.75)", groupRingOff: "rgba(120,134,165,0.45)", groupListOnly: "rgba(120,134,165,0.45)",
     groupFill: (s) => `rgb(${222 - 150 * s},${234 - 100 * s},${244 - 60 * s})`, unknown: [196, 202, 214],
   },
@@ -128,6 +130,9 @@ export function enrichColor(e, alpha = 1) {
   return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
 }
 
+/** Colour that marks a reaction running the other way in B ("A → B" view). */
+export const revColor = () => TH.rev;
+
 // flux change against the reference: blue (down) - slate (same) - orange (up) by default
 export function deltaColor(d, alpha = 1) {
   const k = d ? Math.min(1, 0.3 + Math.abs(d) * 1.2) : 0, to = d > 0 ? D_UP : D_DOWN;
@@ -221,7 +226,9 @@ export class MapView {
     this.dlabel = d.mode === "dlabel";
     // free energy (dG'm per reaction, or per group) is drawn with the delta machinery and its own palette
     this.energy = !!(d.dG || d.energy);
-    this.mode = this.dlabel || this.energy ? "delta" : d.mode || "flux";
+    // "change" (A → B view): colour = change of size, width = |B − A|, reversals / on / off marked apart (core/change.js)
+    this.change = d.mode === "change" && !this.energy && !this.dlabel;
+    this.mode = this.dlabel || this.energy || this.change ? "delta" : d.mode || "flux";
     this.tracerOn = this.mode === "tracer";
     this.masked = !!(d.mask || d.gHas);
     const logScale = (x, max, dec = 4, floor = 0.04) => (x > 0 && max > 0 ? Math.min(1, Math.max(floor, 1 + Math.log10(x / max) / dec)) : 0);
@@ -231,19 +238,38 @@ export class MapView {
       let max = 0;
       // with a cofactor chosen, a reaction's edges carry how much of it the reaction makes or uses (d.qflux)
       const fl = (e) => { const j = sc.nodes[e.r].ref, x = d.v ? d.v[j] * e.coef : 0; return d.qflux ? Math.sign(x) * d.qflux[j] : x; };
-      for (const e of sc.edges) { const f = fl(e); e.f = f; if (Math.abs(f) > max) max = Math.abs(f); }
+      const chg = this.change && ref;
+      let dmax = 0;
+      for (const e of sc.edges) {
+        const f = fl(e); e.f = f; if (Math.abs(f) > max) max = Math.abs(f);
+        if (chg) {
+          const a = ref[sc.nodes[e.r].ref] * e.coef;
+          e.fa = a; e.dflux = Math.abs(f - a);
+          if (Math.abs(a) > max) max = Math.abs(a);
+          if (e.dflux > dmax) dmax = e.dflux;
+        }
+      }
       let tmax = 0;
-      for (const n of sc.nodes) if (n.type === 0 && d.turnover) tmax = Math.max(tmax, d.turnover[n.ref]);
+      for (const n of sc.nodes) if (n.type === 0 && d.turnover) tmax = Math.max(tmax, d.turnover[n.ref], chg && d.refTurnover ? d.refTurnover[n.ref] : 0);
       for (const n of sc.nodes) {
         if (n.type === 0) {
           n.flux = d.turnover ? d.turnover[n.ref] : 0; n.s = logScale(n.flux, tmax);
           n.e = d.metE ? d.metE[n.ref] : 0; n.unc = d.uncertain ? d.uncertain[n.ref] : 0;
           n.de = this.dlabel ? Math.max(-1, Math.min(1, 3 * (n.e - (d.refE ? d.refE[n.ref] : 0)))) : 0;
+          if (chg && d.refTurnover) { // size from the larger of A and B, colour from the change of turnover
+            const t0 = d.refTurnover[n.ref];
+            n.s = logScale(Math.max(n.flux, t0), tmax); n.de = fluxChange(t0, n.flux).size;
+          }
           n.hidden = !!mask && !mask.met[n.ref];
         } else {
           n.flux = d.qflux ? d.qflux[n.ref] : d.v ? Math.abs(d.v[n.ref]) : 0; n.s = logScale(n.flux, max); n.dir = d.v ? Math.sign(d.v[n.ref]) : 0;
           const f0 = ref ? Math.abs(ref[n.ref]) : n.flux;
-          n.d = rel(n.flux, f0); n.lost = !n.flux && f0 > 0;
+          n.d = rel(n.flux, f0); n.lost = !n.flux && f0 > 0; n.ck = null;
+          if (chg) {
+            const c = fluxChange(ref[n.ref], d.v ? d.v[n.ref] : 0);
+            n.d = c.size; n.ck = c.kind; n.lost = false;
+            n.s = logScale(Math.max(Math.abs(ref[n.ref]), n.flux), max);
+          }
           n.hidden = !!mask && !mask.rxn[n.ref];
           n.pert = d.perturb ? d.perturb.get(n.ref) : undefined;
           n.blk = !!(d.blocked && d.blocked.has(n.ref)); // no detected enzyme in the chosen cell type
@@ -267,7 +293,12 @@ export class MapView {
         e.flux = Math.abs(e.f);
         e.s = logScale(e.flux, max);
         e.out = e.f > 0; // reaction -> metabolite
-        e.e = m.e; e.d = this.dlabel ? m.de : r.d; e.lost = r.lost;
+        e.e = m.e; e.d = this.dlabel ? m.de : r.d; e.lost = r.lost; e.ck = r.ck;
+        if (chg) { // width = how much flux moved on this edge; unchanged flux stays as a thin grey line
+          const moved = r.ck !== "same" && r.ck !== "zero";
+          e.s = moved ? Math.max(0.08, logScale(e.dflux, dmax)) : e.f || e.fa ? 0.02 : 0;
+          if (!e.f) e.out = e.fa > 0; // gone in B: drawn in the direction it ran in A
+        }
         e.hidden = r.hidden || m.hidden;
       }
       if (mask) { // a metabolite touched only by affected reactions outside this map would float alone
@@ -572,7 +603,9 @@ export class MapView {
       const [cx, cy] = this._curve(sx[a], sy[a], sx[b], sy[b], 0.1);
       ctx.beginPath(); ctx.moveTo(sx[a], sy[a]); ctx.quadraticCurveTo(cx, cy, sx[b], sy[b]);
       ctx.strokeStyle = this._edgeColor(e, (0.3 + 0.6 * e.s) * d);
-      ctx.lineWidth = (0.8 + 5.2 * e.s) * wk; ctx.lineCap = "round"; ctx.stroke();
+      ctx.lineWidth = (0.8 + 5.2 * e.s) * wk; ctx.lineCap = "round";
+      if (this.change && e.ck === "rev") { ctx.lineCap = "butt"; ctx.setLineDash([7 * wk, 4 * wk]); }
+      ctx.stroke(); ctx.setLineDash([]);
       // arrow head near the target
       const rb = this._radius(ns[b]) + 2, ang = Math.atan2(sy[b] - cy, sx[b] - cx), ah = (3.5 + 4.5 * e.s) * wk;
       const tx = sx[b] - Math.cos(ang) * rb, ty = sy[b] - Math.sin(ang) * rb;
@@ -580,7 +613,7 @@ export class MapView {
       ctx.lineTo(tx - Math.cos(ang - 0.45) * ah, ty - Math.sin(ang - 0.45) * ah);
       ctx.lineTo(tx - Math.cos(ang + 0.45) * ah, ty - Math.sin(ang + 0.45) * ah);
       ctx.closePath(); ctx.fillStyle = this._edgeColor(e, (0.55 + 0.45 * e.s) * d); ctx.fill();
-      if (this.options.particles && d === 1) parts.push([sx[a], sy[a], cx, cy, sx[b], sy[b], e.s, e.phase, this.mode === "delta" ? this._dc(e.d, 0.9) : this.tracerOn ? enrichColor(Math.max(e.e, 0.02), 0.9) : TH.particle]);
+      if (this.options.particles && d === 1 && !(this.change && (e.ck === "same" || e.ck === "zero"))) parts.push([sx[a], sy[a], cx, cy, sx[b], sy[b], e.s, e.phase, this.mode === "delta" ? this._dc(e.d, 0.9) : this.tracerOn ? enrichColor(Math.max(e.e, 0.02), 0.9) : TH.particle]);
     }
     this._drawParticles(ctx, parts);
 
@@ -592,7 +625,7 @@ export class MapView {
       ctx.globalAlpha = a;
       if (n.type === 0) {
         ctx.beginPath(); ctx.arc(sx[i], sy[i], r, 0, 6.283);
-        ctx.fillStyle = n.s ? (this.dlabel ? this._dc(n.de) : this.tracerOn ? enrichColor(n.e) : TH.metOn) : TH.metOff;
+        ctx.fillStyle = n.s ? (this.dlabel || this.change ? this._dc(n.de) : this.tracerOn ? enrichColor(n.e) : TH.metOn) : TH.metOff;
         ctx.fill();
         ctx.lineWidth = n.s ? 2 : 1.2;
         ctx.strokeStyle = compColor(n.comp);
@@ -602,7 +635,23 @@ export class MapView {
         ctx.save(); ctx.translate(sx[i], sy[i]); ctx.rotate(Math.PI / 4);
         ctx.fillStyle = this.mode === "delta" ? this._dc(n.lost ? -1 : n.d, n.s ? 1 : 0.7) : n.s ? (n.transport ? TH.rxnTransport : TH.rxnOn) : TH.rxnOff;
         if (n.blk && !n.s) ctx.fillStyle = TH.blocked;
-        ctx.fillRect(-r, -r, 2 * r, 2 * r); ctx.restore();
+        if (this.change && n.ck === "off") { // active only in A: hollow
+          ctx.fillStyle = TH.halo; ctx.fillRect(-r, -r, 2 * r, 2 * r);
+          ctx.strokeStyle = this._dc(-1); ctx.lineWidth = 1.8; ctx.strokeRect(-r, -r, 2 * r, 2 * r);
+        } else ctx.fillRect(-r, -r, 2 * r, 2 * r);
+        ctx.restore();
+        if (this.change && n.ck === "on") { // active only in B: halo
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 3, 0, 6.283);
+          ctx.strokeStyle = this._dc(1, 0.85); ctx.lineWidth = 2; ctx.stroke();
+        }
+        if (this.change && n.ck === "rev") { // runs the other way in B: magenta ring and ⇄
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 3, 0, 6.283);
+          ctx.strokeStyle = TH.rev; ctx.lineWidth = 2.2; ctx.stroke();
+          const fs = Math.round(Math.max(11, r * 2.2));
+          ctx.font = `700 ${fs}px Inter, "Segoe UI", system-ui, sans-serif`; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+          ctx.lineWidth = 3; ctx.strokeStyle = TH.halo; ctx.strokeText("⇄", sx[i] + r * 1.5 + 5, sy[i] - r * 1.2);
+          ctx.fillStyle = TH.rev; ctx.fillText("⇄", sx[i] + r * 1.5 + 5, sy[i] - r * 1.2);
+        }
         if (n.ghost) { // a reaction of another pathway shown around the selected metabolite
           ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 5, 0, 6.283);
           ctx.strokeStyle = TH.gene; ctx.lineWidth = 1.6; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);

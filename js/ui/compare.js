@@ -7,9 +7,12 @@
 import { t } from "../i18n.js";
 import { escapeHtml as esc, fmtFlux, fmtTime } from "../modelindex.js";
 import { IsotopologueSampler } from "../core/isotopologues.js";
+import { fluxChange } from "../core/change.js";
 
 const $ = (id) => document.getElementById(id);
 const clamp1 = (x) => Math.max(-1, Math.min(1, x));
+/** Unchanged by the same rule as the reactions (core/change.js). */
+const same = (a, b) => { const k = fluxChange(a, b).kind; return k === "same" || k === "zero"; };
 const small = (s) => ` <small style="color:var(--muted);font-weight:400">${s}</small>`;
 
 /**
@@ -58,6 +61,7 @@ export function createCompare(app) {
 
   function setCompare(id) {
     S.compare = id;
+    S.cmpView = id ? "ab" : "b"; // choosing a reference opens the A → B view; the map selector switches from there
     attach();
     render();
     app.redraw();
@@ -182,7 +186,7 @@ export function createCompare(app) {
     S.result.frames.forEach((f, k) => {
       if (!("pertRef" in f)) f.pertRef = f.ref ?? null;
       f.ref = sc && sc.ctx.slug === S.slug ? buildRef(sc, k) : f.pertRef;
-      delete f.flowsBy; delete f.masks; delete f.refFlows;
+      delete f.flowsBy; delete f.masks; delete f.refFlows; delete f.aFrame; delete f.refTurn;
     });
   }
 
@@ -193,6 +197,7 @@ export function createCompare(app) {
     for (const [met, ex] of S.sim.exchanges) {
       const x = f.v[ex.rxn] * ex.dir, y = ref.v[ex.rxn] * ex.dir;
       if (Math.abs(x) < 1e-9 && Math.abs(y) < 1e-9) continue;
+      if (same(x, y)) continue;
       if (S.index.currency[S.model.mets[met].b]) continue;
       seen.add(met);
       rows.push({ met, name: S.model.bases[S.model.mets[met].b].n, a: y, b: x, d: x - y });
@@ -207,7 +212,7 @@ export function createCompare(app) {
     const rows = [];
     for (let s = 0; s < n; s++) {
       const mx = Math.max(cur[s], ref[s]);
-      if (mx < 1e-9 || S.index.isExchangeSub[s]) continue;
+      if (mx < 1e-9 || S.index.isExchangeSub[s] || same(cur[s], ref[s])) continue;
       rows.push({ ss: s, a: ref[s], b: cur[s], d: (cur[s] - ref[s]) / mx, abs: Math.abs(cur[s] - ref[s]) });
     }
     return rows.sort((p, q) => q.abs * Math.abs(q.d) - p.abs * Math.abs(p.d));

@@ -16,7 +16,8 @@
     body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.65 Inter, "Segoe UI", system-ui, -apple-system, sans-serif; }
     header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
     .brand { font-size: 17px; display: flex; align-items: center; gap: 8px; white-space: nowrap; } .brand b { color: var(--accent); }
-    .logo { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff, var(--accent) 45%, #5b7cfa 100%); }
+    .logo { width: 22px; height: 22px; flex: none; overflow: visible; }
+    .logo .s { fill: none; stroke: var(--text); stroke-linecap: round; stroke-linejoin: round; } .logo .sf { fill: var(--text); } .logo .f { fill: var(--accent); } .logo .h { fill: var(--panel); }
     .spacer { flex: 1; }
     a { color: var(--accent); }
     .btn, header button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; color: var(--text); text-decoration: none; font: inherit; font-size: 14px; cursor: pointer; }
@@ -77,7 +78,7 @@
 <body>
   <header>
     <button id="tocBtn" type="button" aria-controls="toc" aria-expanded="false">☰</button>
-    <div class="brand"><span class="logo"></span>Metflux<b>Live</b> · Docs</div>
+    <div class="brand"><svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><circle class="s" stroke-width="3" cx="30" cy="27" r="13"/><path class="s" stroke-width="3" d="M8.5 7.83L14.59 12.77"/><path class="s" stroke-width="3" d="M33.5 36.5L30 40L33.5 43.5"/><circle class="sf" cx="5" cy="5" r="3.5"/><circle class="h" cx="43" cy="27" r="4"/><circle class="s" stroke-width="2.5" cx="43" cy="27" r="4"/><circle class="f" cx="20.81" cy="17.81" r="6.5"/><circle class="s" stroke-width="3" cx="20.81" cy="17.81" r="6.5"/></svg>Metflux<b>Live</b> · Docs</div>
     <div class="spacer"></div>
     <select id="docLang" aria-label="Language"></select>
     <a class="btn" href="index.html" id="back">← App</a>
@@ -134,7 +135,7 @@
   <li><b>Line width and particle speed</b> show flux on a logarithmic scale, so small fluxes stay visible.</li>
   <li><b>In a pathway map</b>, circles are metabolites and diamonds are reactions. The ring colour of a metabolite is its compartment. Cofactors such as ATP or water are hidden to keep the map readable.</li>
   <li><b>With a tracer</b>, colour changes from grey (unlabelled) through amber to magenta (fully labelled).</li>
-  <li><b>With a knockout</b>, choosing "Changed flux only" colours by increase (orange) or decrease (blue) against the unperturbed cell; a red ring marks the perturbed reactions.</li>
+  <li><b>With a knockout</b>, a selector at the top of the map switches between the unperturbed cell (A), the perturbed one (B) and the change A → B: blue = less flux, orange = more, dashed with a magenta ⇄ = runs the other way (<a href="#en-compare">section 12</a>). A red ring marks the perturbed reactions.</li>
 </ul>
 <h3 id="en-carbonflow">What the lines between groups carry</h3>
 <p>In the Cell, Pathways and Cascade views a line joins two groups (bubbles) when one of them <b>makes something that the other uses</b>. The <b>Lines</b> selector below the map, on the left, chooses what that something is:</p>
@@ -192,7 +193,7 @@
 <ul>
   <li><b>Cell view</b>: each compartment's pool is separate, and transporters are groups of their own sitting on the membranes, so a line runs from cytosolic glycolysis to the mitochondrial pyruvate carrier and on to the TCA cycle. <b>Pathways and Cascade</b>: the pools of all compartments are merged and transport reactions are ignored, so the same carbon goes straight from glycolysis to the TCA cycle.</li>
   <li>Only the 220 largest lines (320 in the Cell view) are kept. Width and particle speed are logarithmic, relative to the largest line: lines below about 1/350 of it are hidden, and particles move only on lines above about 1/90 of it. Selecting a bubble keeps its own lines bright and dims the rest.</li>
-  <li><b>Colour</b>: plain flux in cyan. With a tracer of the same element (a <sup>13</sup>C tracer and the Carbon lines, a <sup>15</sup>N tracer and the Nitrogen lines), the colour is the labelled fraction of what the line carries, weighted by production. In "Changed flux only", the colour is the mean change of the two groups it joins.</li>
+  <li><b>Colour</b>: plain flux in cyan. With a tracer of the same element (a <sup>13</sup>C tracer and the Carbon lines, a <sup>15</sup>N tracer and the Nitrogen lines), the colour is the labelled fraction of what the line carries, weighted by production. In the A → B view of a comparison, the colour is the mean change of the two groups it joins.</li>
   <li>In a pathway map the lines are reaction fluxes; with a cofactor chosen (NADH, NADPH, ubiquinol, nucleoside triphosphates or all redox carriers), only the reactions that make or use it keep their lines, as wide as the cofactor they make or use. For free energy the selector colours each reaction.</li>
   <li><b>Download</b> › <i>pathway_flows.csv</i> lists the lines of every quantity between pathways, and <i>fluxes.csv</i> gains ΔG′<sub>m</sub> columns.</li>
 </ul>
@@ -686,7 +687,16 @@
 <p>Below the list, <b>Show [X] compared with [Y]</b> makes both sides explicit. "Show" is the situation drawn on the map and in the panels: the current one or any saved scenario, whose stored result is shown again without recomputing (if it was made with other model edits, it is loaded and recomputed). "Compared with" is the reference: every change is measured from it to the situation shown, so "Flux change from «B» to «A»" means A relative to B. ⇅ swaps the two. Changing anything afterwards turns the shown side back into the current, unsaved situation.</p>
 <p>From then on, the scenario takes the place of the "reference" everywhere:</p>
 <ul>
-  <li><b>Map.</b> "Show: Changed flux only" colours reactions by flux change (blue = less, orange = more). "Changed label" colours metabolites by the change of their mean enrichment and hides the rest. In the global and cell views each group is coloured by the change of its flux-weighted label.</li>
+  <li><b>Map: A, B or A → B.</b> A selector at the top of the map chooses what it draws: <b>A</b> (the reference, "compared with"), <b>B</b> (the situation shown) or <b>A → B</b>, the change between them. Keys 1, 2 and 3 switch between them and keep the view and the selection, so you can flick back and forth. Choosing a scenario opens A → B. The panel on the right always describes B; tooltips give the flux in both.</li>
+  <li><b>The A → B view</b> keeps size and direction apart, so a reversal is never mistaken for a large change:
+    <ul>
+      <li><b>Colour</b>: how many times larger or smaller the flux is in B, whatever its direction (blue = smaller, orange = larger, saturating at 8-fold). It is asinh(|B|/ε) − asinh(|A|/ε) with ε = 0.001 mmol/gDW/h: well above ε it is the logarithm of the fold change, and near zero it stays finite, so a reaction that switches on does not become infinite. The usual log(x + 1) would not work here: fluxes are mostly 0.001–1 mmol/gDW/h, and +1 flattens them.</li>
+      <li><b>Width</b>: how much flux moves, |B − A|. An unchanged flux stays as a thin grey line, and particles move only on fluxes that change, in the direction of B.</li>
+      <li><b>Marks</b>: a reaction that runs the other way in B is dashed, with a magenta ring and ⇄; one active only in B has a ring; one active only in A is hollow.</li>
+      <li>A flux counts as changed when it differs by more than 2 % and at least one side is above ε (below ε it counts as zero). The same rule gives "Most changed reactions", the exchanges and pathways that change, and the filters "Changed flux only" and "Reversed flux only", which also open A → B.</li>
+      <li>In the global and cell views each group is coloured by the change of its total flux. Open a pathway to see reversals and reactions that switch on or off.</li>
+    </ul></li>
+  <li><b>Label.</b> "Changed label" colours metabolites by the change of their mean enrichment and hides the rest. In the global and cell views each group is coloured by the change of its flux-weighted label.</li>
   <li><b>Summary panel.</b> The objective with its change, the most changed reactions, the exchanges that change, the pathways that change most (sum of absolute fluxes) and the metabolites whose labelling changes most. Every line reads "scenario → now"; click it to go there.</li>
   <li><b>Metabolite panel.</b> Turnover and mean enrichment in both situations, and the two <b>isotopologue distributions as paired bars</b> (grey: scenario, amber: now). A situation without a tracer shows as 100 % M+0.</li>
   <li><b>Reaction panel and tooltips.</b> The flux in the scenario next to the current one.</li>
@@ -768,7 +778,7 @@
   <li>Set "Show" to "Changed flux only".</li>
 </ol>
 <p class="res"><b>Result.</b> Growth falls only slightly, from 0.0341 to 0.0333 h⁻¹ (−2 %): the measured cells already take up asparagine from the medium, and that covers most of the need. Switch the measured fluxes to "None" and compare.</p>
-<p class="res"><b>Compare with:</b> <code>PDHB</code> (pyruvate dehydrogenase): growth unchanged, but about 220 reactions are rerouted. <code>FASN</code>, <code>HMGCR</code> or <code>CAD</code>: growth stops, there is no bypass. <code>GAPDH</code>: no effect, because the model has an isoenzyme (GAPDHS).</p>
+<p class="res"><b>Compare with:</b> <code>PDHB</code> (pyruvate dehydrogenase): growth unchanged, but about 150 reactions are rerouted. <code>FASN</code>, <code>HMGCR</code> or <code>CAD</code>: growth stops, there is no bypass. <code>GAPDH</code>: no effect, because the model has an isoenzyme (GAPDHS).</p>
 </div>
 
 <div class="exp">
@@ -1046,6 +1056,9 @@
   <li>Richelle A et al. Model-based assessment of mammalian cell metabolic functionalities using omics data. <i>Cell Rep. Methods</i> 2021; 1:100040. <a href="https://doi.org/10.1016/j.crmeth.2021.100040" target="_blank" rel="noopener">doi:10.1016/j.crmeth.2021.100040</a></li>
   <li>Huangfu Q, Hall JAJ. Parallelizing the dual revised simplex method. <i>Math. Program. Comput.</i> 2018; 10:119–142 (HiGHS). <a href="https://doi.org/10.1007/s12532-017-0130-5" target="_blank" rel="noopener">doi:10.1007/s12532-017-0130-5</a></li>
 </ul>
+<h2 id="en-cite">20. Citation and contact</h2>
+<p>MetfluxLive is pending publication. Once the article is published, its reference will be given here.</p>
+<p>For questions, requests or suggestions, please write to <a href="mailto:jonifg@usal.es">jonifg@usal.es</a>.</p>
 </article>
 
 <!-- ============================================================ ESPAÑOL -->
@@ -1094,7 +1107,7 @@
   <li><b>El grosor de la línea y la velocidad de las partículas</b> indican el flujo en escala logarítmica, para que los flujos pequeños sigan viéndose.</li>
   <li><b>En el mapa de una ruta</b>, los círculos son metabolitos y los rombos reacciones. El color del anillo de un metabolito es su compartimento. Los cofactores como ATP o agua se ocultan para que el mapa sea legible.</li>
   <li><b>Con un trazador</b>, el color pasa de gris (sin marca) por ámbar a magenta (totalmente marcado).</li>
-  <li><b>Con un knockout</b>, al elegir «Solo flujo alterado» el color indica aumento (naranja) o disminución (azul) frente a la célula sin perturbar; un anillo rojo señala las reacciones perturbadas.</li>
+  <li><b>Con un knockout</b>, un selector arriba del mapa cambia entre la célula sin perturbar (A), la perturbada (B) y el cambio A → B: azul = menos flujo, naranja = más, discontinua con ⇄ magenta = va en sentido contrario (<a href="#es-compare">sección 12</a>). Un anillo rojo señala las reacciones perturbadas.</li>
 </ul>
 <h3 id="es-carbonflow">Qué llevan las líneas entre grupos</h3>
 <p>En las vistas Célula, Rutas y Cascada una línea une dos grupos (burbujas) cuando uno de ellos <b>fabrica algo que el otro usa</b>. El selector <b>Líneas</b>, abajo a la izquierda del mapa, elige qué es ese algo:</p>
@@ -1152,7 +1165,7 @@
 <ul>
   <li><b>Vista Célula</b>: el pool de cada compartimento va por separado y los transportadores son grupos propios situados en las membranas, así que una línea va de la glucólisis citosólica al transportador mitocondrial de piruvato y de ahí al ciclo de Krebs. <b>Rutas y Cascada</b>: se juntan los pools de todos los compartimentos y se ignoran las reacciones de transporte, así que el mismo carbono va directamente de la glucólisis al ciclo de Krebs.</li>
   <li>Sólo se conservan las 220 líneas mayores (320 en la vista Célula). El grosor y la velocidad de las partículas son logarítmicos, relativos a la línea mayor: se ocultan las líneas por debajo de 1/350 de ella, aproximadamente, y sólo llevan partículas las que superan 1/90. Al seleccionar una burbuja, sus líneas quedan brillantes y el resto se atenúa.</li>
-  <li><b>Color</b>: el flujo sin más va en cian. Con un trazador del mismo elemento (<sup>13</sup>C con las líneas de carbono, <sup>15</sup>N con las de nitrógeno), el color es la fracción marcada de lo que lleva la línea, ponderada por la producción. En «Solo flujo alterado», el color es el cambio medio de los dos grupos que une.</li>
+  <li><b>Color</b>: el flujo sin más va en cian. Con un trazador del mismo elemento (<sup>13</sup>C con las líneas de carbono, <sup>15</sup>N con las de nitrógeno), el color es la fracción marcada de lo que lleva la línea, ponderada por la producción. En la vista A → B de una comparación, el color es el cambio medio de los dos grupos que une.</li>
   <li>En el mapa de una ruta las líneas son flujos de reacción; con un cofactor elegido (NADH, NADPH, ubiquinol, nucleósidos trifosfato o todos los portadores redox), sólo conservan sus líneas las reacciones que lo producen o consumen, con un grosor igual al cofactor que producen o consumen. Para la energía libre, el selector colorea cada reacción.</li>
   <li><b>Descargar</b> › <i>pathway_flows.csv</i> lista las líneas de cada magnitud entre rutas, y <i>fluxes.csv</i> incluye columnas de ΔG′<sub>m</sub>.</li>
 </ul>
@@ -1646,7 +1659,16 @@
 <p>Bajo la lista, <b>Mostrar [X] comparado con [Y]</b> hace explícitos los dos lados. «Mostrar» es la situación que se dibuja en el mapa y en los paneles: la actual o cualquier escenario guardado, cuyo resultado se vuelve a mostrar sin recalcular (si se hizo con otras ediciones del modelo, se carga y se recalcula). «Comparado con» es la referencia: cada cambio se mide desde ella hacia la situación mostrada, así que «Cambio de flujo de «B» a «A»» significa A respecto a B. ⇅ intercambia los dos. Si después cambias cualquier cosa, el lado mostrado vuelve a ser la situación actual, sin guardar.</p>
 <p>A partir de ahí, el escenario hace de «referencia» en todas partes:</p>
 <ul>
-  <li><b>Mapa.</b> «Mostrar: Sólo flujo cambiado» colorea las reacciones según el cambio de flujo (azul = menos, naranja = más). «Marcaje cambiado» colorea los metabolitos según el cambio de su enriquecimiento medio y oculta el resto. En las vistas global y celular cada grupo se colorea según el cambio de su marcaje ponderado por flujo.</li>
+  <li><b>Mapa: A, B o A → B.</b> Un selector arriba del mapa elige qué dibuja: <b>A</b> (la referencia, «comparado con»), <b>B</b> (la situación que se muestra) o <b>A → B</b>, el cambio entre ambas. Las teclas 1, 2 y 3 cambian entre ellas sin mover la vista ni la selección, para alternar y ver qué cambia. Al elegir un escenario se abre A → B. El panel de la derecha describe siempre B; las etiquetas flotantes dan el flujo en las dos.</li>
+  <li><b>La vista A → B</b> separa tamaño y sentido, para que una inversión no se confunda con un cambio grande:
+    <ul>
+      <li><b>Color</b>: cuántas veces es mayor o menor el flujo en B, sea cual sea su sentido (azul = menor, naranja = mayor, se satura a 8 veces). Es asinh(|B|/ε) − asinh(|A|/ε) con ε = 0,001 mmol/gDW/h: muy por encima de ε es el logaritmo del cambio relativo, y cerca de cero se mantiene finito, así que una reacción que se enciende no da infinito. El habitual log(x + 1) no sirve aquí: los flujos están casi siempre entre 0,001 y 1 mmol/gDW/h, y el +1 los aplana.</li>
+      <li><b>Grosor</b>: cuánto flujo se mueve, |B − A|. Un flujo sin cambio queda como una línea gris fina, y las partículas solo se mueven en los flujos que cambian, en el sentido de B.</li>
+      <li><b>Marcas</b>: una reacción que va en sentido contrario en B es discontinua, con anillo magenta y ⇄; una activa solo en B lleva un anillo; una activa solo en A queda hueca.</li>
+      <li>Un flujo cuenta como cambiado si difiere en más de un 2 % y al menos uno de los dos lados supera ε (por debajo de ε cuenta como cero). La misma regla da «Reacciones que más cambian», los intercambios y rutas que cambian y los filtros «Solo flujo alterado» y «Solo flujo invertido», que además abren A → B.</li>
+      <li>En las vistas global y celular cada grupo se colorea según el cambio de su flujo total. Abre una ruta para ver las inversiones y las reacciones que se encienden o se apagan.</li>
+    </ul></li>
+  <li><b>Marcaje.</b> «Marcaje cambiado» colorea los metabolitos según el cambio de su enriquecimiento medio y oculta el resto. En las vistas global y celular cada grupo se colorea según el cambio de su marcaje ponderado por flujo.</li>
   <li><b>Panel de resumen.</b> El objetivo con su cambio, las reacciones que más cambian, los intercambios que cambian, las rutas que más cambian (suma de flujos absolutos) y los metabolitos cuyo marcaje cambia más. Cada línea se lee «escenario → ahora»; pulsa para ir allí.</li>
   <li><b>Panel de metabolito.</b> Recambio y enriquecimiento medio en ambas situaciones, y las dos <b>distribuciones de isotopólogos como barras pareadas</b> (gris: escenario, ámbar: ahora). Una situación sin trazador aparece como 100 % M+0.</li>
   <li><b>Panel de reacción y descripciones emergentes.</b> El flujo en el escenario junto al actual.</li>
@@ -1728,7 +1750,7 @@
   <li>Pon «Mostrar» en «Solo flujo alterado».</li>
 </ol>
 <p class="res"><b>Resultado.</b> El crecimiento baja solo un poco, de 0,0341 a 0,0333 h⁻¹ (−2 %): las células medidas ya captan asparagina del medio, y eso cubre casi toda la necesidad. Pon los flujos medidos en «Ninguno» y compara.</p>
-<p class="res"><b>Compáralo con:</b> <code>PDHB</code> (piruvato deshidrogenasa): el crecimiento no cambia, pero unas 220 reacciones se redirigen. <code>FASN</code>, <code>HMGCR</code> o <code>CAD</code>: el crecimiento se detiene, no hay alternativa. <code>GAPDH</code>: sin efecto, porque el modelo tiene una isoenzima (GAPDHS).</p>
+<p class="res"><b>Compáralo con:</b> <code>PDHB</code> (piruvato deshidrogenasa): el crecimiento no cambia, pero unas 150 reacciones se redirigen. <code>FASN</code>, <code>HMGCR</code> o <code>CAD</code>: el crecimiento se detiene, no hay alternativa. <code>GAPDH</code>: sin efecto, porque el modelo tiene una isoenzima (GAPDHS).</p>
 </div>
 
 <div class="exp">
@@ -2006,6 +2028,9 @@
   <li>Richelle A et al. Model-based assessment of mammalian cell metabolic functionalities using omics data. <i>Cell Rep. Methods</i> 2021; 1:100040. <a href="https://doi.org/10.1016/j.crmeth.2021.100040" target="_blank" rel="noopener">doi:10.1016/j.crmeth.2021.100040</a></li>
   <li>Huangfu Q, Hall JAJ. Parallelizing the dual revised simplex method. <i>Math. Program. Comput.</i> 2018; 10:119–142 (HiGHS). <a href="https://doi.org/10.1007/s12532-017-0130-5" target="_blank" rel="noopener">doi:10.1007/s12532-017-0130-5</a></li>
 </ul>
+<h2 id="es-cite">20. Cita y contacto</h2>
+<p>MetfluxLive está pendiente de publicación. Cuando se publique el artículo, su referencia aparecerá aquí.</p>
+<p>Para dudas, ruegos o sugerencias, escribe por favor a <a href="mailto:jonifg@usal.es">jonifg@usal.es</a>.</p>
 </article>
 
     </div>

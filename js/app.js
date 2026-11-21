@@ -5,7 +5,8 @@ import { MEASURED_SETS, DEFAULT_TOL, measuredPreset, measuredNgam, measuredSetsF
 import { gprActivity } from "./core/gpr.js";
 import { loadContexts, offGenes, blockedReactions, offGenesOf, ContextIndex, taskName } from "./core/contexts.js";
 import { ModelIndex, fmtFlux, fmtTime, escapeHtml as esc } from "./modelindex.js";
-import { MapView, compColor, setCompAliases, enrichColor, deltaColor, energyColor, setMapTheme } from "./ui/mapview.js";
+import { MapView, compColor, setCompAliases, enrichColor, deltaColor, energyColor, setMapTheme, revColor } from "./ui/mapview.js";
+import { fluxChange, FLUX_EPS } from "./core/change.js";
 import { loadLook, applyLook, openLookDialog } from "./ui/look.js";
 import { OBJECTIVES, OBJECTIVE_GROUPS, objectiveIndex, isGrowthRxn } from "./core/objectives.js";
 import { SearchIndex, attachSearch } from "./ui/search.js";
@@ -35,7 +36,7 @@ const S = {
   supplies: [], perturb: [], events: [], measured: { set: "nci60", tol: DEFAULT_TOL, items: [], ngam: 0, edited: false }, cfg: { objective: 0, maximize: true, parsimonious: true },
   mode: "steady", result: null, frameIdx: 0, stale: false,
   auto: { steady: true, dynamic: false }, // re-run automatically after a change, per mode
-  grouping: "cascade", filter: "all", quantity: "carbon", // what the lines between groups carry
+  grouping: "cascade", filter: "all", cmpView: "b", quantity: "carbon", // what the lines between groups carry
   view: { kind: "global", ss: -1 }, sel: null, runSeq: 0, playing: null,
   scenes: {}, subScenes: new Map(), cell: undefined, statusFn: null,
   base: null, edits: [], edited: null, editMode: false, // model editor: published model + edit operations
@@ -793,7 +794,10 @@ function onMapHover(node, x, y) {
   } else if (node.type === 1) {
     const dg = S.flowData.dG[node.ref];
     if (S.quantity === "dg") html += `<span>${Number.isFinite(dg) ? t("tip.dg", { x: (dg > 0 ? "+" : "") + dg.toFixed(1), sd: S.flowData.dGsd[node.ref].toFixed(1) }) : t("dg.none")}</span>`;
-    html += `<span>${S.model.rxns[node.ref].id} · ${t("tip.flux", { x: fmtFlux(f ? f.v[node.ref] : 0) })}${f?.ref ? (f.ref.scen ? t("tip.refScen", { name: esc(f.ref.scen.name), x: fmtFlux(f.ref.v[node.ref]) }) : t("tip.ref", { x: fmtFlux(f.ref.v[node.ref]) })) : ""}${node.pert !== undefined ? t("tip.activity", { x: Math.round(100 * node.pert) }) : ""}</span>`;
+    if (f?.ref) { // comparing: both conditions, whatever the map shows
+      const nm = cmpNames(f), a = f.ref.v[node.ref], b = f.v[node.ref], c = fluxChange(a, b);
+      html += `<span>${S.model.rxns[node.ref].id} · ${t("tip.ab", { a: esc(nm.a), x: fmtFlux(a), b: esc(nm.b), y: fmtFlux(b) })}${["rev", "on", "off"].includes(c.kind) ? `<br><b${c.kind === "rev" ? ` style="color:${revColor()}"` : ""}>${t("tip.ch." + c.kind)}</b>` : ""}${node.pert !== undefined ? t("tip.activity", { x: Math.round(100 * node.pert) }) : ""}</span>`;
+    } else html += `<span>${S.model.rxns[node.ref].id} · ${t("tip.flux", { x: fmtFlux(f ? f.v[node.ref] : 0) })}${node.pert !== undefined ? t("tip.activity", { x: Math.round(100 * node.pert) }) : ""}</span>`;
   } else {
     const en = f && S.quantity === "dg" ? frameFlows(f).energy : null;
     if (en) html += `<span>${t("tip.dgGroup", { d: fmtFlux(en.diss[node.ref]), u: fmtFlux(en.up[node.ref]), c: Math.round(100 * en.cover[node.ref]) })}</span>`;
@@ -813,6 +817,43 @@ function frameGroupFlux(f, g) {
 // ------------------------------------------------------------- simulation ----
 const frame = () => (S.result ? S.result.frames[Math.min(S.frameIdx, S.result.frames.length - 1)] : null);
 const frameTurnover = (f) => f.turnover || (f.turnover = S.index.turnover(f.v));
+
+// ------------------------------------------------- comparison: A, B, A → B ----
+// With a reference (a compared scenario, or the unperturbed run behind a perturbation) the map can show
+// condition A (the reference), B (what is on screen) or the change A → B. The right panel always describes B.
+/** View in force for a frame: "a", "b" or "ab" ("b" when there is nothing to compare with). */
+const cmpView = (f) => (f?.ref ? S.cmpView : "b");
+/** Condition A as a frame of its own, so the map can draw it like any result. */
+function aFrame(f) {
+  if (f.aFrame) return f.aFrame;
+  const r = f.ref, rf = r.frame;
+  return (f.aFrame = { t: r.t ?? f.t, v: r.v, metE: r.metE || null, status: r.status || "optimal", objective: r.objective,
+    inputs: rf?.inputs || f.inputs, elements: rf?.elements || f.elements, isA: true });
+}
+const refTurnover = (f) => f.refTurn || (f.refTurn = S.index.turnover(f.ref.v));
+/** Names of the two conditions, for the selector, the legend and the tooltip. */
+function cmpNames(f) {
+  if (f?.ref?.scen) return { a: f.ref.scen.name, b: compare.shownName() };
+  return { a: t("cmpv.refAuto"), b: t("cmpv.pert") };
+}
+function setCmpView(v) {
+  if (!frame()?.ref || S.cmpView === v) return;
+  S.cmpView = v;
+  applyFrame();
+}
+function renderCmpViews(f) {
+  const box = $("cmpViews"), on = !!f?.ref;
+  box.hidden = !on;
+  if (!on) return;
+  const nm = cmpNames(f), v = S.cmpView;
+  const lab = { a: `<b>A</b> <span>${esc(nm.a)}</span>`, b: `<b>B</b> <span>${esc(nm.b)}</span>`, ab: `<b>A → B</b>` };
+  const tip = { a: t("cmpv.aTitle", { name: nm.a }), b: t("cmpv.bTitle", { name: nm.b }), ab: t("cmpv.abTitle", { a: nm.a, b: nm.b }) };
+  box.querySelectorAll("button").forEach((b) => {
+    const k = b.dataset.v;
+    b.innerHTML = lab[k]; b.title = tip[k];
+    b.setAttribute("aria-checked", String(k === v)); b.classList.toggle("on", k === v);
+  });
+}
 
 /** Weights of the current quantity for a frame: { w per metabolite, skipBase, lineLabel }. */
 function quantitySpec(f, kind = S.quantity) {
@@ -840,7 +881,7 @@ function frameFlows(f, kind = S.quantity, G = groups()) {
 const canDlabel = (f) => !!(f?.ref?.scen && (f.metE || f.ref.metE));
 function activeFilter(f) {
   if (S.filter === "label" && f?.metE) return "label";
-  if (S.filter === "delta" && f?.ref) return "delta";
+  if ((S.filter === "delta" || S.filter === "rev") && f?.ref) return S.filter;
   if (S.filter === "dlabel" && canDlabel(f)) return "dlabel";
   return "all";
 }
@@ -856,7 +897,18 @@ function dlabelMask(f, thr = 0.01) {
 
 function frameMask(f, kind) {
   const cache = f.masks || (f.masks = {});
-  return cache[kind] || (cache[kind] = kind === "label" ? S.index.labelMask(f.v, f.metE) : kind === "dlabel" ? dlabelMask(f) : S.index.deltaMask(f.v, f.ref.v));
+  return cache[kind] || (cache[kind] = kind === "label" ? S.index.labelMask(f.v, f.metE) : kind === "dlabel" ? dlabelMask(f) : kind === "rev" ? revMask(f) : S.index.deltaMask(f.v, f.ref.v));
+}
+
+/** Reactions that run the other way in B than in A, and the metabolites they touch. */
+function revMask(f) {
+  const { mets, rxns } = S.model, met = new Uint8Array(mets.length), rxn = new Uint8Array(rxns.length);
+  rxns.forEach((r, j) => {
+    if (fluxChange(f.ref.v[j], f.v[j]).kind !== "rev") return;
+    rxn[j] = 1;
+    for (const m of r.m) met[m] = 1;
+  });
+  return { rxn, met };
 }
 
 /** Residual activity of every perturbed reaction (genes go through their GPR rule). */
@@ -998,13 +1050,17 @@ function applyFrame() {
   const fs = $("filterSel");
   fs.querySelector('[value="label"]').disabled = !f?.metE;
   fs.querySelector('[value="delta"]').disabled = !f?.ref;
+  fs.querySelector('[value="rev"]').disabled = !f?.ref;
   fs.querySelector('[value="dlabel"]').disabled = !canDlabel(f);
   const filt = activeFilter(f);
   fs.value = filt;
-  const mode = filt === "delta" ? "delta" : filt === "dlabel" ? "dlabel" : f?.metE ? "tracer" : "flux";
+  const view = cmpView(f), mf = view === "a" ? aFrame(f) : f; // mf: the frame drawn on the map
+  renderCmpViews(f);
+  const mode = filt === "dlabel" ? "dlabel" : view === "ab" ? "change" : mf?.metE ? "tracer" : "flux";
   const mask = filt === "all" ? null : frameMask(f, filt);
   if (S.view.kind === "sub" || S.view.kind === "focus") {
-    map.setData(f ? { v: f.v, turnover: frameTurnover(f), metE: f.metE, uncertain: f.uncertain, mode, mask, ref: f.ref?.v, refE: f.ref?.metE, perturb: S.result.pert, dG: S.quantity === "dg" ? S.flowData.dG : null, blocked: S.ctxBlock ? (S.ctxBlockSet ??= new Set(S.ctxBlock)) : null, qflux: cofactorRxnFlux(f, S.quantity), flex: S.flex && S.flex.result === S.result && S.flex.frameIdx === S.frameIdx ? S.flex.map : null } : {});
+    const pertA = f?.ref?.scen ? f.ref.scen.result.pert : null; // what A itself had knocked out (nothing for the unperturbed reference)
+    map.setData(f ? { v: mf.v, turnover: frameTurnover(mf), metE: mf.metE, uncertain: view === "a" ? null : f.uncertain, mode, mask, ref: f.ref?.v, refE: f.ref?.metE, refTurnover: view === "ab" ? refTurnover(f) : null, perturb: view === "a" ? pertA : S.result.pert, dG: S.quantity === "dg" ? S.flowData.dG : null, blocked: S.ctxBlock ? (S.ctxBlockSet ??= new Set(S.ctxBlock)) : null, qflux: view === "ab" ? null : cofactorRxnFlux(mf, S.quantity), flex: view !== "a" && S.flex && S.flex.result === S.result && S.flex.frameIdx === S.frameIdx ? S.flex.map : null } : {});
   } else if (S.view.kind === "global") {
     let gHas = null;
     if (mask) {
@@ -1012,7 +1068,7 @@ function applyFrame() {
       gHas = new Uint8Array(G.n);
       for (let j = 0; j < mask.rxn.length; j++) if (mask.rxn[j] && G.groupOf[j] >= 0) gHas[G.groupOf[j]] = 1;
     }
-    let fl = f ? frameFlows(f) : null;
+    let fl = f ? frameFlows(mf) : null;
     if (f && mode === "dlabel") { // group colour: change of the flux-weighted label against the compared scenario
       const G = groups(), cache = f.flowsBy, k = "ref:" + G.key;
       const D = S.flowData, refFl = cache[k] || (cache[k] = S.index.groupFlows(f.ref.v, f.ref.metE || new Float32Array(S.model.mets.length), G, null, { w: D.zeroW || (D.zeroW = new Float32Array(S.model.mets.length)), skipBase: D.noSkip }));
@@ -1021,7 +1077,7 @@ function applyFrame() {
     map.setData(f ? { ...fl, mode, gHas, minE: filt === "label" ? 0.005 : 0, energy: fl.energy ? fl.energy.g : null } : {});
   } else renderListView(mask);
   $("emptyNote").hidden = !(mask && S.view.kind !== "list" && map.visibleCount() === 0);
-  renderLegend(mode);
+  renderLegend(mode, view);
   if (S.result && S.result.frames.length > 1 && f) $("timeLabel").textContent = fmtTime(f.t);
 }
 
@@ -1041,7 +1097,28 @@ function startPlay() {
 }
 function stopPlay() { if (S.playing) clearInterval(S.playing); S.playing = null; $("playBtn").textContent = "▶"; }
 
-function renderLegend(mode) {
+/** Legend of the A → B view: one line per visual channel, each with its own sample. */
+function changeLegend(sub) {
+  const nm = cmpNames(frame()), ramp = [-1, -0.33, 0, 0.33, 1].map((x) => deltaColor(x));
+  const sw = (svg, txt) => `<div class="chl"><svg width="34" height="14" aria-hidden="true">${svg}</svg><span>${txt}</span></div>`;
+  const line = (col, w, dash = "") => `<line x1="2" y1="7" x2="32" y2="7" stroke="${col}" stroke-width="${w}" stroke-linecap="${dash ? "butt" : "round"}"${dash ? ` stroke-dasharray="${dash}"` : ""}/>`;
+  const sq = (fill, stroke = "none") => `<rect x="12" y="2" width="10" height="10" transform="rotate(45 17 7)" fill="${fill}" stroke="${stroke}" stroke-width="1.6"/>`;
+  let h = `<div class="chhead">${t("legend.chTitle", { a: esc(nm.a), b: esc(nm.b) })}</div>`;
+  h += `<div class="chsec"><b>${t("legend.chColour")}</b> ${t("legend.chColourHint")}</div>`;
+  h += `<div class="ramp" style="background:linear-gradient(90deg,${ramp.join(",")})"></div><div class="scale"><span>÷8</span><span>÷2</span><span>${t("legend.same")}</span><span>×2</span><span>×8</span></div>`;
+  if (!sub) return h + `<div class="chsec">${t("legend.chGlobal")}</div>`;
+  h += `<div class="chsec"><b>${t("legend.chWidth")}</b> ${t("legend.chWidthHint")}</div>`;
+  h += sw(`<line x1="2" y1="7" x2="12" y2="7" stroke="${deltaColor(0.5)}" stroke-width="1.5" stroke-linecap="round"/><line x1="19" y1="7" x2="31" y2="7" stroke="${deltaColor(0.5)}" stroke-width="5.5" stroke-linecap="round"/>`, t("legend.chWidthSample"));
+  h += `<div class="chsec"><b>${t("legend.chMarks")}</b></div>`;
+  h += sw(line(deltaColor(0.2), 3, "6 3.5") + `<circle cx="17" cy="7" r="5.2" fill="none" stroke="${revColor()}" stroke-width="1.8"/>`, `<b style="color:${revColor()}">⇄</b> ${t("legend.chRev")}`);
+  h += sw(sq(deltaColor(1)) + `<circle cx="17" cy="7" r="6.3" fill="none" stroke="${deltaColor(1)}" stroke-width="1.5"/>`, t("legend.chOn", { b: esc(nm.b) }));
+  h += sw(sq("var(--panel)", deltaColor(-1)), t("legend.chOff", { a: esc(nm.a) }));
+  h += sw(line(deltaColor(0), 1), t("legend.chSame"));
+  h += `<div class="chnote">${t("legend.chEps", { eps: FLUX_EPS })}</div>`;
+  return h;
+}
+
+function renderLegend(mode, view = "b") {
   const sub = S.view.kind === "sub" || S.view.kind === "focus";
   const comps = sub ? [...new Set(map.scene.nodes.filter((n) => n.type === 0).map((n) => n.comp))] : [];
   const ramp = (colors, labels) => `<div class="ramp" style="background:linear-gradient(90deg,${colors.join(",")})"></div><div class="scale">${labels.map((l) => `<span>${l}</span>`).join("")}</div>`;
@@ -1056,7 +1133,8 @@ function renderLegend(mode) {
   else if (sub && q !== "carbon") h += `<div>${t("legend.qSubOnly")}</div>`;
   if (mode === "tracer" && !energy) h += `<div style="margin-top:6px">${t("legend.enrich")}</div>${ramp([0, 0.05, 0.2, 0.5, 1].map((x) => enrichColor(x)), ["0 %", "5", "20", "50", "100 %"])}<div>${t("legend.uncertain")}</div>`;
   if (mode === "dlabel" && !energy) h += `<div style="margin-top:6px">${t("legend.dlabel", { name: esc(frame()?.ref?.scen?.name || ""), cur: esc(compare.shownName()) })}</div>${ramp([-1, -0.3, 0, 0.3, 1].map((x) => deltaColor(x)), [t("legend.lessLabel"), t("legend.same"), t("legend.moreLabel")])}`;
-  if (mode === "delta" && !energy) h += `<div style="margin-top:6px">${t(frame()?.ref?.scen ? "legend.deltaScen" : "legend.delta", { name: esc(frame()?.ref?.scen?.name || ""), cur: esc(compare.shownName()) })}</div>${ramp([-1, -0.3, 0, 0.3, 1].map((x) => deltaColor(x)), [t("legend.down"), t("legend.same"), t("legend.up")])}${sub ? `<div>${t("legend.lost")}</div>` : ""}`;
+  if (mode === "change" && !energy) h += `<div class="chleg">${changeLegend(sub)}</div>`;
+  if (view === "a") h += `<div class="chnote">${t("legend.viewA", { a: esc(cmpNames(frame()).a), b: esc(cmpNames(frame()).b) })}</div>`;
   if (sub && S.result?.pert?.size) h += `<div>${t("legend.pert")}</div>`;
   if (sub && map.scene.ghostBase) h += `<div style="margin-top:4px">${t("legend.ghost")}</div>`;
   if (S.view.kind === "focus") h += `<div style="margin-top:4px">${t("legend.focus")}</div>`;
@@ -1918,19 +1996,20 @@ function labelFate(f) {
 
 function changedHtml(f) {
   const mask = frameMask(f, "delta"), rows = [];
-  let n = 0;
+  let n = 0, nRev = 0;
   for (let j = 0; j < mask.rxn.length; j++) {
     if (!mask.rxn[j]) continue;
     n++;
     rows.push([S.model.rxns[j].n, Math.abs(f.v[j] - f.ref.v[j]), j]);
+    if (fluxChange(f.ref.v[j], f.v[j]).kind === "rev") nRev++;
   }
   if (!n) return `<h4>${t("sum.changed")}</h4><p class="meta">${t("sum.noChange")}</p>`;
   rows.sort((a, b) => b[1] - a[1]);
   const mx = rows[0][1];
   // against a scenario the arrows read "scenario → shown"; against the perturbation reference, "reference → perturbed"
-  const unit = f.ref.scen ? `${t("cmp.metTitle", { name: esc(f.ref.scen.name), cur: esc(compare.shownName()) })} · ${n}` : t("sum.changedUnit", { n });
+  const unit = (f.ref.scen ? `${t("cmp.metTitle", { name: esc(f.ref.scen.name), cur: esc(compare.shownName()) })} · ${n}` : t("sum.changedUnit", { n })) + (nRev ? ` · <span style="color:${revColor()}">⇄ ${t("sum.revCount", { n: nRev })}</span>` : "");
   return `<h4>${t("sum.changed")}${small(unit)}</h4>` +
-    bars(rows.slice(0, 12).map(([name, d, j]) => [name, `${fmtFlux(f.ref.v[j])} → ${fmtFlux(f.v[j])}`, `rxn:${j}`, d / mx]), `linear-gradient(90deg,${deltaColor(-1)},${deltaColor(1)})`, true);
+    bars(rows.slice(0, 12).map(([name, d, j]) => [(fluxChange(f.ref.v[j], f.v[j]).kind === "rev" ? "⇄ " : "") + name, `${fmtFlux(f.ref.v[j])} → ${fmtFlux(f.v[j])}`, `rxn:${j}`, d / mx]), `linear-gradient(90deg,${deltaColor(-1)},${deltaColor(1)})`, true);
 }
 
 /** Flux variability of the selected reaction, on demand (two LPs with the objective held at its optimum). */
@@ -2982,14 +3061,30 @@ function bindUi() {
   $("exportBtn").onclick = openExport;
   $("importBtn").onclick = () => { $("importFile").value = ""; $("importFile").click(); };
   $("importFile").onchange = (ev) => { const file = ev.target.files[0]; if (file) importFile(file); };
-  $("saveScenario").onclick = () => { const sc = compare.save(); if (sc && !S.stale) { S.shown = sc.id; compare.render(); } };
+  // a change not simulated yet (Auto waiting, a run in progress, or Auto off) is simulated first: otherwise the
+  // scenario would keep the new settings with the previous result
+  $("saveScenario").onclick = async () => {
+    if (S.stale) { await run(); if (S.stale) return; } // a newer change superseded that run
+    const sc = compare.save(); if (sc) { S.shown = sc.id; compare.render(); }
+  };
   compare.bindPicker();
   $("stopCompare").onclick = () => compare.setCompare(null);
   $("compareBadge").onclick = () => { S.sel = null; renderDetails(); };
   $("expAll").onclick = () => $("expList").querySelectorAll("input:not(:disabled)").forEach((x) => { x.checked = true; });
   $("expNone").onclick = () => $("expList").querySelectorAll("input").forEach((x) => { x.checked = false; });
   $("expGo").onclick = downloadResults;
-  $("filterSel").onchange = (ev) => { S.filter = ev.target.value; applyFrame(); if (S.view.kind !== "list") map.fit(true, true); };
+  $("filterSel").onchange = (ev) => {
+    S.filter = ev.target.value;
+    if ((S.filter === "delta" || S.filter === "rev") && frame()?.ref) S.cmpView = "ab";
+    applyFrame(); if (S.view.kind !== "list") map.fit(true, true);
+  };
+  $("cmpViews").addEventListener("click", (ev) => { const b = ev.target.closest("button[data-v]"); if (b) setCmpView(b.dataset.v); });
+  window.addEventListener("keydown", (ev) => { // 1 / 2 / 3: condition A, condition B, A → B
+    if (ev.ctrlKey || ev.metaKey || ev.altKey || $("cmpViews").hidden || document.querySelector("dialog[open]")) return;
+    if (ev.target.closest?.("input, select, textarea, [contenteditable]")) return;
+    const v = { 1: "a", 2: "b", 3: "ab" }[ev.key];
+    if (v) { ev.preventDefault(); setCmpView(v); }
+  });
   $("optInactive").onchange = (ev) => { map.options.inactive = ev.target.checked; };
   $("optParticles").onchange = (ev) => { map.options.particles = ev.target.checked; };
   try { S.adaptive = localStorage.getItem("metflux.adaptive") === "1"; } catch { /* ignore */ }

@@ -1,3 +1,4 @@
+import { sizeChange, fluxChange } from "./core/change.js";
 // Derived lookups over a loaded model plus per-frame flux analyses used by the views.
 
 export function carbonCount(formula) {
@@ -65,12 +66,13 @@ export class ModelIndex {
     return { rxn, met };
   }
 
-  /** Reactions whose flux differs from the reference, and the metabolites they touch. */
-  deltaMask(v, v0, tol = 0.02) {
+  /** Reactions whose flux differs from the reference (core/change.js: more than 2 %, a flux below 0.001 counts as zero), and the metabolites they touch. */
+  deltaMask(v, v0) {
     const { mets, rxns } = this.model;
     const met = new Uint8Array(mets.length), rxn = new Uint8Array(rxns.length);
     rxns.forEach((r, j) => {
-      if (Math.abs(v[j] - v0[j]) <= 1e-7 + tol * Math.max(Math.abs(v[j]), Math.abs(v0[j]))) return;
+      const k = fluxChange(v0[j], v[j]).kind;
+      if (k === "same" || k === "zero") return;
       rxn[j] = 1;
       for (const m of r.m) met[m] = 1;
     });
@@ -107,7 +109,7 @@ export class ModelIndex {
    * molecule carries (carbon atoms by default).
    * G = { n, groupOf, skip, perMet }: with perMet each compartment's pool is separate (cell view);
    * otherwise compartments are merged per metabolite and groups flagged in `skip` (transport) are ignored.
-   * vRef (optional) gives the reference fluxes for the per-group change gD in [-1, 1].
+   * vRef (optional) gives the reference fluxes for the per-group change gD in [-1, 1] (core/change.js sizeChange).
    * Q (optional) = { w: weight per metabolite, skipBase: bases left out, lineLabel: colour lines by metE }.
    */
   groupFlows(v, metE, G, vRef, Q) {
@@ -129,8 +131,7 @@ export class ModelIndex {
     });
     for (let g = 0; g < nG; g++) {
       gE[g] = gFlux[g] ? gLab[g] / gFlux[g] : 0;
-      const mx = Math.max(gFlux[g], gRef[g]);
-      gD[g] = vRef && mx > 0 ? (gFlux[g] - gRef[g]) / mx : 0;
+      gD[g] = vRef ? sizeChange(gRef[g], gFlux[g]) : 0; // same asinh scale as the reactions in the A → B view
     }
     const W = Q?.w || (this._wC || (this._wC = Float32Array.from(model.mets, (m) => this.baseCarbons[m.b])));
     const skipBase = Q?.skipBase || this.currency;

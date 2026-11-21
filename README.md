@@ -93,8 +93,10 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
   only direction a reaction is allowed (or the direction of its flux) is thermodynamically impossible
   (ΔG′m above +100 kJ/mol even at the low end of the estimate). Details in Docs › The interface.
 - **Compare** — save the current situation as a scenario, change anything (medium, pulse, knockout, tracer,
-  model edits) and pick the scenario: the map ("Changed flux" / "Changed label"), the summary (exchanges,
-  pathways, labelling) and the metabolite panel (paired isotopologue bars) show scenario → now.
+  model edits) and pick the scenario: the summary (exchanges, pathways, labelling) and the metabolite panel
+  (paired isotopologue bars) show scenario → now. A selector on the map (keys 1, 2, 3) shows condition A,
+  condition B or the change A → B: colour = fold change of the flux size (asinh scale, finite at zero),
+  width = |B − A|, and reactions that reverse, switch on or switch off are marked apart.
 - **✎ Edit model** — add reactions (stoichiometry, bounds, GPR, atom map) and metabolites (new compounds from a
   SMILES, or existing ones in another compartment), change bounds / GPR of published reactions, remove
   reactions and metabolites. Every edit is validated (element balance, GPR syntax, dead ends, atom-map
@@ -381,9 +383,11 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
   la reacción avisa cuando el único sentido permitido (o el sentido de su flujo) es termodinámicamente imposible
   (ΔG′m por encima de +100 kJ/mol incluso en el extremo bajo de la estimación). Detalles en Docs › La interfaz.
 - **Comparar** — guarda la situación actual como escenario, cambia lo que quieras (medio, pulso, knockout,
-  trazador, ediciones del modelo) y elige el escenario: el mapa («Flujo cambiado» / «Marcaje cambiado»), el
-  resumen (intercambios, rutas, marcaje) y la ficha del metabolito (barras pareadas de isotopólogos) muestran
-  escenario → ahora.
+  trazador, ediciones del modelo) y elige el escenario: el resumen (intercambios, rutas, marcaje) y la ficha
+  del metabolito (barras pareadas de isotopólogos) muestran escenario → ahora. Un selector en el mapa (teclas
+  1, 2, 3) muestra la condición A, la B o el cambio A → B: color = cuántas veces cambia el tamaño del flujo
+  (escala asinh, finita en cero), grosor = |B − A|, y las reacciones que se invierten, se encienden o se
+  apagan se marcan aparte.
 - **✎ Editar modelo** — añadir reacciones (estequiometría, límites, GPR, mapa de átomos) y metabolitos
   (compuestos nuevos a partir de un SMILES, o existentes en otro compartimento), cambiar límites / GPR de
   reacciones publicadas, quitar reacciones y metabolitos. Cada edición se valida (balance de elementos,

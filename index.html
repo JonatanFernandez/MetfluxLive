@@ -19,7 +19,7 @@
 <body>
   <header id="topbar">
     <div class="tb-side">
-      <div class="brand"><span class="logo"></span><span class="brand-text">Metflux<b>Live</b></span></div>
+      <div class="brand"><svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><circle class="s" stroke-width="3" cx="30" cy="27" r="13"/><path class="s" stroke-width="3" d="M8.5 7.83L14.59 12.77"/><path class="s" stroke-width="3" d="M33.5 36.5L30 40L33.5 43.5"/><circle class="sf" cx="5" cy="5" r="3.5"/><circle class="h" cx="43" cy="27" r="4"/><circle class="s" stroke-width="2.5" cx="43" cy="27" r="4"/><circle class="f" cx="20.81" cy="17.81" r="6.5"/><circle class="s" stroke-width="3" cx="20.81" cy="17.81" r="6.5"/></svg><span class="brand-text">Metflux<b>Live</b></span></div>
       <select id="modelSelect" data-i18n-title="h.model"></select>
       <div class="search">
         <input id="search" type="search" data-i18n-ph="h.search" autocomplete="off" spellcheck="false">
@@ -187,6 +187,7 @@
       <canvas id="map"></canvas>
       <div id="navBar"><button id="navBack" class="navbtn" disabled data-i18n-title="nav.back" data-i18n-aria="nav.back">‹</button><button id="navFwd" class="navbtn" disabled data-i18n-title="nav.fwd" data-i18n-aria="nav.fwd">›</button><nav id="crumbs"></nav></div>
       <div id="ctxMenu" class="ctxmenu" hidden role="menu"></div>
+      <div id="cmpViews" class="cmp-views" role="radiogroup" data-i18n-aria="cmpv.group" hidden><button type="button" role="radio" data-v="a"></button><button type="button" role="radio" data-v="b"></button><button type="button" role="radio" data-v="ab"></button></div>
       <div id="badges"><span id="editBadge" class="badge-chip edit" hidden></span><span id="compareBadge" class="badge-chip cmp" hidden data-i18n-title="cmp.badgeTitle"></span></div>
       <div id="viewOpts">
         <select id="groupSel" data-i18n-title="h.groupTitle">
@@ -198,6 +199,7 @@
           <option value="all" data-i18n="filter.all"></option>
           <option value="label" data-i18n="filter.label"></option>
           <option value="delta" data-i18n="filter.delta"></option>
+          <option value="rev" data-i18n="filter.rev"></option>
           <option value="dlabel" data-i18n="filter.dlabel"></option>
         </select>
         <label class="check" data-i18n-title="h.inactiveTitle"><input id="optInactive" type="checkbox" checked> <span data-i18n="h.inactive"></span></label>

@@ -43,7 +43,7 @@
   <li><b>Lo spessore della linea e la velocità delle particelle</b> mostrano il flusso in scala logaritmica, così i flussi piccoli restano visibili.</li>
   <li><b>Nella mappa di una via</b>, i cerchi sono metaboliti e i rombi reazioni. Il colore dell'anello di un metabolita è il suo compartimento. I cofattori come ATP o acqua sono nascosti per mantenere la mappa leggibile.</li>
   <li><b>Con un tracciante</b>, il colore passa dal grigio (non marcato) all'ambra fino al magenta (completamente marcato).</li>
-  <li><b>Con un knockout</b>, scegliendo «Solo flusso variato» il colore indica aumento (arancione) o diminuzione (blu) rispetto alla cellula non perturbata; un anello rosso segna le reazioni perturbate.</li>
+  <li><b>Con un knockout</b>, un selettore in cima alla mappa passa tra la cellula non perturbata (A), quella perturbata (B) e la variazione A → B: blu = meno flusso, arancione = più, tratteggiata con ⇄ magenta = va nel verso opposto (<a href="#it-compare">sezione 12</a>). Un anello rosso segna le reazioni perturbate.</li>
 </ul>
 <h3 id="it-carbonflow">Che cosa portano le linee tra i gruppi</h3>
 <p>Nelle viste Cellula, Vie e Cascata una linea unisce due gruppi (bolle) quando uno di essi <b>produce qualcosa che l'altro usa</b>. Il selettore <b>Linee</b>, in basso a sinistra della mappa, sceglie che cosa sia quel qualcosa:</p>
@@ -101,7 +101,7 @@
 <ul>
   <li><b>Vista Cellula</b>: il pool di ogni compartimento è separato, e i trasportatori sono gruppi a sé posti sulle membrane, così una linea va dalla glicolisi citosolica al trasportatore mitocondriale del piruvato e poi al ciclo di Krebs. <b>Vie e Cascata</b>: i pool di tutti i compartimenti sono uniti e le reazioni di trasporto ignorate, così lo stesso carbonio va direttamente dalla glicolisi al ciclo di Krebs.</li>
   <li>Si tengono solo le 220 linee più grandi (320 nella vista Cellula). Spessore e velocità delle particelle sono logaritmici, relativi alla linea più grande: le linee sotto circa 1/350 di essa sono nascoste, e le particelle si muovono solo sulle linee sopra circa 1/90. Selezionare una bolla mantiene luminose le sue linee e attenua le altre.</li>
-  <li><b>Colore</b>: flusso semplice in ciano. Con un tracciante dello stesso elemento (un tracciante <sup>13</sup>C e le linee Carbonio, un tracciante <sup>15</sup>N e le linee Azoto), il colore è la frazione marcata di ciò che la linea porta, pesata per la produzione. In «Solo flusso variato», il colore è la variazione media dei due gruppi che unisce.</li>
+  <li><b>Colore</b>: flusso semplice in ciano. Con un tracciante dello stesso elemento (un tracciante <sup>13</sup>C e le linee Carbonio, un tracciante <sup>15</sup>N e le linee Azoto), il colore è la frazione marcata di ciò che la linea porta, pesata per la produzione. Nella vista A → B di un confronto, il colore è la variazione media dei due gruppi che unisce.</li>
   <li>Nella mappa di una via le linee sono flussi di reazione; con un cofattore scelto (NADH, NADPH, ubichinolo, nucleosidi trifosfato o tutti i trasportatori redox), mantengono le linee solo le reazioni che lo producono o consumano, spesse quanto il cofattore che producono o consumano. Per l'energia libera, il selettore colora ogni reazione.</li>
   <li><b>Scarica</b> › <i>pathway_flows.csv</i> elenca le linee di ogni grandezza tra vie, e <i>fluxes.csv</i> acquista colonne di ΔG′<sub>m</sub>.</li>
 </ul>
@@ -580,7 +580,16 @@
 <p>Sotto l'elenco, <b>Mostra [X] confrontato con [Y]</b> rende espliciti i due lati. «Mostra» è la situazione disegnata sulla mappa e nei pannelli: quella attuale o qualsiasi scenario salvato, il cui risultato memorizzato viene mostrato di nuovo senza ricalcolare (se è stato ottenuto con altre modifiche del modello, viene caricato e ricalcolato). «Confrontato con» è il riferimento: ogni variazione si misura da esso verso la situazione mostrata, quindi «Variazione di flusso da «B» a «A»» significa A rispetto a B. ⇅ scambia i due. Se poi cambi qualcosa, il lato mostrato torna a essere la situazione attuale, non salvata.</p>
 <p>Da quel momento lo scenario prende ovunque il posto del «riferimento»:</p>
 <ul>
-  <li><b>Mappa.</b> «Mostra: Solo flusso variato» colora le reazioni secondo la variazione di flusso (blu = meno, arancione = più). «Marcatura variata» colora i metaboliti secondo la variazione del loro arricchimento medio e nasconde il resto. Nelle viste globale e cellula ogni gruppo è colorato secondo la variazione della sua marcatura pesata per il flusso.</li>
+  <li><b>Mappa: A, B o A → B.</b> Un selettore in cima alla mappa sceglie cosa disegna: <b>A</b> (il riferimento, «confrontato con»), <b>B</b> (la situazione mostrata) o <b>A → B</b>, la variazione tra le due. I tasti 1, 2 e 3 passano dall'una all'altra senza spostare la vista né la selezione, per alternarle e vedere cosa cambia. Scegliere uno scenario apre A → B. Il pannello a destra descrive sempre B; i suggerimenti mostrano il flusso in entrambe.</li>
+  <li><b>La vista A → B</b> tiene separati entità e verso, così un'inversione non si confonde con una grande variazione:
+    <ul>
+      <li><b>Colore</b>: quante volte il flusso è maggiore o minore in B, qualunque sia il verso (blu = minore, arancione = maggiore, satura a 8 volte). È asinh(|B|/ε) − asinh(|A|/ε) con ε = 0,001 mmol/gDW/h: molto sopra ε è il logaritmo del rapporto, e vicino a zero resta finito, quindi una reazione che si accende non dà infinito. Il solito log(x + 1) qui non funziona: i flussi stanno quasi sempre tra 0,001 e 1 mmol/gDW/h, e il +1 li appiattisce.</li>
+      <li><b>Spessore</b>: quanto flusso si sposta, |B − A|. Un flusso invariato resta una linea grigia sottile, e le particelle si muovono solo sui flussi che cambiano, nel verso di B.</li>
+      <li><b>Segni</b>: una reazione che va nel verso opposto in B è tratteggiata, con anello magenta e ⇄; una attiva solo in B ha un anello; una attiva solo in A è vuota.</li>
+      <li>Un flusso conta come variato se differisce di più del 2 % e almeno uno dei due lati supera ε (sotto ε conta come zero). La stessa regola dà «Reazioni più variate», gli scambi e le vie che cambiano e i filtri «Solo flusso variato» e «Solo flusso invertito», che aprono anche A → B.</li>
+      <li>Nelle viste globale e cellula ogni gruppo è colorato secondo la variazione del suo flusso totale. Apri una via per vedere le inversioni e le reazioni che si accendono o si spengono.</li>
+    </ul></li>
+  <li><b>Marcatura.</b> «Marcatura variata» colora i metaboliti secondo la variazione del loro arricchimento medio e nasconde il resto. Nelle viste globale e cellula ogni gruppo è colorato secondo la variazione della sua marcatura pesata per il flusso.</li>
   <li><b>Pannello di riepilogo.</b> L'obiettivo con la sua variazione, le reazioni più variate, gli scambi che cambiano, le vie che cambiano di più (somma dei flussi assoluti) e i metaboliti la cui marcatura cambia di più. Ogni riga si legge «scenario → ora»; cliccala per andarci.</li>
   <li><b>Pannello del metabolita.</b> Ricambio e arricchimento medio nelle due situazioni, e le due <b>distribuzioni degli isotopologhi come barre appaiate</b> (grigio: scenario, ambra: ora). Una situazione senza tracciante appare come 100 % M+0.</li>
   <li><b>Pannello della reazione ed etichette.</b> Il flusso nello scenario accanto a quello attuale.</li>
@@ -662,7 +671,7 @@
   <li>Imposta «Mostra» su «Solo flusso variato».</li>
 </ol>
 <p class="res"><b>Risultato.</b> La crescita cala solo di poco, da 0,0341 a 0,0333 h⁻¹ (−2 %): le cellule misurate assorbono già asparagina dal terreno, e ciò copre la maggior parte del fabbisogno. Imposta i flussi misurati su «Nessuno» e confronta.</p>
-<p class="res"><b>Confronta con:</b> <code>PDHB</code> (piruvato deidrogenasi): crescita invariata, ma circa 220 reazioni vengono reindirizzate. <code>FASN</code>, <code>HMGCR</code> o <code>CAD</code>: la crescita si ferma, non c'è alternativa. <code>GAPDH</code>: nessun effetto, perché il modello ha un isoenzima (GAPDHS).</p>
+<p class="res"><b>Confronta con:</b> <code>PDHB</code> (piruvato deidrogenasi): crescita invariata, ma circa 150 reazioni vengono reindirizzate. <code>FASN</code>, <code>HMGCR</code> o <code>CAD</code>: la crescita si ferma, non c'è alternativa. <code>GAPDH</code>: nessun effetto, perché il modello ha un isoenzima (GAPDHS).</p>
 </div>
 
 <div class="exp">
@@ -940,4 +949,7 @@
   <li>Richelle A et al. Model-based assessment of mammalian cell metabolic functionalities using omics data. <i>Cell Rep. Methods</i> 2021; 1:100040. <a href="https://doi.org/10.1016/j.crmeth.2021.100040" target="_blank" rel="noopener">doi:10.1016/j.crmeth.2021.100040</a></li>
   <li>Huangfu Q, Hall JAJ. Parallelizing the dual revised simplex method. <i>Math. Program. Comput.</i> 2018; 10:119–142 (HiGHS). <a href="https://doi.org/10.1007/s12532-017-0130-5" target="_blank" rel="noopener">doi:10.1007/s12532-017-0130-5</a></li>
 </ul>
+<h2 id="it-cite">20. Citazione e contatti</h2>
+<p>MetfluxLive è in attesa di pubblicazione. Quando l'articolo sarà pubblicato, il suo riferimento comparirà qui.</p>
+<p>Per domande, richieste o suggerimenti, scrivi per favore a <a href="mailto:jonifg@usal.es">jonifg@usal.es</a>.</p>
 </article>
