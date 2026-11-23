@@ -32,7 +32,7 @@ const SESSION_FORMAT = "metfluxlive-session";
 const $ = (id) => document.getElementById(id);
 const S = {
   slug: null, model: null, structures: null, layout: null, index: null, search: null, sim: null,
-  context: { id: null, mode: "block" }, ctxData: null, ctxBlock: null, ctxIndex: null, // cell-type context (genes off)
+  context: { id: null, mode: "complex" }, ctxData: null, ctxBlock: null, ctxIndex: null, // cell-type context (genes off)
   supplies: [], perturb: [], events: [], measured: { set: "nci60", tol: DEFAULT_TOL, items: [], ngam: 0, edited: false }, cfg: { objective: 0, maximize: true, parsimonious: true },
   mode: "steady", result: null, frameIdx: 0, stale: false,
   auto: { steady: true, dynamic: false }, // re-run automatically after a change, per mode
@@ -268,7 +268,7 @@ function applySettings(o) {
   for (const x of o.measured.items) { const m = met(x.met); if (m !== undefined && S.sim.exchanges.has(m)) S.measured.items.push({ met: m, rate: +x.rate }); }
   if (o.context?.user && !S.ctxData.byId.has(o.context.id)) addUserContext(o.context.user); // a session carries its own RNA-seq cell type
   if (o.context && o.context.id && !S.ctxData?.byId.has(o.context.id)) lost++;
-  setContext(o.context?.id && S.ctxData?.byId.has(o.context.id) ? o.context.id : null, o.context?.mode === "penalty" ? "penalty" : "block", false);
+  setContext(o.context?.id && S.ctxData?.byId.has(o.context.id) ? o.context.id : null, o.context?.mode || "complex", false); // setContext validates the mode
   S.perturb = [];
   for (const p of o.perturbations) {
     if (p.type === "gene") { if (S.search.geneRxns.has(p.target)) S.perturb.push({ type: "gene", ref: p.target, a: +p.activity }); else lost++; }
@@ -1260,20 +1260,20 @@ const currentContext = () => (S.context.id && S.ctxData ? S.ctxData.byId.get(S.c
 function storedContext(slug) {
   try {
     const o = JSON.parse(localStorage.getItem("metflux.context." + slug) || "null");
-    if (o && (o.id === null || S.ctxData?.byId.has(o.id))) return { id: o.id, mode: o.mode === "penalty" ? "penalty" : "block" };
+    if (o && (o.id === null || S.ctxData?.byId.has(o.id))) return { id: o.id, mode: (["block", "complex", "penalty"].includes(o.mode) ? o.mode : "complex") };
   } catch { /* storage unavailable */ }
-  return { id: null, mode: "block" };
+  return { id: null, mode: "complex" };
 }
 
 /** Reactions with no detected enzyme in the current context, on the current (possibly edited) model. */
 function computeContextBlock() {
   const ctx = currentContext();
-  S.ctxBlock = ctx && S.model ? blockedReactions(S.model, offGenes(ctx, S.base.model.genes)) : null;
+  S.ctxBlock = ctx && S.model ? blockedReactions(S.model, offGenes(ctx, S.base.model.genes), { complexes: S.context.mode === "complex" }) : null;
   S.ctxBlockSet = null;
 }
 
-function setContext(id, mode = "block", rerun = true) {
-  S.context = { id: id && S.ctxData?.byId.has(id) ? id : null, mode: mode === "penalty" ? "penalty" : "block" };
+function setContext(id, mode = "complex", rerun = true) {
+  S.context = { id: id && S.ctxData?.byId.has(id) ? id : null, mode: (["block", "complex", "penalty"].includes(mode) ? mode : "complex") };
   try { localStorage.setItem("metflux.context." + S.slug, JSON.stringify(S.context)); } catch { /* ignore */ }
   computeContextBlock();
   if (rerun) { renderContext(); renderDetails(); changed(); }
@@ -2041,24 +2041,36 @@ async function fluxRange(j) {
 async function geneScreen() {
   const out = $("screenOut"), f = frame();
   if (S.mode !== "steady" || !f || f.status !== "optimal") { out.innerHTML = `<div class="note">${t("scr.needSteady")}</div>`; return; }
-  const ref = f.ref ? f.ref.objective : f.objective;
+  // The screen runs on top of the current knockouts and knockdowns (the background): what it finds essential is
+  // essential in this perturbed cell. Genes essential only there are then checked in the unperturbed cell, and the
+  // ones that do not matter there are synthetic lethal with the background.
+  const pert = [...perturbActivities()], pref = "pertRef" in f ? f.pertRef : f.ref; // pref: the unperturbed run
+  const ref = f.objective;
   if (!(Math.abs(ref) > 1e-12)) { out.innerHTML = `<div class="note">${t("sum.zero")}</div>`; return; }
   const ctx = currentContext(), off = ctx ? offGenes(ctx, S.base.model.genes) : new Set();
   const blocked = S.ctxBlock ? (S.ctxBlockSet ??= new Set(S.ctxBlock)) : new Set();
+  const koGenes = new Set(S.perturb.filter((p) => p.type === "gene" && p.a <= 0).map((p) => p.ref));
+  const bgClosed = new Set(pert.filter(([, a]) => a <= 0).map(([j]) => j));
+  // reactions a gene's knockout closes, given the genes already off
+  const lostBy = (sym, rx, offSet, closed) => {
+    const levels = new Map([...offSet].map((g) => [g, 0])); levels.set(sym, 0);
+    return rx.filter((j) => !blocked.has(j) && !closed.has(j) && gprActivity(S.model.rxns[j].g, levels) === 0).sort((a, b) => a - b);
+  };
+  const offBg = new Set([...off, ...koGenes]);
   const groups = new Map(); // key -> { rxns, genes }
   const free = [];
   for (const [sym, rx] of S.search.geneRxns) {
-    if (off.has(sym) || !rx.some((j) => Math.abs(f.v[j]) > 1e-9)) continue;
-    const levels = new Map([...off].map((g) => [g, 0])); levels.set(sym, 0);
-    const lost = rx.filter((j) => !blocked.has(j) && gprActivity(S.model.rxns[j].g, levels) === 0).sort((a, b) => a - b);
+    if (off.has(sym) || koGenes.has(sym) || !rx.some((j) => Math.abs(f.v[j]) > 1e-9)) continue;
+    const lost = lostBy(sym, rx, offBg, bgClosed);
     if (!lost.length) { free.push(sym); continue; }
     const key = lost.join(",");
     if (!groups.has(key)) groups.set(key, { rxns: Int32Array.from(lost), genes: [] });
     groups.get(key).genes.push(sym);
   }
   const list = [...groups.values()];
-  const cfg = { ...S.cfg, measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam, trace: S.measured.trace },
+  const cfg = { ...S.cfg, perturb: pert, measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam, trace: S.measured.trace },
     context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
+  const refV = pert.length ? (pref?.v || f.v) : null;
   S.screening = { stop: false };
   $("geneScreen").textContent = t("scr.stop");
   const t0 = performance.now();
@@ -2068,21 +2080,44 @@ async function geneScreen() {
       out.innerHTML = `<p class="meta">${t("scr.progress", { done, total, genes: list.reduce((s, g) => s + g.genes.length, 0) })}</p>`;
       setProgress(done / total);
       return !S.screening.stop;
-    });
+    }, refV);
   } catch (err) { out.innerHTML = `<div class="note err">${esc(err.message)}</div>`; }
-  S.screening = null; $("geneScreen").textContent = t("scr.button"); setProgress(null);
-  if (!res) return;
+  // the unperturbed-cell phase below is part of the screen: it stays stoppable, and the button stays "stop"
+  const finish = () => { S.screening = null; $("geneScreen").textContent = t("scr.button"); setProgress(null); };
+  if (!res) { finish(); return; }
   const rows = [];
   res.forEach((r, i) => { for (const g of list[i].genes) rows.push({ g, x: r.objective / ref, relaxed: r.relaxed, status: r.status, rxns: list[i].rxns }); });
+  // with a background: the same genes in the unperturbed cell (one LP per distinct set of reactions; none when the
+  // gene closes nothing there, e.g. its isoenzyme is what the background knocked out)
+  if (pert.length && pref && Math.abs(pref.objective) > 1e-12 && !S.screening.stop) {
+    const hit = rows.filter((r) => r.x < 0.95), wtGroups = new Map();
+    for (const r of hit) {
+      const lost = lostBy(r.g, S.search.geneRxns.get(r.g), off, new Set());
+      if (!lost.length) { r.wt = 1; continue; }
+      const key = lost.join(",");
+      if (!wtGroups.has(key)) wtGroups.set(key, { rxns: Int32Array.from(lost), rows: [] });
+      wtGroups.get(key).rows.push(r);
+    }
+    const wl = [...wtGroups.values()];
+    if (wl.length) {
+      out.innerHTML = `<p class="meta">${t("scr.wtProgress", { n: wl.length })}</p>`;
+      const wres = await S.sim.screenKnockouts({ ...cfg, perturb: [] }, S.supplies, wl.map((g) => g.rxns), (done, total) => {
+        out.innerHTML = `<p class="meta">${t("scr.wtProgress", { n: wl.length })}</p>`; setProgress(done / total); return !S.screening.stop;
+      });
+      wres.forEach((r, i) => { for (const row of wl[i].rows) row.wt = r.objective / pref.objective; });
+    }
+  }
+  finish();
   const rescued = new Map((ctx?.rescued || []).map(([k, ti]) => [S.base.model.genes[k][1], taskName(S.ctxData, ti)]));
   rows.sort((a, b) => a.x - b.x);
   const ess = rows.filter((r) => r.x < 0.01), red = rows.filter((r) => r.x >= 0.01 && r.x < 0.95);
   const row = (r) => {
     const names = Array.from(r.rxns, (j) => S.model.rxns[j].n).join("\n"), resc = rescued.get(r.g);
-    return `<div class="scr-row"><span class="linkish" data-gene="${esc(r.g)}">${esc(r.g)}</span>${resc ? `<span class="warn" title="${esc(t("scr.rescuedTitle", { task: resc }))}">↺</span>` : "<span></span>"}<small class="meta" title="${esc(names)}">${t("scr.nRxns", { n: r.rxns.length })}${r.relaxed ? " *" : ""}</small><span class="val">${Math.round(100 * r.x)} %</span><button class="link" data-ko="${esc(r.g)}" title="${esc(t("scr.addTitle"))}">✂</button></div>`;
+    const sl = r.wt === undefined ? "" : r.wt >= 0.95 ? `<b class="slb" title="${esc(t("scr.slTitle", { wt: Math.round(100 * r.wt) }))}">SL</b>` : `<small class="meta" title="${esc(t("scr.wtTitle"))}"> (${Math.round(100 * r.wt)} %)</small>`;
+    return `<div class="scr-row"><span><span class="linkish" data-gene="${esc(r.g)}">${esc(r.g)}</span>${sl}</span>${resc ? `<span class="warn" title="${esc(t("scr.rescuedTitle", { task: resc }))}">↺</span>` : "<span></span>"}<small class="meta" title="${esc(names)}">${t("scr.nRxns", { n: r.rxns.length })}${r.relaxed ? " *" : ""}</small><span class="val">${Math.round(100 * r.x)} %</span><button class="link" data-ko="${esc(r.g)}" title="${esc(t("scr.addTitle"))}">✂</button></div>`;
   };
   const none = rows.filter((r) => r.x >= 0.95).map((r) => r.g).concat(free).sort();
-  out.innerHTML = `<div class="note">${t("scr.summary", { n: rows.length + free.length, lp: res.length, s: ((performance.now() - t0) / 1000).toFixed(0), ess: ess.length, red: red.length, ctx: esc(ctx?.name || t("ctx.none")) })}${res.length < list.length ? " " + t("scr.stopped") : ""}</div>`
+  out.innerHTML = `<div class="note">${t("scr.summary", { n: rows.length + free.length, lp: res.length, s: ((performance.now() - t0) / 1000).toFixed(0), ess: ess.length, red: red.length, ctx: esc(ctx?.name || t("ctx.none")) })}${res.length < list.length ? " " + t("scr.stopped") : ""}${pert.length ? "<br>" + t("scr.bgNote", { list: esc(S.perturb.map((p) => (p.type === "gene" ? geneSymbol(p.ref) : S.model.rxns[p.ref].id) + (p.a > 0 ? ` ${Math.round(100 * p.a)} %` : "")).join(", ")), sl: rows.filter((r) => r.wt >= 0.95).length }) : ""}</div>`
     + (ess.length ? `<details class="scr-group" open><summary>${t("scr.ess")} (${ess.length})</summary><div class="scr-list">${ess.map(row).join("")}</div></details>` : "")
     + (red.length ? `<details class="scr-group"><summary>${t("scr.red")} (${red.length})</summary><div class="scr-list">${red.map(row).join("")}</div></details>` : "")
     + (none.length ? `<details class="scr-group"><summary>${t("scr.none", { n: none.length })}</summary><div class="scr-list"><p class="meta">${none.map(esc).join(", ")}</p></div></details>` : "")
@@ -2090,6 +2125,53 @@ async function geneScreen() {
     + (rows.some((r) => r.relaxed) ? `<p class="meta">${t("scr.relaxedNote")}</p>` : "");
   out.querySelectorAll("[data-ko]").forEach((b) => { b.onclick = () => addPerturb("gene", b.dataset.ko); });
   out.querySelectorAll("[data-gene]").forEach((b) => { b.onclick = () => { S.sel = { type: "gene", sym: b.dataset.gene }; renderDetails(); }; });
+}
+
+/**
+ * Medium screen: leave out each component of the medium, one by one, and see which ones lower the objective. With
+ * knockouts in the list it runs on top of them, and the nutrients the unperturbed cell does not need are flagged SL
+ * (the cell depends on them only because of the knockouts: a synthetic-lethal pair of one gene and one nutrient).
+ */
+async function nutrientScreen() {
+  const out = $("nutOut"), f = frame();
+  if (S.mode !== "steady" || !f || f.status !== "optimal") { out.innerHTML = `<div class="note">${t("scr.needSteady")}</div>`; return; }
+  if (!(Math.abs(f.objective) > 1e-12)) { out.innerHTML = `<div class="note">${t("nut.noGrowth")}</div>`; return; }
+  const pert = [...perturbActivities()], pref = "pertRef" in f ? f.pertRef : f.ref;
+  const name = (m) => S.model.bases[S.model.mets[m].b].n;
+  const mets = S.supplies.filter((it) => !it.unlimited && it.conc > 0).map((it) => it.met);
+  const cfg = { ...S.cfg, perturb: pert, measured: { items: S.measured.items.map((x) => ({ met: x.met, rate: x.rate })), tol: S.measured.tol, ngam: S.measured.ngam, trace: S.measured.trace },
+    context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined };
+  const refV = pert.length ? (pref?.v || f.v) : null;
+  S.screening = { stop: false };
+  $("nutScreen").textContent = t("scr.stop");
+  const t0 = performance.now();
+  let res, wt = null;
+  try {
+    res = await S.sim.screenMedium(cfg, S.supplies, mets, (done, total) => {
+      out.innerHTML = `<p class="meta">${t("nut.progress", { done, total })}</p>`; setProgress(done / total); return !S.screening.stop;
+    }, refV);
+    if (pert.length && pref && Math.abs(pref.objective) > 1e-12 && !S.screening.stop) {
+      wt = await S.sim.screenMedium({ ...cfg, perturb: [] }, S.supplies, mets, (done, total) => {
+        out.innerHTML = `<p class="meta">${t("nut.wtProgress", { n: mets.length })}</p>`; setProgress(done / total); return !S.screening.stop;
+      });
+    }
+  } catch (err) { out.innerHTML = `<div class="note err">${esc(err.message)}</div>`; }
+  S.screening = null; $("nutScreen").textContent = t("nut.button"); setProgress(null);
+  if (!res) return;
+  const rows = res.map((r, i) => ({ m: mets[i], x: r.objective / f.objective, wt: wt && wt[i] ? wt[i].objective / pref.objective : undefined, relaxed: r.relaxed }))
+    .sort((a, b) => a.x - b.x);
+  const ess = rows.filter((r) => r.x < 0.01), red = rows.filter((r) => r.x >= 0.01 && r.x < 0.95), none = rows.filter((r) => r.x >= 0.95);
+  const row = (r) => {
+    const sl = r.wt === undefined ? "" : r.wt >= 0.95 ? `<b class="slb" title="${esc(t("nut.slTitle", { wt: Math.round(100 * r.wt) }))}">SL</b>` : `<small class="meta" title="${esc(t("nut.wtTitle"))}"> (${Math.round(100 * r.wt)} %)</small>`;
+    return `<div class="scr-row"><span><span class="linkish" data-met="${r.m}">${esc(name(r.m))}</span>${sl}</span><span></span><small class="meta">${r.relaxed ? "*" : ""}</small><span class="val">${Math.round(100 * r.x)} %</span><span></span></div>`;
+  };
+  const nSL = rows.filter((r) => r.x < 0.95 && r.wt >= 0.95).length;
+  out.innerHTML = `<div class="note">${t("nut.summary", { n: rows.length, s: ((performance.now() - t0) / 1000).toFixed(0), ess: ess.length, red: red.length })}${res.length < mets.length ? " " + t("scr.stopped") : ""}${pert.length ? "<br>" + t("nut.bgNote", { list: esc(S.perturb.map((p) => (p.type === "gene" ? geneSymbol(p.ref) : S.model.rxns[p.ref].id) + (p.a > 0 ? ` ${Math.round(100 * p.a)} %` : "")).join(", ")), sl: nSL }) : ""}</div>`
+    + (ess.length ? `<details class="scr-group" open><summary>${t("nut.ess")} (${ess.length})</summary><div class="scr-list">${ess.map(row).join("")}</div></details>` : "")
+    + (red.length ? `<details class="scr-group"><summary>${t("scr.red")} (${red.length})</summary><div class="scr-list">${red.map(row).join("")}</div></details>` : "")
+    + (none.length ? `<details class="scr-group"><summary>${t("nut.none", { n: none.length })}</summary><div class="scr-list"><p class="meta">${none.map((r) => esc(name(r.m))).join(", ")}</p></div></details>` : "")
+    + (rows.some((r) => r.relaxed) ? `<p class="meta">${t("scr.relaxedNote")}</p>` : "");
+  out.querySelectorAll("[data-met]").forEach((b) => { b.onclick = () => { S.sel = { type: "met", met: +b.dataset.met }; renderDetails(); }; });
 }
 
 /**
@@ -2579,6 +2661,10 @@ function rxnHtml(j) {
   if (S.ctxBlock && S.ctxBlock.includes(j)) {
     const ctx = currentContext(), genes = offGenesOf(r.g, offGenes(ctx, S.base.model.genes));
     note += `<div class="note ctxnote">${t(S.context.mode === "penalty" ? "ctx.rxnPenal" : "ctx.rxnBlocked", { ctx: esc(ctx.name), genes: esc(genes.join(", ")) })}</div>`;
+  } else if (S.ctxBlock && S.context.mode === "complex" && r.g) {
+    // kept by the majority rule although some subunits (or mitochondrially encoded genes) are not detected
+    const ctx = currentContext(), genes = offGenesOf(r.g, offGenes(ctx, S.base.model.genes));
+    if (genes.length) note += `<div class="note ctxnote">${t("ctx.rxnKept", { ctx: esc(ctx.name), genes: esc(genes.join(", ")) })}</div>`;
   }
   const tag = r.user ? t("ed.tagNewRxn") : r.edited ? t("ed.tagEditedRxn") : "";
   return `<div class="kind">${t("rxn.kind")}</div><h3>${esc(r.n)}</h3>${tag ? `<div class="note edtag">${tag}</div>` : ""}
@@ -3034,7 +3120,9 @@ function bindUi() {
   $("deleteMedium").onclick = deleteMedium;
   { const st = document.createElement("style"); st.textContent = CTT_CSS; document.head.appendChild(st); }
   $("ctxExplore").ontoggle = () => { if ($("ctxExplore").open) renderCtxExplore(); };
+  // both screens share S.screening (only one runs at a time): each button stops whichever is running
   $("geneScreen").onclick = () => (S.screening ? (S.screening.stop = true) : geneScreen());
+  $("nutScreen").onclick = () => (S.screening ? (S.screening.stop = true) : nutrientScreen());
   $("clearPerturb").onclick = () => { S.perturb = []; renderPerturb(); renderMeasured(); changed(); };
   $("measuredSel").onchange = (ev) => { loadMeasured(ev.target.value); renderObjective(); renderSecondary(); renderContext(); };
   $("resetMeasured").onclick = () => loadMeasured(S.measured.set);

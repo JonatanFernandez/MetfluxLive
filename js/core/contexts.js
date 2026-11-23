@@ -5,7 +5,7 @@
 // back on so that the essential metabolic tasks stay possible). A reaction is blocked when its GPR rule
 // evaluates to 0 with those genes off: isoenzymes (or) compensate, a complex (and) needs all its subunits.
 
-import { gprActivity } from "./gpr.js";
+import { gprActivity, gprPresent } from "./gpr.js";
 
 /** Extra parsimony weight of a reaction whose enzymes are not detected, in "penalise" mode. */
 export const CONTEXT_PENALTY = 10;
@@ -44,10 +44,21 @@ export function isDiffusion(model, r) {
   return comps.size > 1 && r.m.every((m) => DIFFUSIBLE.has(model.bases[model.mets[m].b].n));
 }
 
-/** Reactions of the (possibly edited) model that no detected enzyme can catalyse. */
-export function blockedReactions(model, off) {
-  const levels = new Map([...off].map((g) => [g, 0]));
+/** Genes encoded in mitochondrial DNA (MT-ND1… in Human-GEM, mt-Nd1… in the animal models). */
+export const isMitoGene = (sym) => /^mt-/i.test(sym);
+
+/** Reactions of the (possibly edited) model that no detected enzyme can catalyse.
+ *  opts.complexes ("complexes by majority" mode, docs section 6): large complexes count as present when most of their
+ *  subunits are detected (gpr.js gprPresent), and genes of mitochondrial DNA are never switched off by expression
+ *  (their transcripts are missing from single-nucleus data for technical reasons). */
+export function blockedReactions(model, off, opts = {}) {
   const out = [];
+  if (opts.complexes) {
+    const off2 = new Set([...off].filter((g) => !isMitoGene(g)));
+    model.rxns.forEach((r, j) => { if (r.g && !r.removed && !isDiffusion(model, r) && !gprPresent(r.g, off2, { complexes: true })) out.push(j); });
+    return Int32Array.from(out);
+  }
+  const levels = new Map([...off].map((g) => [g, 0]));
   model.rxns.forEach((r, j) => { if (r.g && !r.removed && !isDiffusion(model, r) && gprActivity(r.g, levels) === 0) out.push(j); });
   return Int32Array.from(out);
 }

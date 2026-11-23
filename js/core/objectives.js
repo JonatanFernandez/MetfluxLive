@@ -21,6 +21,10 @@ export const OBJECTIVES = [
   // growth rate. MAR13082, the generic cell biomass reaction it inherits from Human-GEM (same composition per gDW),
   // is closed in the published Mouse-GEM; the simulator opens it only while it is the objective (OPEN_AS_OBJECTIVE).
   { id: "biomassGeneric", group: "general", rxn: "MAR13082", max: true, notDefault: true },
+  // the same without the cofactor pool (vitamins, heme, CoQ, carnitine, retinoid and vitamin D/E metabolites): cofactors
+  // are catalytic and their stocks outlast weeks without synthesis, so for gene essentiality they are better left out
+  // (DepMap validation, docs section 4). Added at build time (tools/build_all.sh), closed except as objective.
+  { id: "biomassNoCof", group: "general", rxn: "MFL_biomass_nocof", max: true },
   { id: "atp", group: "general", rxn: "MAR03964", max: true }, // ATP + H2O -> ADP + Pi + H+ (cytosolic ATP hydrolysis)
   { id: "gsh", group: "general", rxn: "MAR09351", max: true }, // GSH release: net glutathione synthesis
   { id: "urea", group: "liver", rxn: "MAR09438", max: true, cellType: true }, // urea cycle, ammonia disposal
@@ -73,10 +77,10 @@ export const OBJECTIVE_GROUPS = ["general", "microbe", "liver", "kidney", "muscl
 export const MAINT_AS_OBJECTIVE = new Set(["ATPM", "r_4046"]);
 
 /** Reactions closed in a published model (lb = ub = 0) that are opened (0 .. 1000) only while they are the objective. */
-export const OPEN_AS_OBJECTIVE = new Set(["MAR13082", "MFL_DM_protein"]); // MFL_DM_protein: added at build time (tools/build_all.sh)
+export const OPEN_AS_OBJECTIVE = new Set(["MAR13082", "MFL_DM_protein", "MFL_biomass_nocof"]); // MFL_*: added at build time (tools/build_all.sh)
 
-/** A growth reaction: its flux is a growth rate in h⁻¹ (the model's own biomass objective, or MAR13082). */
-export const isGrowthRxn = (r) => !!r && (!!r.obj || r.id === "MAR13082");
+/** A growth reaction: its flux is a growth rate in h⁻¹ (the model's own biomass objective, MAR13082 or its variant). */
+export const isGrowthRxn = (r) => !!r && (!!r.obj || r.id === "MAR13082" || r.id === "MFL_biomass_nocof");
 
 /** Reaction index of a built-in objective in a model, or -1 when the model lacks it. */
 export function objectiveIndex(model, index, o) {

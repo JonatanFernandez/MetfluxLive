@@ -33,3 +33,26 @@ export function gprActivity(rule, levels) {
   };
   return ev(ast);
 }
+
+/**
+ * Whether a reaction keeps an enzyme when the genes in `off` are absent (cell types: genes whose mRNA is not detected).
+ * Strict (default): every subunit of a complex is needed, as in gprActivity.
+ * With `complexes`: a complex of at least `minSize` subunits (an "and" of that many terms; an "or" of isoforms inside it
+ * counts as one subunit) is kept when at least `minShare` of its subunits are detected. A single undetected subunit
+ * among dozens of well-expressed ones is more often a measurement or annotation problem than a missing complex: in the
+ * Human Protein Atlas, NDUFA6 alone would remove respiratory complex I from a quarter of all cell types (docs, section 6).
+ */
+export function gprPresent(rule, off, { complexes = false, minSize = 5, minShare = 0.8 } = {}) {
+  if (!rule) return true;
+  let ast = cache.get(rule);
+  if (ast === undefined) cache.set(rule, (ast = parse(rule)));
+  const flat = (n, op, out = []) => { if (Array.isArray(n) && n[0] === op) { flat(n[1], op, out); flat(n[2], op, out); } else out.push(n); return out; };
+  const ev = (n) => {
+    if (typeof n === "string") return !off.has(n);
+    if (!n) return true;
+    if (n[0] === "or") return flat(n, "or").some(ev);
+    const parts = flat(n, "and"), ok = parts.filter(ev).length;
+    return complexes && parts.length >= minSize ? ok >= minShare * parts.length : ok === parts.length;
+  };
+  return ev(ast);
+}

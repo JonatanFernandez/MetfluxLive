@@ -136,6 +136,40 @@ function schneider() {
   return rows;
 }
 
+// RPMI 1640 (Gibco 11875) and DMEM high glucose (Gibco 11965), the media of most DepMap cancer cell lines, in mM exactly as
+// in the manufacturer's formulation tables (thermofisher.com, media formulations 114 and 8; Moore et al., JAMA 199:519,
+// 1967; Dulbecco & Freeman, Virology 8:396, 1959). Not represented in the models and left out: phenol red,
+// p-aminobenzoate, nitrate. Hydroxyproline is "trans-4-hydroxy-L-proline", vitamin B12 "aquacob(III)alamin". Both are used
+// with 10 % FBS: fatty acids and fat-soluble vitamins come from the standard medium (SERUM), and in DMEM, which lacks
+// them, biotin and vitamin B12 too (as with the serum of Plasmax). Salts are listed as ions (INORGANIC).
+const RPMI1640 = [
+  ["glucose", 11.111111], ["glutamine", 2.0547945],
+  ["glycine", 0.13333334], ["arginine", 1.1494253], ["asparagine", 0.37878788], ["aspartate", 0.15037593],
+  ["cystine", 0.20766774], ["glutamate", 0.13605443], ["histidine", 0.09677419], ["trans-4-hydroxy-L-proline", 0.15267175],
+  ["isoleucine", 0.3816794], ["leucine", 0.3816794], ["lysine", 0.21857923], ["methionine", 0.10067114],
+  ["phenylalanine", 0.09090909], ["proline", 0.17391305], ["serine", 0.2857143], ["threonine", 0.16806723],
+  ["tryptophan", 0.024509804], ["tyrosine", 0.11111111], ["valine", 0.17094018],
+  ["biotin", 0.00081967213], ["choline", 0.021428572], ["pantothenate", 0.000524109], ["folate", 0.0022675737],
+  ["nicotinamide", 0.008196721], ["pyridoxine", 0.004854369], ["riboflavin", 0.0005319149], ["thiamin", 0.002967359],
+  ["aquacob(III)alamin", 0.000003690037], ["inositol", 0.19444445], ["GSH", 0.0032573289],
+];
+const DMEM = [
+  ["glucose", 25.0], ["glutamine", 4.0],
+  ["glycine", 0.4], ["arginine", 0.39810428], ["cystine", 0.20127796], ["histidine", 0.2], ["isoleucine", 0.8015267],
+  ["leucine", 0.8015267], ["lysine", 0.7978142], ["methionine", 0.20134228], ["phenylalanine", 0.4], ["serine", 0.4],
+  ["threonine", 0.79831934], ["tryptophan", 0.078431375], ["tyrosine", 0.39846742], ["valine", 0.8034188],
+  ["choline", 0.028571429], ["pantothenate", 0.008385744], ["folate", 0.009070295], ["nicotinamide", 0.032786883],
+  ["pyridoxine", 0.019417476], ["riboflavin", 0.0010638298], ["thiamin", 0.011869436], ["inositol", 0.04],
+];
+function classic(list, serumExtra = []) {
+  const std = new Map(DEFAULT_MEDIUM.map((d) => [d[0], d]));
+  const rows = list.map(([n, c]) => [n, c, ...(std.get(n)?.slice(2, 4) || KINETICS[n] || KIN_FALLBACK)]);
+  rows.splice(2, 0, std.get("O2"));
+  for (const n of [...SERUM, ...serumExtra]) rows.push(std.get(n));
+  for (const n of INORGANIC) rows.push([n, null]);
+  return rows;
+}
+
 // ---------------------------------------------------------------- microbial media ----
 // Concentrations in mM from the published recipes (sources in docs, "Media"). Uptake kinetics are the microbes' own
 // orders of magnitude, not the mammalian ones above: a glucose uptake of about 10 mmol/gDW/h for E. coli (Castaño-Cerezo
@@ -172,11 +206,19 @@ const YEAST_O2 = 8;
 const ANAER = [["ergosterol", 0.025, 0.01, 0.001], ["oleate", 0.32, 0.2, 0.01], ["palmitolate", 0.32, 0.2, 0.01], ["heme a", 0.0001, 0.0001, 0.00001]];
 
 /** Built-in media. Display names and notes are in js/i18n.js under medium.name.<id> / medium.note.<id>. */
+// Lipids that 10 % fetal bovine serum brings to a culture and the standard medium leaves out: carnitine (~5 µM),
+// cholesterol (as LDL, ~0.1 mM) and the main free fatty acids. Without them the model must make carnitine and
+// cholesterol, and their synthesis genes come out essential in every cell line, against DepMap (docs section 4).
+const SERUM_LIPIDS = [["L-carnitine", 0.005, 0.0005, 0.001], ["cholesterol", 0.1, 0.002, 0.02], ["palmitate", 0.02, 0.002, 0.004], ["oleate", 0.02, 0.002, 0.004]];
+
 export const MEDIA = [
   { id: "default", rows: DEFAULT_MEDIUM },
+  { id: "defaultSerum", rows: [...DEFAULT_MEDIUM, ...SERUM_LIPIDS] },
   { id: "plasmax", rows: plasmaLike(1) },
   { id: "hplm", rows: plasmaLike(2) },
   { id: "williamsE", rows: williamsE() },
+  { id: "rpmi1640", rows: classic(RPMI1640) },
+  { id: "dmem", rows: classic(DMEM, ["biotin", "aquacob(III)alamin"]) },
   { id: "schneider", rows: schneider() },
   // E. coli
   { id: "m9glc", org: "ecoli-gem", rows: M9("glucose", 22.2, 10.5, 0.01) },

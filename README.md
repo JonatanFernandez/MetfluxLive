@@ -43,7 +43,9 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
   described with [Cellosaurus](https://www.cellosaurus.org)), cell type (155, HPA single cell types), tissue
   (HPA tissue consensus) or the NCI-60 panel, and in Mouse-GEM in 276 tissues and cell types from
   [Bgee](https://www.bgee.org). The reactions left without a detected enzyme are blocked or, as an option,
-  only made costlier in pFBA. Genes that the 57 essential metabolic tasks of Human-GEM need are switched back
+  only made costlier in pFBA; the default mode keeps large complexes (5+ subunits) when at least 80 % of their
+  subunits are detected and never switches off mitochondrial DNA genes (one undetected subunit, NDUFA6, removed
+  respiratory complex I from 469 cell types). Genes that the 57 essential metabolic tasks of Human-GEM need are switched back
   on. Off by default. Sources, cut-off and preprocessing: Docs › Cell types.
   Your own RNA-seq table (TPM or similar, one row per gene) can be turned into a cell type with the same
   procedure, in the browser; the data never leave the computer (Docs › Cell types › Your own RNA-seq data).
@@ -136,8 +138,10 @@ docs.html                    documentation (EN/ES)
 vendor/highs/                HiGHS LP solver compiled to WebAssembly (MIT)
 vendor/rdkit/                RDKit MinimalLib 2026.03.6, WebAssembly (BSD-3), used only by the model editor
 data/<model>/                model.json, structures.json, atommaps.json, layout.json, thermo.json, contexts.json
-tools/                       preprocessing (Python) and tests (Node)
 ```
+
+The preprocessing, testing and validation scripts used to generate the files in `data/` are not part of the web
+application and live in a separate repository: **[MetfluxTools](https://github.com/JonatanFernandez/MetfluxTools)**.
 
 **Licence of the cell-type data.** `data/human-gem/contexts.json` is derived from the Human Protein Atlas
 (version 26.0, CC BY-SA 4.0) and is distributed under
@@ -147,23 +151,32 @@ from Bgee 15.2 and is CC0. The licence is also written inside each file (`meta.l
 `data/tasks/metabolicTasks_Essential.txt` is copied unchanged from Human-GEM 2.1.1 (CC BY 4.0, Robinson et al. 2020);
 it is used to build cell types from the user's RNA-seq data in the browser.
 
-To share or host the app you only need `index.html`, `docs.html`, `css/`, `js/`, `vendor/` and `data/` (about 31 MB, 7 MB of it RDKit).
+To share or host the app you only need `index.html`, `docs.html`, `docs/`, `css/`, `js/`, `vendor/` and `data/` (about 72 MB, 7 MB of it RDKit).
 Python is used only for preprocessing, never at run time.
 
 ### Rebuilding the data or adding another model
+
+The code used to generate the preprocessed assets in `data/` (models, atom maps, layouts, Gibbs energies,
+expression contexts) and to run the tests and validations lives in
+**[MetfluxTools](https://github.com/JonatanFernandez/MetfluxTools)**. Clone it into `tools/` at the root of this
+repository:
+
+```bash
+git clone https://github.com/JonatanFernandez/MetfluxTools.git tools
+```
 
 Preprocessing converts a repository in [standard-GEM](https://github.com/MetabolicAtlas/standard-GEM)
 format (`model/*.yml` + `model/*.tsv`) into the JSON files the app reads. The source zips are not in this
 repository: download `Human-GEM-2.1.1.zip`, `Mouse-GEM-1.8.0.zip`, `Rat-GEM-1.8.0.zip`, `Zebrafish-GEM-1.6.0.zip`, `Fruitfly-GEM-1.7.0.zip` and `Worm-GEM-1.8.0.zip` from the
 [Human-GEM](https://github.com/SysBioChalmers/Human-GEM),
-[Mouse-GEM](https://github.com/SysBioChalmers/Mouse-GEM), [Rat-GEM](https://github.com/SysBioChalmers/Rat-GEM), [Zebrafish-GEM](https://github.com/SysBioChalmers/Zebrafish-GEM), [Fruitfly-GEM](https://github.com/SysBioChalmers/Fruitfly-GEM) and [Worm-GEM](https://github.com/SysBioChalmers/Worm-GEM) releases and put them in the project root.
+[Mouse-GEM](https://github.com/SysBioChalmers/Mouse-GEM), [Rat-GEM](https://github.com/SysBioChalmers/Rat-GEM), [Zebrafish-GEM](https://github.com/SysBioChalmers/Zebrafish-GEM), [Fruitfly-GEM](https://github.com/SysBioChalmers/Fruitfly-GEM) and [Worm-GEM](https://github.com/SysBioChalmers/Worm-GEM) releases (plus `yeast-GEM` and `iML1515`; full provenance and checksums in `tools/DATA_SOURCES.md`) and put them in the project root.
 
 ```bash
 python3 -m venv --without-pip tools/.venv
 python3 -m pip --python tools/.venv/bin/python install rdkit pyyaml igraph rxnmapper \
     torch --extra-index-url https://download.pytorch.org/whl/cpu
 
-tools/build_all.sh                      # all six models
+tools/build_all.sh                      # all eight models
 
 # another model (zip or folder):
 tools/.venv/bin/python tools/build_model.py   Other-GEM.zip other-gem [--structures-from human-gem]
@@ -218,6 +231,8 @@ non-exchange reactions. Where there is no map, the label is
 spread over the products and the metabolite is drawn with a dashed border.
 
 ### Tests
+
+The test and validation scripts are in **[MetfluxTools](https://github.com/JonatanFernandez/MetfluxTools)** (cloned into `tools/`):
 
 ```bash
 node tools/test_fba.mjs    [human-gem|mouse-gem] [default|plasmax|hplm]   # FBA/pFBA on a built-in medium
@@ -331,7 +346,9 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
   no tumorales, descritas con [Cellosaurus](https://www.cellosaurus.org)), un tipo celular (155, tipos
   celulares del HPA), un tejido (consenso de tejidos del HPA) o el panel NCI-60, y en Mouse-GEM en 276 tejidos
   y tipos celulares de [Bgee](https://www.bgee.org). Las reacciones que se quedan sin enzima detectada se
-  bloquean o, como opción, sólo se encarecen en el pFBA. Los genes que necesitan las 57 tareas metabólicas
+  bloquean o, como opción, sólo se encarecen en el pFBA; el modo por defecto conserva los complejos grandes (5 o
+  más subunidades) si se detecta al menos el 80 % de sus subunidades y nunca apaga los genes del ADN
+  mitocondrial (una sola subunidad no detectada, NDUFA6, eliminaba el complejo I de 469 tipos celulares). Los genes que necesitan las 57 tareas metabólicas
   esenciales de Human-GEM se vuelven a encender. Desactivado por defecto. Fuentes, umbral y preprocesado:
   Docs › Tipos celulares.
   Tu propia tabla de RNA-seq (TPM o similar, una fila por gen) se puede convertir en un tipo celular con el
@@ -428,8 +445,10 @@ docs.html                    documentación (EN/ES)
 vendor/highs/                solver LP HiGHS compilado a WebAssembly (MIT)
 vendor/rdkit/                RDKit MinimalLib 2026.03.6, WebAssembly (BSD-3), sólo para el editor del modelo
 data/<modelo>/               model.json, structures.json, atommaps.json, layout.json, thermo.json, contexts.json
-tools/                       preprocesado (Python) y pruebas (Node)
 ```
+
+Los scripts de preprocesado, pruebas y validación usados para generar los ficheros de `data/` no forman parte de la
+aplicación web y están en un repositorio aparte: **[MetfluxTools](https://github.com/JonatanFernandez/MetfluxTools)**.
 
 **Licencia de los datos de tipos celulares.** `data/human-gem/contexts.json` deriva del Human Protein Atlas
 (versión 26.0, CC BY-SA 4.0) y se distribuye bajo
@@ -439,23 +458,32 @@ deriva de Bgee 15.2 y es CC0. La licencia también va escrita dentro de cada arc
 `data/tasks/metabolicTasks_Essential.txt` se copia sin cambios de Human-GEM 2.1.1 (CC BY 4.0, Robinson et al. 2020);
 se usa para construir tipos celulares a partir del RNA-seq del usuario en el navegador.
 
-Para compartir o alojar la app basta con `index.html`, `docs.html`, `css/`, `js/`, `vendor/` y `data/` (unos 31 MB, 7 de ellos RDKit).
+Para compartir o alojar la app basta con `index.html`, `docs.html`, `docs/`, `css/`, `js/`, `vendor/` y `data/` (unos 72 MB, 7 de ellos RDKit).
 Python solo se usa en el preprocesado, nunca en ejecución.
 
 ### Regenerar los datos o añadir otro modelo
 
+El código usado para generar los ficheros preprocesados de `data/` (modelos, mapas atómicos, disposiciones, energías
+de Gibbs y contextos de expresión) y ejecutar las pruebas y validaciones está en
+**[MetfluxTools](https://github.com/JonatanFernandez/MetfluxTools)**. Clónalo en la carpeta `tools/` en la raíz de
+este repositorio:
+
+```bash
+git clone https://github.com/JonatanFernandez/MetfluxTools.git tools
+```
+
 El preprocesado convierte un repositorio en formato [standard-GEM](https://github.com/MetabolicAtlas/standard-GEM)
 (`model/*.yml` + `model/*.tsv`) en los JSON que lee la app. Los zip de origen no están en este
 repositorio: descarga `Human-GEM-2.1.1.zip`, `Mouse-GEM-1.8.0.zip`, `Rat-GEM-1.8.0.zip`, `Zebrafish-GEM-1.6.0.zip`, `Fruitfly-GEM-1.7.0.zip` y `Worm-GEM-1.8.0.zip` de las publicaciones de
-[Human-GEM](https://github.com/SysBioChalmers/Human-GEM) y
-[Mouse-GEM](https://github.com/SysBioChalmers/Mouse-GEM), [Rat-GEM](https://github.com/SysBioChalmers/Rat-GEM), [Zebrafish-GEM](https://github.com/SysBioChalmers/Zebrafish-GEM), [Fruitfly-GEM](https://github.com/SysBioChalmers/Fruitfly-GEM) y [Worm-GEM](https://github.com/SysBioChalmers/Worm-GEM) y ponlos en la raíz del proyecto.
+[Human-GEM](https://github.com/SysBioChalmers/Human-GEM),
+[Mouse-GEM](https://github.com/SysBioChalmers/Mouse-GEM), [Rat-GEM](https://github.com/SysBioChalmers/Rat-GEM), [Zebrafish-GEM](https://github.com/SysBioChalmers/Zebrafish-GEM), [Fruitfly-GEM](https://github.com/SysBioChalmers/Fruitfly-GEM) y [Worm-GEM](https://github.com/SysBioChalmers/Worm-GEM) (además de `yeast-GEM` e `iML1515`; procedencia y sumas SHA-256 en `tools/DATA_SOURCES.md`) y ponlos en la raíz del proyecto.
 
 ```bash
 python3 -m venv --without-pip tools/.venv
 python3 -m pip --python tools/.venv/bin/python install rdkit pyyaml igraph rxnmapper \
     torch --extra-index-url https://download.pytorch.org/whl/cpu
 
-tools/build_all.sh                      # all six models
+tools/build_all.sh                      # los ocho modelos
 
 # otro modelo (zip o carpeta):
 tools/.venv/bin/python tools/build_model.py   Otro-GEM.zip otro-gem [--structures-from human-gem]
@@ -510,6 +538,8 @@ El trazador cuenta como no marcados los átomos del CoA que quedan sin mapear. C
 reparte entre los productos y el metabolito se dibuja con borde discontinuo.
 
 ### Pruebas
+
+Los scripts de pruebas y validación están en **[MetfluxTools](https://github.com/JonatanFernandez/MetfluxTools)** (clonado en `tools/`):
 
 ```bash
 node tools/test_fba.mjs    [human-gem|mouse-gem] [default|plasmax|hplm]   # FBA/pFBA con un medio predefinido

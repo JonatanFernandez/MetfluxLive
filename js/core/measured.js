@@ -83,6 +83,10 @@ const YEAST_O2_28 = J([1.32, 1.28, 1.36], [-0.085, -0.07, -0.10], 2.5);
 const YEAST_O2_10 = J([2.05, 1.97, 2.13], [-1.78, -1.56, -2.00], 1.7);
 const YEAST_O2_05 = J([2.49, 2.20, 2.78], [-2.75, -2.59, -2.91], 1.2);
 const YEAST_O2_0 = J([6.44, 6.30, 6.58], [-9.26, -9.05, -9.47], 0, [-1.08, -1.05, -1.11]);
+// S. cerevisiae BY4947 (S288C background), SD medium (0.5 % glucose, YNB without amino acids), aerobic batch, mean ± SD:
+// Fujiwara et al., Metab Eng Commun 20:e00260 (2025), Supplementary Data S1 (growth 0.368 1/h). The same culture's amino acid
+// labelling from [1-13C]glucose is the yeast labelling test of docs section 4.
+const YEAST_SD = [["glucose", 14.84, 14.22, 15.46], ["ethanol", -22.56, -21.95, -23.17], ["glycerol", -1.11, -1.08, -1.14], ["acetate", -0.384, -0.363, -0.405]];
 // E. coli BW25113 (a K-12 strain), M9 glucose, aerobic batch, mean ± SD: Zampieri et al., Nat Commun 10:3354 (2019), Table 1
 const ECOLI_ZAMPIERI = [["glucose", 9.13, 8.52, 9.74], ["acetate", -5.43, -5.27, -5.59]];
 // E. coli BW25113, glucose or acetate minimal medium, batch, mean ± SD: Castaño-Cerezo et al., Microb Cell Fact 8:54 (2009),
@@ -110,6 +114,7 @@ export const MEASURED_SETS = [
   { id: "yeastO2_10", org: "yeast-gem", rows: YEAST_O2_10, ngam: 0, unit: "mmol/gDW/h", spread: "two cultures", trace: 0.02, toGDW: MM, medium: "verduyn" },
   { id: "yeastO2_05", org: "yeast-gem", rows: YEAST_O2_05, ngam: 0, unit: "mmol/gDW/h", spread: "two cultures", trace: 0.02, toGDW: MM, medium: "verduyn" },
   { id: "yeastO2_0", org: "yeast-gem", rows: YEAST_O2_0, ngam: 0, unit: "mmol/gDW/h", spread: "two cultures", trace: 0.02, toGDW: MM, medium: "verduynAnaer" },
+  { id: "yeastSD", org: "yeast-gem", rows: YEAST_SD, ngam: 0, unit: "mmol/gDW/h", spread: "± SD", trace: 0.02, toGDW: MM, medium: "ynb" },
   { id: "ecoliZampieri", org: "ecoli-gem", rows: ECOLI_ZAMPIERI, ngam: 0, unit: "mmol/gDW/h", spread: "± SD", toGDW: MM, medium: "m9glc" },
   { id: "ecoliGlcAer", org: "ecoli-gem", rows: ECOLI_CC_AER, ngam: 0, unit: "mmol/gDW/h", spread: "± SD", toGDW: MM, medium: "m9glc" },
   { id: "ecoliGlcAnaer", org: "ecoli-gem", rows: ECOLI_CC_ANAER, ngam: 0, unit: "mmol/gDW/h", spread: "± SD", toGDW: MM, medium: "m9glcAnaer" },

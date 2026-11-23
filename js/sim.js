@@ -88,13 +88,44 @@ export class Simulator {
    * @param groups [Int32Array of reactions]  @param onProgress (done, total) -> false to stop
    * @returns [{ objective, status, relaxed }] in the order of groups (shorter if stopped)
    */
-  async screenKnockouts(cfg, supplies, groups, onProgress) {
+  async screenKnockouts(cfg, supplies, groups, onProgress, refV = null) {
     const base = { ...cfg, parsimonious: false, perturb: [] }, out = [];
+    // background: the perturbations of cfg (given the unperturbed fluxes refV), kept in every knockout of the screen,
+    // so that the screen finds what becomes essential on top of them (synthetic lethality)
+    const bg = cfg.perturb?.length && refV ? this._caps(cfg.perturb, refV) : null;
+    const capsOf = (g) => { const c = new Map(bg || []); for (const j of g) c.set(j, 0); return c; };
+    // Solution reuse (exact): a flux vector that reaches the unperturbed optimum with every reaction of a group at
+    // zero is still feasible with that group closed, so that knockout keeps the optimum and needs no LP. Optimal
+    // vectors found along the way (the reference and each knockout that keeps the optimum) are pooled.
+    const r0 = await this._solve(base, supplies, null, null, bg);
+    const ref = r0.status === "optimal" ? r0.objective : null, tol = Math.abs(ref ?? 0) * 1e-7 + 1e-12;
+    const pool = ref !== null ? [r0.v] : [];
+    const free = (g) => pool.some((v) => g.every((j) => Math.abs(v[j]) <= 1e-9));
     for (let i = 0; i < groups.length; i++) {
-      const caps = new Map(Array.from(groups[i], (j) => [j, 0]));
-      const r = await this._solve(base, supplies, null, null, caps);
-      out.push({ objective: r.status === "optimal" ? r.objective : 0, status: r.status, relaxed: !!r.relaxed });
+      if (ref !== null && free(groups[i])) out.push({ objective: ref, status: "optimal", relaxed: !!r0.relaxed });
+      else {
+        const r = await this._solve(base, supplies, null, null, capsOf(groups[i]));
+        out.push({ objective: r.status === "optimal" ? r.objective : 0, status: r.status, relaxed: !!r.relaxed });
+        if (ref !== null && r.status === "optimal" && !!r.relaxed === !!r0.relaxed && r.objective >= ref - tol && pool.length < 64) pool.push(r.v);
+      }
       if (onProgress && onProgress(i + 1, groups.length) === false) break;
+    }
+    return out;
+  }
+
+  /**
+   * Medium screen: the objective with each medium component left out (its uptake closed; a measured rate for it is
+   * dropped, as in a phase plane), under the same measured fluxes, cell type and, given refV, the perturbations of cfg.
+   * @param mets [metabolite index]  @returns [{ objective, status, relaxed }] in the order of mets (shorter if stopped)
+   */
+  async screenMedium(cfg, supplies, mets, onProgress, refV = null) {
+    const bg = cfg.perturb?.length && refV ? this._caps(cfg.perturb, refV) : null, out = [];
+    for (let i = 0; i < mets.length; i++) {
+      const m = mets[i];
+      const base = { ...cfg, parsimonious: false, perturb: [], measured: cfg.measured ? { ...cfg.measured, items: cfg.measured.items.filter((x) => x.met !== m) } : undefined };
+      const r = await this._solve(base, supplies.filter((it) => it.met !== m), null, null, bg);
+      out.push({ objective: r.status === "optimal" ? r.objective : 0, status: r.status, relaxed: !!r.relaxed });
+      if (onProgress && onProgress(i + 1, mets.length) === false) break;
     }
     return out;
   }
