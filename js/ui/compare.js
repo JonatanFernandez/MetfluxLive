@@ -100,6 +100,13 @@ export function createCompare(app) {
     const sc = current();
     $("compareBadge").hidden = !sc;
     if (sc) $("compareBadge").innerHTML = t("cmp.badge", { a: esc(shownName()), b: esc(sc.name) });
+    const tb = $("cmpTabBadge");
+    if (tb) {
+      const n = S.scenarios.filter((x) => x.ctx.slug === S.slug).length;
+      tb.hidden = !n && !sc;
+      tb.textContent = sc ? "A↔B" : String(n);
+      tb.classList.toggle("active", !!sc);
+    }
   }
 
   /** "Show [X] compared with [Y]": both sides explicit, any pair of scenarios. */

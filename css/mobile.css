@@ -96,7 +96,9 @@ body.mobile dialog form, body.mobile dialog.editor form { max-height: 100dvh; ov
 /* bigger touch targets in the panels */
 body.mobile aside button, body.mobile aside select, body.mobile aside input:not([type=checkbox]):not([type=radio]) { min-height: 34px; }
 body.mobile aside input[type=search], body.mobile aside input[type=text], body.mobile aside input[type=number] { font-size: 16px; }
-body.mobile aside section { scroll-margin-top: 52px; }
+body.mobile aside section { scroll-margin-top: 96px; }
+body.mobile .task-tabs { top: 44px; z-index: 2; padding: 6px 10px; }
+body.mobile .task-tabs button { min-height: 34px; font-size: 12.5px; }
 body.mobile .cmp-views { top: 84px; }
 body.mobile .cmp-views button { padding: 5px 10px; }
 body.mobile .cmp-views button span { max-width: 9ch; }

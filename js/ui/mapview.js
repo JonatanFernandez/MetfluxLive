@@ -228,6 +228,7 @@ export class MapView {
     this.energy = !!(d.dG || d.energy);
     // "change" (A → B view): colour = change of size, width = |B − A|, reversals / on / off marked apart (core/change.js)
     this.change = d.mode === "change" && !this.energy && !this.dlabel;
+    this.mtbOn = !!(d.mtb || d.mtbGlobal);
     this.mode = this.dlabel || this.energy || this.change ? "delta" : d.mode || "flux";
     this.tracerOn = this.mode === "tracer";
     this.masked = !!(d.mask || d.gHas);
@@ -251,6 +252,7 @@ export class MapView {
       }
       let tmax = 0;
       for (const n of sc.nodes) if (n.type === 0 && d.turnover) tmax = Math.max(tmax, d.turnover[n.ref], chg && d.refTurnover ? d.refTurnover[n.ref] : 0);
+      const mtb = d.mtb || null;
       for (const n of sc.nodes) {
         if (n.type === 0) {
           n.flux = d.turnover ? d.turnover[n.ref] : 0; n.s = logScale(n.flux, tmax);
@@ -261,6 +263,9 @@ export class MapView {
             n.s = logScale(Math.max(n.flux, t0), tmax); n.de = fluxChange(t0, n.flux).size;
           }
           n.hidden = !!mask && !mask.met[n.ref];
+          const fc = mtb ? mtb.fcByMet.get(n.ref) : undefined;
+          n.mtbFc = fc !== undefined ? fc : NaN;
+          n.mtbSig = !!(mtb && mtb.sigMets.has(n.ref));
         } else {
           n.flux = d.qflux ? d.qflux[n.ref] : d.v ? Math.abs(d.v[n.ref]) : 0; n.s = logScale(n.flux, max); n.dir = d.v ? Math.sign(d.v[n.ref]) : 0;
           const f0 = ref ? Math.abs(ref[n.ref]) : n.flux;
@@ -274,6 +279,8 @@ export class MapView {
           n.pert = d.perturb ? d.perturb.get(n.ref) : undefined;
           n.blk = !!(d.blocked && d.blocked.has(n.ref)); // no detected enzyme in the chosen cell type
           n.fx = d.flex ? d.flex.get(n.ref)?.cls : undefined; // flux variability class (FVA of the pathway)
+          n.mtbObs = !!(mtb && mtb.obsRxns.has(n.ref));
+          n.mtbTop = !!(mtb && mtb.topSteps.has(n.ref));
         }
       }
       if (d.dG) { // reactions coloured by dG'm in the direction they run: -40 kJ/mol and below is full red
@@ -310,9 +317,13 @@ export class MapView {
     } else if (sc.kind === "global") {
       let max = 0;
       for (const n of sc.nodes) { n.flux = d.gFlux ? d.gFlux[n.ref] : 0; if (n.flux > max) max = n.flux; }
+      const mg = d.mtbGlobal || null;
       for (const n of sc.nodes) {
         n.s = logScale(n.flux, max); n.e = d.gE ? d.gE[n.ref] : 0; n.d = d.energy ? d.energy[n.ref] : d.gD ? d.gD[n.ref] : 0;
         n.hidden = !!d.gHas && !d.gHas[n.ref];
+        n.mtbFc = mg ? mg.medFc[n.ref] : NaN;
+        n.mtbObs = !!(mg && mg.hasObs[n.ref]);
+        n.mtbTop = !!(mg && mg.hasTop[n.ref]);
       }
       const byRef = new Map(sc.nodes.map((n, i) => [n.ref, i]));
       const fmax = d.flows && d.flows.length ? d.flows[0].flow : 0;
@@ -324,7 +335,7 @@ export class MapView {
   }
 
   /** A node is drawn when it passes the filter and either carries flux or inactive ones are shown. */
-  _vis(n) { return !n.hidden && (this.options.inactive || n.s > 0 || this.masked || this.scene.kind !== "sub"); }
+  _vis(n) { return !n.hidden && (this.options.inactive || n.s > 0 || this.masked || this.scene.kind !== "sub" || (this.mtbOn && (Number.isFinite(n.mtbFc) || n.mtbObs || n.mtbTop))); }
 
   visibleCount() { let k = 0; for (const n of this.scene.nodes) if (this._vis(n)) k++; return k; }
 
@@ -624,13 +635,31 @@ export class MapView {
       const r = this._radius(n), a = dim(i);
       ctx.globalAlpha = a;
       if (n.type === 0) {
-        ctx.beginPath(); ctx.arc(sx[i], sy[i], r, 0, 6.283);
-        ctx.fillStyle = n.s ? (this.dlabel || this.change ? this._dc(n.de) : this.tracerOn ? enrichColor(n.e) : TH.metOn) : TH.metOff;
-        ctx.fill();
-        ctx.lineWidth = n.s ? 2 : 1.2;
-        ctx.strokeStyle = compColor(n.comp);
-        if (n.unc) ctx.setLineDash([3, 2.5]);
-        ctx.globalAlpha = a * (n.s ? 1 : 0.5); ctx.stroke(); ctx.setLineDash([]);
+        if (this.mtbOn) {
+          const meas = Number.isFinite(n.mtbFc);
+          const col = meas ? deltaColor(Math.max(-1, Math.min(1, n.mtbFc / 2))) : TH.metOff;
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r, 0, 6.283);
+          ctx.globalAlpha = a * (meas ? 1 : 0.42);
+          ctx.fillStyle = col; ctx.fill();
+          ctx.lineWidth = meas ? 2.2 : 1;
+          ctx.strokeStyle = compColor(n.comp);
+          if (n.unc) ctx.setLineDash([3, 2.5]);
+          ctx.globalAlpha = a * (meas ? 1 : 0.35); ctx.stroke(); ctx.setLineDash([]);
+          if (meas && n.mtbSig) { // statistically significant metabolite change (q < 0.05)
+            ctx.beginPath(); ctx.arc(sx[i], sy[i], r + 3.2, 0, 6.283);
+            ctx.globalAlpha = a;
+            ctx.strokeStyle = deltaColor(Math.max(-1, Math.min(1, n.mtbFc / 2)), 0.92);
+            ctx.lineWidth = 1.8; ctx.stroke();
+          }
+        } else {
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r, 0, 6.283);
+          ctx.fillStyle = n.s ? (this.dlabel || this.change ? this._dc(n.de) : this.tracerOn ? enrichColor(n.e) : TH.metOn) : TH.metOff;
+          ctx.fill();
+          ctx.lineWidth = n.s ? 2 : 1.2;
+          ctx.strokeStyle = compColor(n.comp);
+          if (n.unc) ctx.setLineDash([3, 2.5]);
+          ctx.globalAlpha = a * (n.s ? 1 : 0.5); ctx.stroke(); ctx.setLineDash([]);
+        }
       } else {
         ctx.save(); ctx.translate(sx[i], sy[i]); ctx.rotate(Math.PI / 4);
         ctx.fillStyle = this.mode === "delta" ? this._dc(n.lost ? -1 : n.d, n.s ? 1 : 0.7) : n.s ? (n.transport ? TH.rxnTransport : TH.rxnOn) : TH.rxnOff;
@@ -638,8 +667,17 @@ export class MapView {
         if (this.change && n.ck === "off") { // active only in A: hollow
           ctx.fillStyle = TH.halo; ctx.fillRect(-r, -r, 2 * r, 2 * r);
           ctx.strokeStyle = this._dc(-1); ctx.lineWidth = 1.8; ctx.strokeRect(-r, -r, 2 * r, 2 * r);
+        } else if (this.mtbOn && !n.mtbObs) { // not observable on both sides by the metabolomics panel
+          ctx.globalAlpha = a * 0.55;
+          ctx.fillStyle = TH.halo; ctx.fillRect(-r, -r, 2 * r, 2 * r);
+          ctx.strokeStyle = TH.rxnOff; ctx.lineWidth = 1.2; ctx.setLineDash([2.5, 2]);
+          ctx.strokeRect(-r, -r, 2 * r, 2 * r); ctx.setLineDash([]);
         } else ctx.fillRect(-r, -r, 2 * r, 2 * r);
         ctx.restore();
+        if (this.mtbOn && n.mtbTop) { // candidate bottleneck step from metabolomics
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 4, 0, 6.283);
+          ctx.strokeStyle = TH.flexOpt; ctx.lineWidth = 2.6; ctx.stroke();
+        }
         if (this.change && n.ck === "on") { // active only in B: halo
           ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 3, 0, 6.283);
           ctx.strokeStyle = this._dc(1, 0.85); ctx.lineWidth = 2; ctx.stroke();
@@ -690,19 +728,19 @@ export class MapView {
     const want = (i) => {
       const n = ns[i];
       if (!onScreen(i) || !this._vis(n)) return false;
-      if (near.has(i) || n.ghost) return true;
-      if (n.type === 0) return z > 0.75 || (n.s > 0 && drawn < 28);
+      if (near.has(i) || n.ghost || (this.mtbOn && n.mtbTop)) return true;
+      if (n.type === 0) return z > 0.75 || (this.mtbOn && Number.isFinite(n.mtbFc) && z > 0.5) || (n.s > 0 && drawn < 28);
       return z > 1.7;
     };
     const drawLabel = (i) => {
       const n = ns[i], r = this._radius(n);
-      const active = n.s > 0, hl = near.has(i);
+      const active = n.s > 0 || (this.mtbOn && (Number.isFinite(n.mtbFc) || n.mtbTop)), hl = near.has(i);
       const size = n.type === 0 ? (hl ? 12.5 : 11) : 9.5;
       const col = n.type === 0 ? (active || hl ? TH.labelOn : TH.labelOff) : (active || hl ? TH.rxnLabelOn : TH.rxnLabelOff);
       if (this._label(ctx, n.label, sx[i], sy[i] + r + size * 0.75, size, col, boxes)) drawn++;
     };
     for (const i of near) if (this._vis(ns[i])) drawLabel(i);
-    ns.forEach((n, i) => { if (n.ghost && !near.has(i) && this._vis(n) && onScreen(i)) drawLabel(i); });
+    ns.forEach((n, i) => { if ((n.ghost || (this.mtbOn && n.mtbTop)) && !near.has(i) && this._vis(n) && onScreen(i)) drawLabel(i); });
     for (const i of order) { if (drawn >= maxLabels) break; if (!near.has(i) && want(i)) drawLabel(i); }
   }
 
@@ -777,18 +815,41 @@ export class MapView {
       if (n.hidden) continue;
       const delta = this.mode === "delta";
       ctx.globalAlpha = a;
-      if (n.s > 0) {
-        const g = ctx.createRadialGradient(sx[i], sy[i], r * 0.4, sx[i], sy[i], r * (1.5 + n.s));
-        const col = delta ? this._dc(n.d, 0.45 * n.s) : this.tracerOn ? enrichColor(n.e, 0.5 * n.s) : `rgba(${TH.flux.join(",")},${0.42 * n.s})`;
-        g.addColorStop(0, col); g.addColorStop(1, TH.blend === "lighter" ? "rgba(0,0,0,0)" : "rgba(255,255,255,0)");
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx[i], sy[i], r * (1.5 + n.s), 0, 6.283); ctx.fill();
+      if (this.mtbOn) {
+        const meas = Number.isFinite(n.mtbFc);
+        const dc = meas ? Math.max(-1, Math.min(1, n.mtbFc / 2)) : 0;
+        if (meas && Math.abs(dc) > 0.08) {
+          const g = ctx.createRadialGradient(sx[i], sy[i], r * 0.4, sx[i], sy[i], r * (1.5 + Math.abs(dc)));
+          g.addColorStop(0, deltaColor(dc, 0.45)); g.addColorStop(1, TH.blend === "lighter" ? "rgba(0,0,0,0)" : "rgba(255,255,255,0)");
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx[i], sy[i], r * (1.5 + Math.abs(dc)), 0, 6.283); ctx.fill();
+        }
+        ctx.beginPath(); ctx.arc(sx[i], sy[i], r, 0, 6.283);
+        ctx.globalAlpha = a * (meas ? 1 : 0.48);
+        ctx.fillStyle = meas ? deltaColor(dc) : TH.groupOff;
+        ctx.fill();
+        ctx.lineWidth = n.mtbObs ? 2 : 1.4;
+        ctx.strokeStyle = n.mtbObs ? TH.groupRing : TH.groupRingOff;
+        if (!meas) ctx.setLineDash([4, 3]);
+        ctx.stroke(); ctx.setLineDash([]);
+        if (n.mtbTop) { // pathway contains a candidate bottleneck step
+          ctx.globalAlpha = a;
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r + 4, 0, 6.283);
+          ctx.strokeStyle = TH.flexOpt; ctx.lineWidth = 2.6; ctx.stroke();
+        }
+      } else {
+        if (n.s > 0) {
+          const g = ctx.createRadialGradient(sx[i], sy[i], r * 0.4, sx[i], sy[i], r * (1.5 + n.s));
+          const col = delta ? this._dc(n.d, 0.45 * n.s) : this.tracerOn ? enrichColor(n.e, 0.5 * n.s) : `rgba(${TH.flux.join(",")},${0.42 * n.s})`;
+          g.addColorStop(0, col); g.addColorStop(1, TH.blend === "lighter" ? "rgba(0,0,0,0)" : "rgba(255,255,255,0)");
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx[i], sy[i], r * (1.5 + n.s), 0, 6.283); ctx.fill();
+        }
+        ctx.beginPath(); ctx.arc(sx[i], sy[i], r, 0, 6.283);
+        ctx.fillStyle = delta ? this._dc(n.d, n.s > 0 ? 1 : 0.55) : n.s > 0 ? (this.tracerOn ? enrichColor(n.e) : TH.groupFill(n.s)) : TH.groupOff;
+        ctx.fill();
+        ctx.lineWidth = 1.5; ctx.strokeStyle = n.listOnly ? TH.groupListOnly : n.s > 0 ? TH.groupRing : TH.groupRingOff;
+        if (n.listOnly) ctx.setLineDash([3, 3]);
+        ctx.stroke(); ctx.setLineDash([]);
       }
-      ctx.beginPath(); ctx.arc(sx[i], sy[i], r, 0, 6.283);
-      ctx.fillStyle = delta ? this._dc(n.d, n.s > 0 ? 1 : 0.55) : n.s > 0 ? (this.tracerOn ? enrichColor(n.e) : TH.groupFill(n.s)) : TH.groupOff;
-      ctx.fill();
-      ctx.lineWidth = 1.5; ctx.strokeStyle = n.listOnly ? TH.groupListOnly : n.s > 0 ? TH.groupRing : TH.groupRingOff;
-      if (n.listOnly) ctx.setLineDash([3, 3]);
-      ctx.stroke(); ctx.setLineDash([]);
       ctx.globalAlpha = 1;
     }
     this._rings(ctx, sx, sy);

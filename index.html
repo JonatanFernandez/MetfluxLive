@@ -38,7 +38,7 @@
       </div>
     </div>
     <div class="tb-side right">
-      <button id="tourBtn" data-i18n="h.tour" data-i18n-title="h.tourTitle"></button>
+      <button id="tourBtn" data-i18n="h.tour" data-i18n-title="h.tourTitle"></button> <button id="demoBtn" class="link" data-i18n="demo.button" data-i18n-title="demo.buttonTitle"></button>
       <a id="docsBtn" class="btn" href="docs.html" target="_blank" rel="noopener" data-i18n="h.docs" data-i18n-title="h.docsTitle"></a>
       <button id="editBtn" class="toggle" data-i18n="h.edit" data-i18n-title="h.editTitle"></button>
       <button id="importBtn" data-i18n="h.import" data-i18n-title="h.importTitle"></button>
@@ -54,7 +54,12 @@
   </header>
 
   <main>
-    <aside id="left">
+    <aside id="left" data-task="sim">
+      <nav id="taskTabs" class="task-tabs" role="tablist" data-i18n-aria="tab.aria">
+        <button type="button" role="tab" data-task="sim" class="on" aria-selected="true" data-i18n-title="tab.simTitle"><span data-i18n="tab.sim"></span></button>
+        <button type="button" role="tab" data-task="cmp" aria-selected="false" data-i18n-title="tab.cmpTitle"><span data-i18n="tab.cmp"></span><span id="cmpTabBadge" class="tab-badge" hidden></span></button>
+        <button type="button" role="tab" data-task="data" aria-selected="false" data-i18n-title="tab.dataTitle"><span data-i18n="tab.data"></span></button>
+      </nav>
       <section id="secEdits" class="fold edits" hidden>
         <h2><span data-i18n="h.edits"></span> <button id="discardEdits" class="link" data-i18n="ed.discard" hidden></button></h2>
         <p class="hint" id="editSummary"></p>
@@ -72,20 +77,19 @@
         <div id="editList"></div>
         <div id="editIssues"></div>
       </section>
-      <section id="secContext" class="fold" hidden>
+      <section id="secContext" class="fold" data-task="sim" hidden>
         <h2><span data-i18n="h.context"></span> <button id="clearContext" class="link" data-i18n="ctx.clear" hidden></button> <a class="link" id="ctxBrowse" href="contexts.html" target="_blank" data-i18n="ctx.browse" data-i18n-title="ctx.browseTitle"></a> <a class="link" data-docs="contexts" target="_blank" data-i18n="obj.help"></a></h2>
         <div class="add">
           <input id="ctxInput" type="search" data-i18n-ph="ctx.ph" autocomplete="off" spellcheck="false">
           <div id="ctxResults" class="dropdown" hidden></div>
         </div>
         <div id="ctxCurrent"></div>
-        <div class="row"><button id="rnaOpen" class="link" data-i18n="rna.open" data-i18n-title="rna.openTitle"></button></div>
         <div class="row medium-bar">
           <select id="ctxMode" class="grow" data-i18n-title="ctx.modeTitle"><option value="block" data-i18n="ctx.mode.block"></option><option value="complex" data-i18n="ctx.mode.complex"></option><option value="penalty" data-i18n="ctx.mode.penalty"></option></select>
         </div>
         <p class="hint" id="ctxNote"></p>
       </section>
-      <section id="secMedium" class="fold">
+      <section id="secMedium" class="fold" data-task="sim">
         <h2><span data-i18n="h.medium"></span> <button id="resetMedium" class="link" data-i18n="h.reset" data-i18n-title="h.resetTitle"></button></h2>
         <div class="row medium-bar">
           <select id="mediumSel" class="grow" data-i18n-title="h.mediumSel"></select>
@@ -98,11 +102,11 @@
           <input id="addSupply" type="search" data-i18n-ph="h.addSupply" autocomplete="off" spellcheck="false">
           <div id="addResults" class="dropdown" hidden></div>
         </div>
-        <div class="row trl-row"><select id="trLib" class="grow" data-i18n-title="trl.title"></select><button id="designBtn" class="link" data-i18n="des.open" data-i18n-title="des.openTitle"></button></div>
+        <div class="row trl-row"><select id="trLib" class="grow" data-i18n-title="trl.title"></select></div>
         <div id="tracerList"></div>
         <div id="supplyList"></div>
       </section>
-      <section id="secMeasured" class="fold">
+      <section id="secMeasured" class="fold" data-task="sim">
         <h2><span data-i18n="h.measured"></span> <button id="resetMeasured" class="link" data-i18n="h.reset" data-i18n-title="meas.resetTitle"></button></h2>
         <div class="row medium-bar">
           <select id="measuredSel" class="grow" data-i18n-title="h.measured"></select>
@@ -115,7 +119,7 @@
         </div>
         <div id="measuredList"></div>
       </section>
-      <section id="secObjective" class="fold">
+      <section id="secObjective" class="fold" data-task="sim">
         <h2><span data-i18n="h.objective"></span> <a class="link" data-docs="objectives" target="_blank" data-i18n="obj.help"></a></h2>
         <div class="row medium-bar">
           <select id="objPreset" class="grow" data-i18n-title="obj.presetTitle"></select>
@@ -140,7 +144,7 @@
           <div id="secCurve"></div>
         </details>
       </section>
-      <section id="secPerturb" class="fold">
+      <section id="secPerturb" class="fold" data-task="sim">
         <h2><span data-i18n="h.perturb"></span> <button id="clearPerturb" class="link" data-i18n="h.clearPerturb" hidden></button></h2>
         <p class="hint" data-i18n="h.perturbHint"></p>
         <div class="add">
@@ -149,12 +153,31 @@
         </div>
         <div id="perturbList"></div>
         <details id="ctxExplore" hidden><summary></summary><div id="ctxExploreBox"></div></details>
-        <div class="row"><button id="geneScreen" class="link" data-i18n="scr.button" data-i18n-title="scr.title"></button> <a class="link" data-docs="screen" target="_blank" data-i18n="obj.help"></a></div>
-        <div id="screenOut"></div>
-        <div class="row"><button id="nutScreen" class="link" data-i18n="nut.button" data-i18n-title="nut.title"></button> <a class="link" data-docs="screen-nutrients" target="_blank" data-i18n="obj.help"></a></div>
-        <div id="nutOut"></div>
+        <details id="simScreens" class="sec2"><summary data-i18n="scr.groupTitle"></summary>
+          <div class="row"><button id="geneScreen" class="link" data-i18n="scr.button" data-i18n-title="scr.title"></button> <a class="link" data-docs="screen" target="_blank" data-i18n="obj.help"></a></div>
+          <div id="screenOut"></div>
+          <div class="row"><button id="nutScreen" class="link" data-i18n="nut.button" data-i18n-title="nut.title"></button> <a class="link" data-docs="screen-nutrients" target="_blank" data-i18n="obj.help"></a></div>
+          <div id="nutOut"></div>
+        </details>
       </section>
-      <section id="secCompare" class="fold">
+      <section id="dynSection" class="fold" data-task="sim" hidden>
+        <h2><span data-i18n="h.dynParams"></span></h2>
+        <label class="field"><span class="t" data-i18n="h.dynHours"></span> <span><input id="dynHours" type="number" min="0.1" step="1" value="24"> h</span></label>
+        <label class="field"><span class="t" data-i18n="h.dynBiomass"></span> <span><input id="dynBiomass" type="number" min="0.001" step="0.1" value="0.5"> gDW/L</span></label>
+        <label class="field"><span class="t" data-i18n="h.dynPool"></span> <span><input id="dynPool" type="number" min="0.01" step="0.1" value="0.5"> µmol/gDW</span></label>
+        <p class="hint" data-i18n="h.dynHint"></p>
+      </section>
+      <section id="secEvents" class="fold" data-task="sim" hidden>
+        <h2><span data-i18n="h.events"></span> <button id="clearEvents" class="link" data-i18n="h.clearPerturb" hidden></button></h2>
+        <p class="hint" data-i18n="h.eventsHint"></p>
+        <div class="add">
+          <input id="addEvent" type="search" data-i18n-ph="h.addEvent" autocomplete="off" spellcheck="false">
+          <div id="eventResults" class="dropdown" hidden></div>
+        </div>
+        <button id="addMediumEvent" class="link" data-i18n="ev.addMedium"></button>
+        <div id="eventList"></div>
+      </section>
+      <section id="secCompare" class="fold" data-task="cmp">
         <h2><span data-i18n="h.compare"></span> <button id="stopCompare" class="link" data-i18n="cmp.stop" hidden></button></h2>
         <p class="hint" data-i18n-html="cmp.hint"></p>
         <button id="saveScenario" data-i18n="cmp.save" data-i18n-title="cmp.saveTitle"></button>
@@ -165,22 +188,42 @@
           <label><span data-i18n="cmp.refLbl"></span> <select id="cmpRef" data-i18n-title="cmp.refTitle"></select></label>
         </div>
       </section>
-      <section id="dynSection" class="fold" hidden>
-        <h2><span data-i18n="h.dynParams"></span></h2>
-        <label class="field"><span class="t" data-i18n="h.dynHours"></span> <span><input id="dynHours" type="number" min="0.1" step="1" value="24"> h</span></label>
-        <label class="field"><span class="t" data-i18n="h.dynBiomass"></span> <span><input id="dynBiomass" type="number" min="0.001" step="0.1" value="0.5"> gDW/L</span></label>
-        <label class="field"><span class="t" data-i18n="h.dynPool"></span> <span><input id="dynPool" type="number" min="0.01" step="0.1" value="0.5"> µmol/gDW</span></label>
-        <p class="hint" data-i18n="h.dynHint"></p>
-      </section>
-      <section id="secEvents" class="fold" hidden>
-        <h2><span data-i18n="h.events"></span> <button id="clearEvents" class="link" data-i18n="h.clearPerturb" hidden></button></h2>
-        <p class="hint" data-i18n="h.eventsHint"></p>
-        <div class="add">
-          <input id="addEvent" type="search" data-i18n-ph="h.addEvent" autocomplete="off" spellcheck="false">
-          <div id="eventResults" class="dropdown" hidden></div>
+      <section id="secDiffScreens" class="fold" data-task="cmp">
+        <h2><span data-i18n="diff.title"></span> <a class="link" data-docs="screen-nutrients" target="_blank" data-i18n="obj.help"></a></h2>
+        <p class="hint" data-i18n="diff.hint"></p>
+        <div class="row diff-btns">
+          <button id="cmpNutScreen" data-i18n="diff.nutBtn" data-i18n-title="diff.nutTitle"></button>
+          <button id="cmpGeneScreen" data-i18n="diff.geneBtn" data-i18n-title="diff.geneTitle"></button>
         </div>
-        <button id="addMediumEvent" class="link" data-i18n="ev.addMedium"></button>
-        <div id="eventList"></div>
+        <div id="cmpScreenOut"></div>
+      </section>
+      <section id="secDesign" class="fold" data-task="cmp">
+        <h2><span data-i18n="des.secTitle"></span> <a class="link" data-docs="design" target="_blank" data-i18n="obj.help"></a></h2>
+        <p class="hint" data-i18n="des.secHint"></p>
+        <button id="designBtn" data-i18n="des.open" data-i18n-title="des.openTitle"></button>
+      </section>
+      <section id="secDataIntro" class="task-intro" data-task="data">
+        <p class="hint" data-i18n="data.intro"></p>
+      </section>
+      <section id="secExo" class="fold" data-task="data">
+        <h2><span data-i18n="data.exoTitle"></span> <a class="link" data-docs="exometabolomics" target="_blank" data-i18n="obj.help"></a></h2>
+        <p class="hint" data-i18n="data.exoHint"></p>
+        <button id="exoOpen" data-i18n="exo.open" data-i18n-title="exo.openTitle"></button>
+      </section>
+      <section id="secMtb" class="fold" data-task="data">
+        <h2><span data-i18n="h.mtb"></span> <a class="link" data-docs="metabolomics" target="_blank" data-i18n="obj.help"></a></h2>
+        <p class="hint" data-i18n="data.mtbHint"></p>
+        <button id="mtbOpen" data-i18n="mtb.open" data-i18n-title="mtb.openTitle"></button>
+        <p class="hint" id="mtbNote"></p>
+        <div class="row" id="mtbOverlayWrap" hidden>
+          <label class="check"><input id="mtbOverlay" type="checkbox"> <span data-i18n="mtb.showMap"></span></label>
+          <button id="mtbClear" class="link" data-i18n="mtb.clear"></button>
+        </div>
+      </section>
+      <section id="secRna" class="fold" data-task="data">
+        <h2><span data-i18n="data.rnaTitle"></span> <a class="link" data-docs="contexts" target="_blank" data-i18n="obj.help"></a></h2>
+        <p class="hint" data-i18n="data.rnaHint"></p>
+        <button id="rnaOpen" data-i18n="rna.open" data-i18n-title="rna.openTitle"></button>
       </section>
     </aside>
     <div class="resizer" id="resLeft" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-title="h.resize"></div>
@@ -360,6 +403,56 @@
       </div>
       <p class="hint" id="rnaStatus"></p>
       <footer><span style="flex:1"></span><button type="button" id="rnaBuild" class="primary" data-i18n="rna.build" disabled></button></footer>
+    </form>
+  </dialog>
+  <dialog id="exoDialog" class="editor">
+    <form method="dialog" id="exoForm">
+      <header><h3 data-i18n="exo.title"></h3><button class="icon" value="cancel" data-i18n-aria="h.close">✕</button></header>
+      <details class="rna-how"><summary data-i18n="exo.howH"></summary><div data-i18n-html="exo.how"></div></details>
+      <label class="rna-file"><span data-i18n="exo.file"></span> <input id="exoFile" type="file" accept=".tsv,.tab,.txt,.csv,text/plain,text/csv,text/tab-separated-values"></label>
+      <textarea id="exoText" rows="6" spellcheck="false" data-i18n-ph="exo.paste"></textarea>
+      <div class="exo-grid">
+        <label><span data-i18n="exo.gdwPerCell"></span><input id="exoGdw" type="number" min="0" step="any" value="300"></label>
+        <label><span data-i18n="exo.condition"></span><select id="exoCond"></select></label>
+      </div>
+      <div class="row"><button type="button" id="exoParse" class="primary" data-i18n="exo.parse"></button></div>
+      <p class="hint" id="exoStatus"></p>
+      <div id="exoOut" hidden>
+        <div id="exoRates"></div>
+        <details id="exoUnmappedBox" hidden><summary id="exoUnmappedH"></summary><div id="exoUnmapped"></div></details>
+        <div class="exo-grid">
+          <label><span data-i18n="exo.mu"></span><input id="exoMu" type="number" min="0" step="any"></label>
+          <label><span data-i18n="exo.muSd"></span><input id="exoMuSd" type="number" min="0" step="any"></label>
+        </div>
+        <div class="row">
+          <button type="button" id="exoApply" data-i18n="exo.apply" data-i18n-title="exo.applyTitle"></button>
+          <button type="button" id="exoCheck" data-i18n="exo.check" data-i18n-title="exo.checkTitle"></button>
+        </div>
+        <div id="exoFit"></div>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="demoDialog" class="editor">
+    <form method="dialog">
+      <header><h3 data-i18n="demo.title"></h3><button class="icon" value="cancel" data-i18n-aria="h.close">✕</button></header>
+      <p class="hint" data-i18n="demo.intro"></p>
+      <div id="demoList"></div>
+    </form>
+  </dialog>
+  <dialog id="mtbDialog" class="editor">
+    <form method="dialog" id="mtbForm">
+      <header><h3 data-i18n="mtb.title"></h3><button class="icon" value="cancel" data-i18n-aria="h.close">✕</button></header>
+      <details class="rna-how"><summary data-i18n="mtb.howH"></summary><div data-i18n-html="mtb.how"></div></details>
+      <label class="rna-file"><span data-i18n="mtb.file"></span> <input id="mtbFile" type="file" accept=".tsv,.tab,.txt,.csv,text/plain,text/csv,text/tab-separated-values"></label>
+      <textarea id="mtbText" rows="6" spellcheck="false" data-i18n-ph="mtb.paste"></textarea>
+      <div class="exo-grid">
+        <label><span data-i18n="mtb.patA"></span><input id="mtbPatA" type="text" maxlength="40"></label>
+        <label><span data-i18n="mtb.patB"></span><input id="mtbPatB" type="text" maxlength="40"></label>
+      </div>
+      <div class="row"><button type="button" id="mtbRun" class="primary" data-i18n="mtb.run"></button></div>
+      <p class="hint" id="mtbStatus"></p>
+      <div id="mtbOut" hidden></div>
+      <details id="mtbUnmappedBox" hidden><summary id="mtbUnmappedH"></summary><div id="mtbUnmapped"></div></details>
     </form>
   </dialog>
   <dialog id="methodsDialog">

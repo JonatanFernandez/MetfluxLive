@@ -114,6 +114,17 @@ export class Simulator {
   }
 
   /**
+   * Least-absolute-deviation fit of measured exchange rates to the network (js/core/fitexchange.js):
+   * which rates are consistent with each other and, when they are not, which ones have to give way.
+   * @param params { lb, ub, measurements: [{ rxn, dir, rate, sigma, met }], minSigma? }
+   * @returns { status, deviation, v, residuals }
+   */
+  async fitExchanges(params) {
+    await this.ready;
+    return this._call({ type: "fit", params });
+  }
+
+  /**
    * Medium screen: the objective with each medium component left out (its uptake closed; a measured rate for it is
    * dropped, as in a phase plane), under the same measured fluxes, cell type and, given refV, the perturbations of cfg.
    * @param mets [metabolite index]  @returns [{ objective, status, relaxed }] in the order of mets (shorter if stopped)

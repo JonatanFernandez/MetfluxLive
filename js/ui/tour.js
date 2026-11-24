@@ -12,11 +12,11 @@ export const TOUR_STEPS = [
   { id: "context", sel: "#secContext" },
   { id: "medium", sel: "#secMedium" },
   { id: "tracers", sel: "#trLib" },
-  { id: "design", sel: "#designBtn" },
   { id: "measured", sel: "#secMeasured" },
   { id: "objective", sel: "#secObjective" },
   { id: "perturb", sel: "#secPerturb" },
   { id: "compare", sel: "#secCompare" },
+  { id: "design", sel: "#designBtn" },
   { id: "map", sel: "#map" },
   { id: "nav", sel: "#navBar" },
   { id: "view", sel: "#groupSel" },
@@ -69,22 +69,42 @@ const CSS = `
 
 let styled = false;
 
+function taskOf(sel) {
+  if (!sel) return null;
+  const el = document.querySelector(sel);
+  return el?.closest("section[data-task]")?.dataset.task || null;
+}
+
 /**
  * Start the walkthrough. opts.sheet(name) opens a panel of the phone layout before a step that has `sheet`
- * (the panel slides in, so the step is placed once it has arrived).
+ * (the panel slides in, so the step is placed once it has arrived). opts.task(name) switches the left-panel tab.
  */
 export function startTour(customSteps, opts = {}) {
   if (!styled) { const st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st); styled = true; }
   document.querySelector(".tour-shade")?.remove();
+  const initialTask = document.getElementById("left")?.dataset.task || null;
   const shade = document.createElement("div"); shade.className = "tour-shade";
   const hole = document.createElement("div"); hole.className = "tour-hole";
   const pop = document.createElement("div"); pop.className = "tour-pop"; pop.setAttribute("role", "dialog");
   shade.append(hole, pop);
   document.body.appendChild(shade);
-  // steps inside a closed panel are not visible yet: keep them if their element exists
-  const steps = (Array.isArray(customSteps) ? customSteps : TOUR_STEPS).filter((s) => !s.sel || (s.sheet ? document.querySelector(s.sel) : visibleEl(s.sel)));
+  // steps inside a closed panel or inactive task tab are not visible yet: keep them if their element exists and is not hidden
+  const steps = (Array.isArray(customSteps) ? customSteps : TOUR_STEPS).filter((s) => {
+    if (!s.sel) return true;
+    if (s.sheet) return !!document.querySelector(s.sel);
+    if (visibleEl(s.sel)) return true;
+    if (opts.task && taskOf(s.sel)) {
+      const el = document.querySelector(s.sel);
+      return !!el && !el.closest("[hidden]");
+    }
+    return false;
+  });
   let i = 0;
-  const close = () => { if (steps.some((s) => s.sheet !== undefined)) opts.sheet?.(""); shade.remove(); window.removeEventListener("keydown", key); window.removeEventListener("resize", place); };
+  const close = () => {
+    if (steps.some((s) => s.sheet !== undefined)) opts.sheet?.("");
+    if (opts.task && initialTask) opts.task(initialTask);
+    shade.remove(); window.removeEventListener("keydown", key); window.removeEventListener("resize", place);
+  };
   const key = (ev) => {
     if (ev.key === "Escape") close();
     else if (ev.key === "ArrowRight" || ev.key === "Enter") go(1);
@@ -117,6 +137,8 @@ export function startTour(customSteps, opts = {}) {
   let timer = null;
   function show() {
     const s = steps[i];
+    const tk = s.task || taskOf(s.sel);
+    if (tk && opts.task) opts.task(tk);
     if (s.sheet !== undefined && opts.sheet) opts.sheet(s.sheet);
     const el = s.sel ? visibleEl(s.sel) : null;
     if (el) {
