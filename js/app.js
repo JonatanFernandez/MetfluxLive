@@ -8,6 +8,7 @@ import { buildMetIndex, resolveMetabolite, suggestMetabolites } from "./core/met
 import { DEMOS, demoById, runDemo } from "./ui/demos.js";
 import { parseWideTable, splitByPattern, contrast, normaliseByMedian, metaboliteNetwork, observability,
   bottlenecks, pathwayShifts, ratioChanges, permutationNull, deltaDeltaG } from "./core/metcontrast.js";
+import { parseRnaDiffTable, inferRegulatorsMultiOmic } from "./core/reginfer.js";
 import { gprActivity } from "./core/gpr.js";
 import { loadContexts, offGenes, blockedReactions, offGenesOf, ContextIndex, taskName } from "./core/contexts.js";
 import { ModelIndex, fmtFlux, fmtTime, escapeHtml as esc } from "./modelindex.js";
@@ -145,6 +146,8 @@ async function loadModel(slug, opts = {}) {
     S.edits = opts.edits ?? storedEdits(slug);
     $("loadingText").textContent = t("load.solver");
     mtbClear(false);
+    regClear(false);
+    updateRegButton();
     rebuildModel();
     S.supplies = []; S.events = [];
     loadMedium(storedMediumId(), false);
@@ -664,6 +667,19 @@ function focusScene(center) {
 /** Everything a demo is allowed to do, each one the function a click would reach. */
 function demoApi() {
   const settle = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+  const DLG_IDS = { exo: "exoDialog", mtb: "mtbDialog", reg: "regDialog", rna: "rnaDialog" };
+  const closeAllDialogs = () => { for (const id of Object.values(DLG_IDS)) if ($(id)?.open) $(id).close(); };
+  // Non-destructive modal switcher for tour Back/Next: re-opens the already-populated dialog without clearing results.
+  const onStep = async (step) => {
+    if (step.open === undefined) return;
+    if (!step.open) { closeAllDialogs(); await settle(); return; }
+    const targetId = DLG_IDS[step.open];
+    if (!targetId) return;
+    for (const [k, id] of Object.entries(DLG_IDS)) if (k !== step.open && $(id)?.open) $(id).close();
+    const dlg = $(targetId);
+    if (dlg && !dlg.open) dlg.showModal();
+    await settle();
+  };
   let lastScId = null;
   return {
     note: (msg) => console.warn(msg),
@@ -684,6 +700,21 @@ function demoApi() {
       renderPerturb(); await settle();
     },
     clearPerturb: async () => { S.perturb = []; renderPerturb(); renderMeasured(); await settle(); },
+    tracer: async (id) => { await applyLibraryTracer(id); await settle(); },
+    setConc: async (name, conc) => {
+      const low = String(name).toLowerCase();
+      const it = S.supplies.find((s) => S.model.bases[S.model.mets[s.met].b].n.toLowerCase() === low);
+      if (it) { it.conc = +conc; it.unlimited = false; renderSupplies(); }
+      await settle();
+    },
+    selectMet: async (name) => {
+      const low = String(name).toLowerCase();
+      // Prefer mitochondrial pool when available (e.g. citrate[m] in TCA tracing), else cytosolic or first match
+      const cand = S.model.mets.map((m, i) => [i, m]).filter(([, m]) => !m.removed && S.model.bases[m.b].n.toLowerCase() === low);
+      const pick = cand.find(([, m]) => m.c === "m") || cand.find(([, m]) => m.c === "c") || cand[0];
+      if (pick) { S.sel = { type: "met", met: pick[0] }; renderDetails(); }
+      await settle();
+    },
     run: async () => { await run(); },
     saveScenario: async (name) => {
       let nm = name || "WT";
@@ -700,18 +731,35 @@ function demoApi() {
       if (target !== undefined) compare.setCompare(target);
       await settle();
     },
-    open: async (which) => { (which === "exo" ? openExoDialog : openMtbDialog)(); await settle(); },
+    open: async (which) => {
+      const fn = which === "exo" ? openExoDialog : which === "reg" ? openRegDialog : which === "rna" ? openRnaDialog : openMtbDialog;
+      await fn(); await settle();
+    },
+    closeDialogs: async () => { closeAllDialogs(); await settle(); },
     fill: async (id, value) => { const el = $(id); if (el) { el.value = value; el.dispatchEvent(new Event("input", { bubbles: true })); } await settle(); },
     click: async (id) => { const el = $(id); if (el) el.click(); await settle(); await settle(); },
-    tour: (steps) => startTour(steps, { task: setTask }),
+    loadRnaText: async (text, name) => { readRnaText(text, name || "sample.tsv"); await settle(); },
+    setOverlay: async (on) => {
+      const cb = $("mtbOverlay");
+      if (cb) { cb.checked = !!on; cb.dispatchEvent(new Event("change", { bubbles: true })); }
+      await settle();
+    },
+    markTopTf: async () => {
+      const top = REG.result?.tfs.find((x) => x.metRxns?.size);
+      if (top) regMarkTf(top.tf);
+      await settle();
+    },
+    tour: (steps) => startTour(steps, { task: setTask, onStep }),
   };
 }
 
-/** The picker: one line per example, with the work its data comes from. */
+/** The picker: one line per example, linked to its corresponding section in docs.html. */
 function openDemoDialog() {
   const list = $("demoList");
-  list.innerHTML = DEMOS.map((d) => `<div class="demo-row"><button type="button" class="link" data-demo="${esc(d.id)}">${esc(t(`demo.${d.id}.title`))}</button>`
-    + `<p class="hint">${esc(t(`demo.${d.id}.what`))}</p><p class="hint cite">${esc(d.cite)}</p></div>`).join("");
+  const dl = docsLang();
+  list.innerHTML = DEMOS.map((d) => `<div class="demo-row"><div class="row"><button type="button" class="link" data-demo="${esc(d.id)}">${esc(t(`demo.${d.id}.title`))}</button>`
+    + (d.docs ? `<span class="spacer"></span><a class="link" href="docs.html?lang=${dl}#${dl}-${esc(d.docs)}" target="_blank" rel="noopener">${esc(t("obj.help"))}</a>` : "")
+    + `</div><p class="hint">${esc(t(`demo.${d.id}.what`))}</p><p class="hint cite">${esc(d.cite)}</p></div>`).join("");
   list.querySelectorAll("[data-demo]").forEach((b) => {
     b.onclick = async () => {
       const d = demoById(b.dataset.demo);
@@ -763,6 +811,9 @@ function mtbClear(redraw = true) {
   if ($("mtbOverlay")) $("mtbOverlay").checked = false;
   if ($("mtbOverlayWrap")) $("mtbOverlayWrap").hidden = true;
   if ($("mtbNote")) $("mtbNote").textContent = "";
+  if ($("mtbText")) $("mtbText").value = "";
+  if ($("mtbOut")) { $("mtbOut").hidden = true; $("mtbOut").textContent = ""; }
+  if (redraw && REG.rnaMap) regRun();
   if (redraw) { applyFrame(); renderDetails(); }
 }
 
@@ -925,6 +976,7 @@ async function mtbRun() {
   if ($("mtbOverlayWrap")) $("mtbOverlayWrap").hidden = false;
   mtbRender();
   mtbRenderUnmapped(unresolved);
+  if (REG.rnaMap) await regRun();
   applyFrame();
   renderDetails();
 }
@@ -956,7 +1008,12 @@ function mtbRender() {
         + steps.slice(0, 8).map((b) => {
             const ddg = deltaDeltaG(S.model, b.rxn, fcByBase, { direction: b.direction });
             const ddgTxt = ddg ? ` · ${t(ddg.partial ? "mtb.ddgPartial" : "mtb.ddg", { x: (ddg.ddg > 0 ? "+" : "") + ddg.ddg.toFixed(1), m: ddg.measured, n: ddg.total })}` : "";
-            return `<div class="mtb-step"><span class="linkish" data-mtbrxn="${b.rxn}">${esc(b.name)}</span>`
+            const cls = REG.result?.classifiedSteps?.find((x) => x.rxn === b.rxn);
+            const mechBadge = cls?.mechanism === "transcriptional"
+              ? `<span class="reg-tag tx">${t("reg.mechTx")}</span>`
+              : cls?.mechanism === "postTranscriptional"
+                ? `<span class="reg-tag ptx">${t("reg.mechPtx")}</span>` : "";
+            return `<div class="mtb-step"><span class="linkish" data-mtbrxn="${b.rxn}">${esc(b.name)}</span>${mechBadge}`
               + `<span class="meta">${esc(b.ss)} · ${t("mtb.stepScore", { s: b.score.toFixed(2) })} · ${t("mtb.stepSides", {
                   sub: esc(b.measured.sub.map(name).join(", ")), up: b.subUp.toFixed(2),
                   prod: esc(b.measured.prod.map(name).join(", ")), down: b.prodDown.toFixed(2) })}${ddgTxt}`
@@ -965,6 +1022,7 @@ function mtbRender() {
               + `<div class="mtb-step-acts"><button type="button" class="link" data-mtbopen="${b.rxn}">${t("mtb.openPath")}</button><button type="button" class="link" data-mtbtest="${b.rxn}">${t("mtb.testBlock")}</button></div></div>`;
           }).join("")
         + `</div>` + (perm ? `<p class="hint${perm.p > 0.05 ? " warn" : ""}">${t("mtb.perm", { p: perm.p.toFixed(3), better: perm.better, rounds: perm.rounds })}</p>` : "")
+        + (REG_MODELS.has(S.slug) ? `<p class="hint"><button type="button" class="link" id="mtbCrossRna">${t("mtb.crossRna")}</button></p>` : "")
         + `</details>` : `<p class="hint">${t("mtb.noSteps")}</p>`)
     + (shifts.length ? `<details class="scr-group"><summary>${t("mtb.classes")}</summary><div class="scr-list">`
         + shifts.slice(0, 6).map((p) => `<div class="mtb-row"><span title="${esc(p.ss)}">${esc(p.ss)}</span>`
@@ -995,6 +1053,8 @@ function mtbRender() {
   $("mtbOut").querySelectorAll("[data-mtbtest]").forEach((el) => {
     el.onclick = () => mtbTestBlock(+el.dataset.mtbtest);
   });
+  const cross = $("mtbCrossRna");
+  if (cross) cross.onclick = () => { $("mtbDialog").close(); openRegDialog(); };
   $("mtbNote").textContent = t("mtb.loaded", { n: rows.length, sig });
 }
 
@@ -1021,6 +1081,234 @@ function mtbRenderUnmapped(rows) {
       mtbRun();
     };
   });
+}
+
+// ------------------------------------------------ regulatory network inference ----
+// Signed TF activity via ULM (js/core/reginfer.js) from user differential RNA-seq (A vs B), optionally
+// combined with intracellular metabolomics for 3-step causal chains and bottleneck mechanism classification.
+// Validated on E. coli single & double TF knockouts (GSE153906 / GSE195954); metabolomics-only TF inference
+// is intentionally omitted because whole-sample permutation testing showed it is underpowered.
+
+const REG_MODELS = new Set(["human-gem", "mouse-gem", "ecoli-gem"]);
+const REG = { data: null, slug: null, rnaMap: null, result: null, markedTf: null, markedRxns: null };
+
+function updateRegButton() {
+  const btn = $("regOpen");
+  if (!btn) return;
+  const ok = REG_MODELS.has(S.slug);
+  btn.disabled = !ok;
+  btn.title = ok ? t("reg.openTitle") : t("reg.noModel");
+}
+
+async function loadRegulons() {
+  if (REG.data && REG.slug === S.slug) return REG.data;
+  if (!REG_MODELS.has(S.slug)) return null;
+  const r = await fetch(`data/${S.slug}/regulons.json`);
+  if (!r.ok) return null;
+  REG.data = await r.json();
+  REG.slug = S.slug;
+  return REG.data;
+}
+
+function regClear(redraw = true) {
+  REG.rnaMap = null; REG.result = null; REG.markedTf = null; REG.markedRxns = null;
+  if ($("regBar")) $("regBar").hidden = true;
+  if ($("regNote")) $("regNote").textContent = "";
+  if ($("regMarkTxt")) $("regMarkTxt").textContent = "";
+  if ($("regText")) $("regText").value = "";
+  if ($("regOut")) { $("regOut").hidden = true; $("regOut").textContent = ""; }
+  if (map && S.sel?.type !== "gene") map.marks = null;
+  if (MTB.result) mtbRender();
+  if (redraw) { applyFrame(); renderDetails(); }
+}
+
+async function openRegDialog() {
+  if (!REG_MODELS.has(S.slug)) return;
+  if (!REG.result) {
+    $("regFile").value = "";
+    $("regText").value = "";
+    $("regOut").hidden = true; $("regOut").textContent = ""; $("regStatus").textContent = "";
+  }
+  $("regMeta").textContent = t("reg.loading");
+  $("regDialog").showModal();
+  const data = await loadRegulons();
+  if (!data) { $("regMeta").textContent = t("reg.noModel"); return; }
+  $("regMeta").textContent = t("reg.meta", { src: data.meta.source, n: data.meta.nTFs });
+  // If metabolomics state changed since the last run, re-run automatically to refresh concordance
+  if (REG.rnaMap && (!REG.result || REG.result.hasMet !== !!MTB.result)) await regRun();
+  else if (REG.result) { $("regOut").hidden = false; regRender(); }
+}
+
+async function regRun() {
+  const text = $("regText").value.trim();
+  const status = $("regStatus"), out = $("regOut");
+  if (!text) { status.textContent = t("reg.errEmpty"); return; }
+  const parsed = parseRnaDiffTable(text);
+  if (parsed.map.size < 20) {
+    out.hidden = true;
+    status.innerHTML = `<span class="err">${t("reg.errFew", { n: parsed.map.size })}</span>`;
+    return;
+  }
+  const data = await loadRegulons();
+  if (!data) { status.innerHTML = `<span class="err">${t("reg.noModel")}</span>`; return; }
+  status.textContent = "";
+  const ctx = currentContext();
+  const offSet = ctx && S.base?.model?.genes ? new Set([...offGenes(ctx, S.base.model.genes)].map((g) => g.toLowerCase())) : null;
+  const hasMtb = !!MTB.result;
+  if (hasMtb) MTB.net ??= metaboliteNetwork(S.model, S.layout);
+  const res = inferRegulatorsMultiOmic(
+    S.model,
+    hasMtb ? MTB.net : null,
+    data,
+    hasMtb ? MTB.result.fcByBase : null,
+    hasMtb ? MTB.result.qByBase : null,
+    parsed.map,
+    {
+      thermo: S.base?.thermo?.rxns || null,
+      flux: frame()?.v || null,
+      offGenes: offSet,
+      bottleneckSteps: hasMtb ? MTB.result.steps.slice(0, 12) : [],
+    },
+  );
+  REG.rnaMap = parsed.map;
+  REG.result = res;
+  out.hidden = false;
+  regRender();
+  if (MTB.result) mtbRender();
+}
+
+function regMarkTf(tfName) {
+  const entry = REG.result?.tfs.find((x) => x.tf === tfName);
+  if (!entry || !entry.metRxns?.size) return;
+  REG.markedTf = entry.tf;
+  REG.markedRxns = entry.metRxns;
+  $("regMarkTxt").textContent = t("reg.marked", { tf: entry.tf, n: entry.metRxns.size });
+  $("regBar").hidden = false;
+  $("regDialog").close();
+  // Jump to the pathway containing the most regulated reactions if we are in global view
+  if (S.view.kind === "global") {
+    const counts = new Map();
+    for (const j of entry.metRxns) {
+      const ss = S.model.rxns[j]?.ss;
+      if (ss >= 0 && drawable(ss)) counts.set(ss, (counts.get(ss) || 0) + 1);
+    }
+    const best = [...counts].sort((a, b) => b[1] - a[1])[0];
+    if (best) openSubsystem(best[0], true);
+  }
+  S.sel = null;
+  map.marks = REG.markedRxns;
+  applyFrame();
+  renderDetails();
+}
+
+async function regTestTf(tfName) {
+  const entry = REG.result?.tfs.find((x) => x.tf === tfName);
+  if (!entry) return;
+  // Map concordantly downregulated metabolic target genes to canonical model gene refs
+  const symToRef = new Map();
+  for (const g of S.model.genes) {
+    const ref = g[1] || g[0];
+    if (g[1]) symToRef.set(g[1].toLowerCase(), ref);
+    if (g[0] && !symToRef.has(g[0].toLowerCase())) symToRef.set(g[0].toLowerCase(), ref);
+  }
+  const downs = entry.metGenes
+    .filter((mg) => mg.log2fc <= -0.35 && symToRef.has(mg.gene.toLowerCase()))
+    .sort((a, b) => a.log2fc - b.log2fc)
+    .slice(0, 8);
+  if (!downs.length) return;
+  $("regDialog").close();
+  if (S.stale || !S.result) { await run(); if (S.stale || !S.result) return; }
+  let baseId = S.compare;
+  if (!baseId) {
+    let nm = t("mtb.baseline");
+    if (S.scenarios.some((x) => x.name === nm)) {
+      let k = 2; while (S.scenarios.some((x) => x.name === `${nm} ${k}`)) k++;
+      nm = `${nm} ${k}`;
+    }
+    const sc = compare.save(nm);
+    if (sc) baseId = sc.id;
+  }
+  for (const mg of downs) {
+    const ref = symToRef.get(mg.gene.toLowerCase());
+    // Convert mRNA fold change into fractional activity cap (full KO if <= -2 log2FC)
+    const a = mg.log2fc <= -2 ? 0 : Math.max(0.05, Math.min(0.5, Number(Math.pow(2, mg.log2fc).toFixed(2))));
+    const ex = S.perturb.find((p) => p.type === "gene" && p.ref === ref);
+    if (ex) ex.a = Math.min(ex.a, a); else S.perturb.push({ type: "gene", ref, a });
+  }
+  renderPerturb(); renderMeasured();
+  await run();
+  if (baseId) compare.setCompare(baseId);
+  REG.markedTf = entry.tf;
+  REG.markedRxns = entry.metRxns;
+  $("regMarkTxt").textContent = t("reg.marked", { tf: entry.tf, n: entry.metRxns.size });
+  $("regBar").hidden = false;
+  map.marks = REG.markedRxns;
+  setTask("cmp");
+  applyFrame();
+  renderDetails();
+}
+
+function regRender() {
+  const res = REG.result;
+  if (!res) return;
+  const fmtq = (q) => (q < 1e-4 ? q.toExponential(1) : q.toFixed(3));
+  const sig = res.tfs.filter((x) => x.qRna < 0.05).length;
+  const top = res.tfs.slice(0, 14);
+  const symSet = new Set(S.model.genes.flatMap((g) => [g[0]?.toLowerCase(), g[1]?.toLowerCase()]).filter(Boolean));
+
+  const tfHtml = top.map((x) => {
+    const up = x.combinedScore >= 0;
+    const arrow = `<span class="reg-dir ${up ? "up" : "down"}">${up ? "↑" : "↓"}</span>`;
+    const sample = x.metGenes.slice(0, 4).map((g) => `${esc(g.gene)}(${g.log2fc > 0 ? "+" : ""}${g.log2fc.toFixed(1)})`).join(", ");
+    const chainTxt = res.hasMet && x.concordant.length
+      ? ` · <b>${t("reg.chains", { n: x.concordant.length })}</b>` : "";
+    const hasDown = x.metGenes.some((g) => g.log2fc <= -0.35 && symSet.has(g.gene.toLowerCase()));
+    return `<div class="mtb-step">${arrow}<b>${esc(x.tf)}</b>`
+      + ` <span class="val">t = ${x.zRna > 0 ? "+" : ""}${x.zRna.toFixed(2)}</span>`
+      + ` <span class="q">q ${fmtq(x.qRna)}</span>`
+      + `<span class="meta">${t("reg.tfMeta", { obs: x.nObsRna, tot: x.nTotalRna, met: x.metGenes.length, rxns: x.metRxns.size })}${chainTxt}`
+      + (sample ? `<br>${t("reg.topMet")}: ${sample}` : "") + `</span>`
+      + `<div class="mtb-step-acts">`
+      + (x.metRxns.size ? `<button type="button" class="link" data-regmark="${esc(x.tf)}">${t("reg.markMap")}</button>` : "")
+      + (hasDown ? `<button type="button" class="link" data-regtest="${esc(x.tf)}">${t("reg.testKd")}</button>` : "")
+      + `</div></div>`;
+  }).join("");
+
+  const mechHtml = res.hasMet && res.classifiedSteps.length
+    ? `<details class="scr-group" open><summary>${t("reg.mechTitle")} (${res.classifiedSteps.length})</summary><div class="scr-list">`
+      + res.classifiedSteps.slice(0, 8).map((s) => {
+          const tagCls = s.mechanism === "transcriptional" ? "tx" : s.mechanism === "postTranscriptional" ? "ptx" : "";
+          const tagKey = s.mechanism === "transcriptional" ? "reg.mechTx" : s.mechanism === "postTranscriptional" ? "reg.mechPtx" : "reg.mechUnk";
+          const gTxt = s.rnaGenes.slice(0, 3).map((g) => `${esc(g.gene)} (${g.log2fc > 0 ? "+" : ""}${g.log2fc.toFixed(2)})`).join(", ");
+          const tfList = [...new Set(s.rnaGenes.flatMap((g) => g.tfs.map((u) => u.tf)))].slice(0, 4).join(", ");
+          return `<div class="mtb-step"><span class="linkish" data-regrxn="${s.rxn}">${esc(s.name)}</span>`
+            + `<span class="reg-tag ${tagCls}">${t(tagKey)}</span>`
+            + `<span class="meta">${gTxt || t("reg.noRnaGene")}${tfList ? ` · TFs: ${esc(tfList)}` : ""}</span></div>`;
+        }).join("") + `</div></details>`
+    : "";
+
+  $("regOut").innerHTML =
+    `<div class="note">${t("reg.summary", { g: res.nRnaGenes, n: res.tfs.length, sig })} `
+    + `${res.hasMet ? t("reg.linkedMet", { rxns: res.nObservableRxns }) : t("reg.rnaOnlyNote")}</div>`
+    + (top.length
+      ? `<details class="scr-group" open><summary>${t("reg.topTfs")} (${sig})</summary><div class="scr-list">${tfHtml}</div></details>`
+      : `<p class="hint">${t("reg.noTfs")}</p>`)
+    + mechHtml;
+
+  $("regOut").querySelectorAll("[data-regmark]").forEach((b) => { b.onclick = () => regMarkTf(b.dataset.regmark); });
+  $("regOut").querySelectorAll("[data-regtest]").forEach((b) => { b.onclick = () => regTestTf(b.dataset.regtest); });
+  $("regOut").querySelectorAll("[data-regrxn]").forEach((el) => {
+    el.onclick = () => {
+      const j = +el.dataset.regrxn;
+      $("regDialog").close();
+      openSubsystem(S.model.rxns[j].ss, true);
+      S.sel = { type: "rxn", rxn: j };
+      const ni = map.findNode(1, j);
+      if (ni >= 0) map.focusNode(ni);
+      renderDetails();
+    };
+  });
+  $("regNote").textContent = t("reg.loaded", { n: res.tfs.length, sig });
 }
 
 // ---------------------------------------------------------- exometabolomics ----
@@ -1985,12 +2273,11 @@ function geneMatcher() {
   return (id) => m.get(String(id).toUpperCase().replace(/^(ENS[A-Z]*G\d+)\.\d+$/, "$1"));
 }
 
-async function readRnaFile(file) {
-  if (!file) return;
+function readRnaText(text, name = "expression.tsv") {
   $("rnaStatus").textContent = "";
   try {
-    const tbl = parseExpressionTable(await file.text());
-    RNA.table = tbl; RNA.file = file.name;
+    const tbl = parseExpressionTable(text);
+    RNA.table = tbl; RNA.file = name;
     const match = geneMatcher();
     const hits = tbl.names.map((_, k) => tbl.body.slice(0, 2000).filter((r) => match(r[k] ?? "")).length);
     const idCol = hits.indexOf(Math.max(...hits));
@@ -2001,10 +2288,14 @@ async function readRnaFile(file) {
     fill($("rnaValCol"), [...numCols, ...(numCols.length > 1 ? [["mean", t("rna.meanCols", { n: numCols.length })]] : [])], numCols[0][0]);
     const looksLog = numCols.every(([k]) => tbl.body.slice(0, 2000).every((r) => !num0(r[k]) || +r[k] < 25));
     $("rnaLog").checked = looksLog;
-    $("rnaName").value = file.name.replace(/\.[^.]+$/, "").slice(0, 60);
+    $("rnaName").value = name.replace(/\.[^.]+$/, "").slice(0, 60);
     $("rnaParsed").hidden = false;
     rnaPreview();
   } catch (err) { RNA.table = null; $("rnaParsed").hidden = true; $("rnaBuild").disabled = true; $("rnaStatus").innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+}
+async function readRnaFile(file) {
+  if (!file) return;
+  readRnaText(await file.text(), file.name);
 }
 const num0 = (x) => x !== undefined && x !== "" && Number.isFinite(+x);
 
@@ -3594,7 +3885,7 @@ function geneHtml(ref) {
 function renderDetails() {
   const box = $("details"), sel = S.sel;
   if (!S.model) return;
-  map.marks = sel?.type === "gene" ? new Set(S.search.geneRxns.get(sel.sym) || []) : null;
+  map.marks = sel?.type === "gene" ? new Set(S.search.geneRxns.get(sel.sym) || []) : (REG.markedRxns || null);
   box.innerHTML = !sel ? summaryHtml() : sel.type === "met" ? metHtml(sel.met) : sel.type === "rxn" ? rxnHtml(sel.rxn) : sel.type === "sub" ? subHtml(sel.ss) : sel.type === "grp" ? grpHtml(sel.g) : geneHtml(sel.sym);
   if (sel) {
     const back = document.createElement("div");
@@ -3863,7 +4154,10 @@ function changeLanguage(lang) {
   design.reset(); renderTracerLib();
   renderContext(); renderMediumSel(); renderSupplies(); renderMeasured(); renderPerturb(); renderEvents(); renderObjective(); renderSecondary(); renderCrumbs(); applyFrame(); renderDetails();
   editor.render(); compare.render(); renderEditBadge();
+  updateRegButton();
   if (MTB.result) mtbRender();
+  if (REG.result) regRender();
+  if (REG.markedTf && $("regMarkTxt")) $("regMarkTxt").textContent = t("reg.marked", { tf: REG.markedTf, n: REG.markedRxns?.size || 0 });
   if (S.statusFn) setStatus(S.statusFn, S.statusErr, S.statusKind);
   if ($("runBtn").classList.contains("running")) $("runBtn").textContent = t("h.running");
 }
@@ -3879,6 +4173,10 @@ function bindUi() {
   $("mtbClear").onclick = () => mtbClear(true);
   $("mtbFile").onchange = (ev) => { const f = ev.target.files[0]; if (f) f.text().then((x) => { $("mtbText").value = x; mtbRun(); }); };
   $("mtbRun").onclick = mtbRun;
+  $("regOpen").onclick = openRegDialog;
+  $("regClear").onclick = () => regClear(true);
+  $("regFile").onchange = (ev) => { const f = ev.target.files[0]; if (f) f.text().then((x) => { $("regText").value = x; regRun(); }); };
+  $("regRun").onclick = regRun;
   $("exoOpen").onclick = openExoDialog;
   $("exoFile").onchange = (ev) => { const f = ev.target.files[0]; if (f) f.text().then((x) => { $("exoText").value = x; exoParse(); }); };
   $("exoParse").onclick = exoParse;

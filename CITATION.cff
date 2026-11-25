@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use MetfluxLive, please cite it as below."
 title: "MetfluxLive: interactive genome-scale flux balance analysis and isotope-tracing simulation in the web browser"
 type: software
-version: "1.0"
-date-released: "2026-11-19"
+version: "1.2"
+date-released: "2026-11-25"
 authors:
   - family-names: "Fernández-García"
     given-names: "Jonatan"
@@ -17,3 +17,7 @@ keywords:
   - isotope tracing
   - atom mapping
   - mass isotopologue distribution
+  - exometabolomics
+  - metabolomics
+  - transcription factor activity
+  - synthetic lethality

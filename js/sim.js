@@ -50,7 +50,7 @@ export class Simulator {
       const conc = concOverride?.get(it.met) ?? it.conc;
       if (this.exchanges.has(it.met)) medium.push({ ...it, conc });
       else if (conc > 0) {
-        sources.push({ met: it.met, max: it.unlimited ? UNLIMITED : uptakeCapacity(conc, it.vmax, it.km) });
+        sources.push({ met: it.met, max: it.unlimited ? UNLIMITED : uptakeCapacity(conc, it.vmax, it.km), min: it.min || 0 });
         srcItems.push(it);
       }
     }

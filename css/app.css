@@ -434,6 +434,16 @@ dialog.editor input[type=number] { width: 100%; text-align: left; }
 .mtb-step .warn { color: var(--hot); }
 .mtb-step-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 3px; font-size: 11.5px; }
 #mtbOverlayWrap { justify-content: space-between; align-items: center; margin-top: 4px; }
+#secRna .stack { display: flex; flex-direction: column; gap: 6px; }
+#regBar { justify-content: space-between; align-items: center; margin-top: 4px; gap: 8px; }
+#regDialog textarea { width: 100%; font: 11.5px/1.45 var(--mono, ui-monospace, monospace); resize: vertical; }
+#regOut { max-height: 360px; overflow: auto; margin: 6px 0; }
+.reg-dir { display: inline-block; font-weight: 700; margin-right: 4px; }
+.reg-dir.up { color: var(--hot); }
+.reg-dir.down { color: var(--accent); }
+.reg-tag { display: inline-block; font-size: 10.5px; padding: 1px 5px; border-radius: 3px; background: var(--panel2); color: var(--muted); margin-left: 5px; }
+.reg-tag.tx { background: rgba(76, 201, 240, 0.18); color: var(--accent); }
+.reg-tag.ptx { background: rgba(255, 190, 60, 0.18); color: var(--hot); }
 .exo-row .via { font-size: 10px; padding: 1px 4px; border-radius: 3px; background: var(--panel2); color: var(--muted); margin-left: 5px; cursor: help; }
 .exo-row .via.weak { background: var(--hot); color: var(--bg); }
 #exoFit .bad { color: var(--danger); }

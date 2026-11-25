@@ -1,6 +1,6 @@
 # MetfluxLive
 
-**[English](#english)** · **[Español](#español)**
+**[English](#english)** · **[Español](#español)** · **[Changelog (v1.2)](CHANGELOG.md)**
 
 ---
 
@@ -53,6 +53,36 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
   each metabolite (shadow prices), the ATP/NADH/NADPH balance by pathway, phase planes of a nutrient, flux ranges
   (FVA) of a reaction and of a whole pathway (cycle-free, with "what can replace it"), an essential-gene screen,
   and a comparator of two cell types in the catalogue. Docs › Flux balance analysis.
+- **Three task tabs (*Simulate · Compare · Interpret*)** — the left panel is organised into three tabs:
+  *Simulate* (medium, cell type, knockouts, tracers, model edits), *Compare* (saved scenarios, A→B flux map,
+  conditional nutrient auxotrophy screen, and conditional gene essentiality / synthetic lethality screen), and
+  *Interpret* (exometabolomics uptake/secretion fitter, intracellular metabolomics contrast, and transcription-factor
+  regulatory inference).
+- **Exometabolomics importer (*Interpret*)** — paste or drop a spent-medium concentration time course (with cell
+  counts or OD600) to compute specific uptake/secretion rates (mmol/gDW/h), growth rate, respiratory quotient,
+  and carbon/nitrogen closure, fit them to the GEM via L1 LP consistency check (`js/core/fitexchange.js`), and
+  apply the measured rates directly to the simulation. Docs › Measured values.
+- **Intracellular metabolomics (*Interpret*)** — paste a wide metabolite abundance table (metabolites × samples,
+  with group labels or regex split) to compute Welch t-tests, BH FDR, diagnostic redox/energy ratios, reaction-level
+  substrate/product bottleneck signals with non-parametric sample-permutation null checks, reaction $\Delta(\Delta G')$
+  shifts, a live map overlay (metabolite log2FC fill, $q < 0.05$ halo, unobservable reactions and candidate bottlenecks),
+  and one-click "Test block in model" perturbations. Docs › Intracellular metabolomics.
+- **Regulators from differential RNA-seq (*Interpret*)** — paste a differential expression table (gene + log2FC or
+  signed statistic) to score transcription factor (TF) activities using sparse exact Univariate Linear Model (ULM,
+  equivalent to decoupleR; Badia-i-Mompel et al. 2022) against signed regulons bundled for **Human-GEM** (917 TFs,
+  CollecTRI via OmniPath, CC BY-SA 4.0), **Mouse-GEM** (838 TFs, CollecTRI orthology, CC BY-SA 4.0), and
+  **E. coli iML1515** (239 TFs, RegulonDB v14.5.1, academic licence). When paired with intracellular metabolomics,
+  MetfluxLive separates **transcriptional** from **post-transcriptional / allosteric** metabolic bottlenecks, traces
+  3-step `TF → mRNA → metabolite` chains, highlights TF-regulated reactions on the map, and tests TF-driven enzyme
+  scaling directly in FBA. Docs › Regulatory hypotheses.
+- **Worked examples (*Examples*)** — six reproducible guided experiments built directly from published data and
+  aligned with each analysis workflow in the Docs, each with its own step-by-step walkthrough (where to enter data,
+  required table format, and tour of the results): (1) `SDHB` knockout, A→B comparison and conditional screens
+  (Cardaci et al. 2015), (2) `[U-13C6]glucose` normoxia vs. hypoxia isotope tracing and paired citrate MIDs,
+  (3) HEK293 spent-medium exometabolomics fitting (Dietmair et al. 2012), (4) HEK293 producer vs. non-producer
+  intracellular metabolomics contrast, Δ(ΔG′) and map overlay (Dietmair et al. 2012), (5) custom cell-type context
+  from HCT116 RNA-seq TPM (DepMap 26Q3), and (6) *E. coli* `ΔarcA` vs. WT differential RNA-seq TF inference
+  (Pal et al. 2020, GSE153906).
 - **Moving around and appearance** — back/forward (‹ ›, Alt+←/→), reactions of other pathways around a selected
   metabolite, a map centred on any metabolite or reaction (right-click menu, or "adaptive" on click), and an
   Appearance dialog (backgrounds, accent, flux colour, colour scales, colour-blind safe compartments).
@@ -130,28 +160,34 @@ js/core/                     FBA/pFBA (fba.js), medium (medium.js), isotope trac
 js/core/isotopologues.js     isotopologue distributions (Monte-Carlo over atom maps)
 js/core/measured.js          measured exchange fluxes (NCI-60, HEK293, fibroblasts, liver) and ATP maintenance
 js/core/contexts.js          cell-type contexts: genes off, blocked reactions, search
+js/core/exodata.js, fitexchange.js   spent-medium rate estimation, C/N/RQ balance, LP flux consistency fit
+js/core/metcontrast.js       intracellular metabolomics contrast, permutation null, reaction Δ(ΔG′)
+js/core/reginfer.js          sparse exact ULM TF activity inference and multi-omic bottleneck classification
 js/core/edits.js, chem.js    model edits (apply, validate, layout) and chemistry (SMILES, atom maps via RDKit)
-js/ui/editor.js, compare.js  model editor dialogs; scenarios and comparison
+js/ui/editor.js, compare.js, demos.js  model editor dialogs; scenarios/comparison; worked examples
 js/celllayout.js, js/cascade.js, js/i18n.js   cell and cascade layouts; EN/ES texts
 js/export/                   results download: datasets, SVG charts, zip writer
-docs.html                    documentation (EN/ES)
+docs.html, docs/             documentation in 7 languages
 vendor/highs/                HiGHS LP solver compiled to WebAssembly (MIT)
 vendor/rdkit/                RDKit MinimalLib 2026.03.6, WebAssembly (BSD-3), used only by the model editor
-data/<model>/                model.json, structures.json, atommaps.json, layout.json, thermo.json, contexts.json
+data/<model>/                model.json, structures.json, atommaps.json, layout.json, thermo.json, contexts.json, regulons.json
 ```
 
 The preprocessing, testing and validation scripts used to generate the files in `data/` are not part of the web
 application and live in a separate repository: **[MetfluxTools](https://github.com/JonatanFernandez/MetfluxTools)**.
 
-**Licence of the cell-type data.** `data/human-gem/contexts.json` is derived from the Human Protein Atlas
+**Licence of the cell-type and regulatory data.** `data/human-gem/contexts.json` is derived from the Human Protein Atlas
 (version 26.0, CC BY-SA 4.0) and is distributed under
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), with attribution to the Human Protein Atlas;
 its cell line descriptions come from Cellosaurus 57.0 (CC BY 4.0). `data/mouse-gem/contexts.json` is derived
-from Bgee 15.2 and is CC0. The licence is also written inside each file (`meta.license`).
+from Bgee 15.2 and is CC0. `data/human-gem/regulons.json` and `data/mouse-gem/regulons.json` are derived from
+CollecTRI (Müller-Dott et al. 2023) via OmniPath and distributed under CC BY-SA 4.0.
+`data/ecoli-gem/regulons.json` is derived from RegulonDB v14.5.1 (Salgado et al. 2023, CCG-UNAM; academic licence).
+The licence is also written inside each file (`meta.license`).
 `data/tasks/metabolicTasks_Essential.txt` is copied unchanged from Human-GEM 2.1.1 (CC BY 4.0, Robinson et al. 2020);
 it is used to build cell types from the user's RNA-seq data in the browser.
 
-To share or host the app you only need `index.html`, `docs.html`, `docs/`, `css/`, `js/`, `vendor/` and `data/` (about 72 MB, 7 MB of it RDKit).
+To share or host the app you only need `index.html`, `docs.html`, `docs/`, `css/`, `js/`, `vendor/` and `data/` (about 73 MB, 7 MB of it RDKit).
 Python is used only for preprocessing, never at run time.
 
 ### Rebuilding the data or adding another model
@@ -298,6 +334,8 @@ The files in `data/` are derived from public resources and keep their licences:
 - iML1515: as distributed by [BiGG Models](http://bigg.ucsd.edu) (University of California terms;
   commercial use may need their permission);
 - human cell-type contexts: CC BY-SA 4.0 (Human Protein Atlas); other animal contexts: CC0 (Bgee);
+- signed TF regulons: human and mouse derived from CollecTRI (Müller-Dott et al. 2023) via OmniPath (CC BY-SA 4.0);
+  *E. coli* derived from RegulonDB v14.5.1 (Salgado et al. 2023, CCG-UNAM; academic licence);
 - metabolite structures from MetaNetX/MNXref: CC BY 4.0, used only when their source is ChEBI, SwissLipids
   or LIPID MAPS (CC BY 4.0).
 
@@ -357,6 +395,39 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
   metabolito (precios sombra), el balance de ATP/NADH/NADPH por ruta, planos de fase de un nutriente, rangos de
   flujo (FVA) de una reacción y de una ruta entera (sin ciclos, con «qué puede sustituirla»), un cribado de
   genes esenciales y un comparador de dos tipos celulares en el catálogo. Docs › Análisis de balance de flujos.
+- **Tres pestañas de trabajo (*Simular · Comparar · Interpretar*)** — el panel izquierdo se organiza en tres
+  pestañas: *Simular* (medio, tipo celular, knockouts, trazadores, ediciones del modelo), *Comparar* (escenarios
+  guardados, mapa de cambio A→B, cribado condicional de auxotrofías por nutrientes y cribado condicional de
+  esencialidad / letalidad sintética), e *Interpretar* (ajuste de exometabolómica, contraste de metabolómica
+  intracelular e inferencia regulatoria de factores de transcripción).
+- **Importador de exometabolómica (*Interpretar*)** — pega o arrastra una serie temporal de concentraciones en
+  medio gastado (con recuento celular u OD600) para calcular tasas específicas de captación/excreción
+  (mmol/gDW/h), tasa de crecimiento, cociente respiratorio y cierre de carbono/nitrógeno, comprobar su
+  consistencia con el modelo mediante un ajuste LP L1 (`js/core/fitexchange.js`) y aplicar las tasas medidas
+  directamente a la simulación. Docs › Valores medidos.
+- **Metabolómica intracelular (*Interpretar*)** — pega una tabla ancha de abundancias (metabolitos × muestras,
+  con fila de grupo o patrón de división) para calcular pruebas t de Welch, FDR de Benjamini-Hochberg, cocientes
+  diagnósticos de redox/energía, señales de cuello de botella sustrato/producto con prueba nula no paramétrica por
+  permutación de muestras, cambios de $\Delta(\Delta G')$ por reacción, superposición en vivo sobre el mapa
+  (color por log2FC, halo en $q < 0{,}05$, reacciones no observables y cuellos de botella candidatos) y prueba
+  directa en el modelo con «Probar bloqueo en el modelo». Docs › Metabolómica intracelular.
+- **Reguladores a partir de RNA-seq diferencial (*Interpretar*)** — pega una tabla de expresión diferencial
+  (gen + log2FC o estadístico con signo) para puntuar la actividad de factores de transcripción (TF) mediante
+  modelo lineal univariante disperso exacto (ULM, equivalente a decoupleR; Badia-i-Mompel et al. 2022) frente a
+  regulones con signo incluidos para **Human-GEM** (917 TFs, CollecTRI vía OmniPath, CC BY-SA 4.0), **Mouse-GEM**
+  (838 TFs, ortología CollecTRI, CC BY-SA 4.0) y **E. coli iML1515** (239 TFs, RegulonDB v14.5.1, licencia
+  académica). Al combinarse con metabolómica intracelular, MetfluxLive distingue cuellos de botella
+  **transcripcionales** de **postranscripcionales / alostéricos**, traza cadenas de 3 pasos
+  `TF → ARNm → metabolito`, marca las reacciones reguladas en el mapa y prueba en FBA el escalado enzimático
+  impulsado por un TF. Docs › Hipótesis regulatorias.
+- **Ejemplos guiados (*Ejemplos*)** — seis experimentos reproducibles construidos a partir de datos publicados y
+  alineados con cada tipo de análisis de la documentación, cada uno con su propio recorrido paso a paso (dónde
+  pegar los datos, formato exacto de tabla y tour por los resultados): (1) knockout de `SDHB`, comparación A→B y
+  cribados condicionales (Cardaci et al. 2015), (2) trazado isotópico con `[U-13C6]glucosa` en normoxia frente a
+  hipoxia y barras pareadas de citrato, (3) ajuste de exometabolómica en medio gastado de HEK293 (Dietmair et al.
+  2012), (4) contraste de metabolómica intracelular en HEK293 productora frente a parental, Δ(ΔG′) y capa en el mapa
+  (Dietmair et al. 2012), (5) tipo celular propio desde RNA-seq TPM de HCT116 (DepMap 26Q3), y (6) inferencia de
+  reguladores a partir de RNA-seq diferencial en *E. coli* `ΔarcA` frente a WT (Pal et al. 2020, GSE153906).
 - **Navegación y apariencia** — atrás/adelante (‹ ›, Alt+←/→), reacciones de otras rutas alrededor de un
   metabolito seleccionado, mapa centrado en cualquier metabolito o reacción (menú del clic derecho, o
   «adaptable» al hacer clic) y un diálogo de Apariencia (fondos, acento, color del flujo, escalas de color,
@@ -437,28 +508,34 @@ js/core/                     FBA/pFBA (fba.js), medio (medium.js), trazado isot�
 js/core/isotopologues.js     distribuciones de isotopólogos (Monte Carlo sobre los mapas atómicos)
 js/core/measured.js          flujos de intercambio medidos (NCI-60, HEK293, fibroblastos, hígado) y ATP de mantenimiento
 js/core/contexts.js          tipos celulares: genes apagados, reacciones bloqueadas, búsqueda
+js/core/exodata.js, fitexchange.js   tasas en medio gastado, balance C/N/RQ, ajuste LP de consistencia de flujos
+js/core/metcontrast.js       contraste de metabolómica intracelular, prueba nula por permutación, Δ(ΔG′)
+js/core/reginfer.js          inferencia ULM dispersa exacta de TFs y clasificación multiómica de cuellos de botella
 js/core/edits.js, chem.js    ediciones del modelo (aplicar, validar, disposición) y química (SMILES, mapas de átomos con RDKit)
-js/ui/editor.js, compare.js  diálogos del editor del modelo; escenarios y comparación
+js/ui/editor.js, compare.js, demos.js  diálogos del editor del modelo; escenarios/comparación; ejemplos guiados
 js/celllayout.js, js/cascade.js, js/i18n.js   disposición celular y en cascada; textos EN/ES
 js/export/                   descarga de resultados: tablas, gráficas SVG, escritor de zip
-docs.html                    documentación (EN/ES)
+docs.html, docs/             documentación en 7 idiomas
 vendor/highs/                solver LP HiGHS compilado a WebAssembly (MIT)
 vendor/rdkit/                RDKit MinimalLib 2026.03.6, WebAssembly (BSD-3), sólo para el editor del modelo
-data/<modelo>/               model.json, structures.json, atommaps.json, layout.json, thermo.json, contexts.json
+data/<modelo>/               model.json, structures.json, atommaps.json, layout.json, thermo.json, contexts.json, regulons.json
 ```
 
 Los scripts de preprocesado, pruebas y validación usados para generar los ficheros de `data/` no forman parte de la
 aplicación web y están en un repositorio aparte: **[MetfluxTools](https://github.com/JonatanFernandez/MetfluxTools)**.
 
-**Licencia de los datos de tipos celulares.** `data/human-gem/contexts.json` deriva del Human Protein Atlas
+**Licencia de los datos de tipos celulares y regulación.** `data/human-gem/contexts.json` deriva del Human Protein Atlas
 (versión 26.0, CC BY-SA 4.0) y se distribuye bajo
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), con atribución al Human Protein Atlas; la
 descripción de las líneas celulares sale de Cellosaurus 57.0 (CC BY 4.0). `data/mouse-gem/contexts.json`
-deriva de Bgee 15.2 y es CC0. La licencia también va escrita dentro de cada archivo (`meta.license`).
+deriva de Bgee 15.2 y es CC0. `data/human-gem/regulons.json` y `data/mouse-gem/regulons.json` derivan de
+CollecTRI (Müller-Dott et al. 2023) vía OmniPath y se distribuyen bajo CC BY-SA 4.0.
+`data/ecoli-gem/regulons.json` deriva de RegulonDB v14.5.1 (Salgado et al. 2023, CCG-UNAM; licencia académica).
+La licencia también va escrita dentro de cada archivo (`meta.license`).
 `data/tasks/metabolicTasks_Essential.txt` se copia sin cambios de Human-GEM 2.1.1 (CC BY 4.0, Robinson et al. 2020);
 se usa para construir tipos celulares a partir del RNA-seq del usuario en el navegador.
 
-Para compartir o alojar la app basta con `index.html`, `docs.html`, `docs/`, `css/`, `js/`, `vendor/` y `data/` (unos 72 MB, 7 de ellos RDKit).
+Para compartir o alojar la app basta con `index.html`, `docs.html`, `docs/`, `css/`, `js/`, `vendor/` y `data/` (unos 73 MB, 7 de ellos RDKit).
 Python solo se usa en el preprocesado, nunca en ejecución.
 
 ### Regenerar los datos o añadir otro modelo
@@ -607,6 +684,8 @@ Los ficheros de `data/` derivan de recursos públicos y conservan sus licencias:
 - iML1515: tal como lo distribuye [BiGG Models](http://bigg.ucsd.edu) (condiciones de la Universidad de
   California; el uso comercial puede requerir su permiso);
 - contextos de tipos celulares humanos: CC BY-SA 4.0 (Human Protein Atlas); los demás contextos animales: CC0 (Bgee);
+- regulones de TF con signo: humano y ratón derivados de CollecTRI (Müller-Dott et al. 2023) vía OmniPath (CC BY-SA 4.0);
+  *E. coli* derivado de RegulonDB v14.5.1 (Salgado et al. 2023, CCG-UNAM; licencia académica);
 - estructuras de metabolitos de MetaNetX/MNXref: CC BY 4.0, usadas solo cuando su fuente es ChEBI, SwissLipids o
   LIPID MAPS (CC BY 4.0).
 

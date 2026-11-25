@@ -147,7 +147,7 @@ const betainc = (x, a, b) => {
   const bt = Math.exp(logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log(1 - x));
   return x < (a + 1) / (a + b + 2) ? (bt * betacf(x, a, b)) / a : 1 - (bt * betacf(1 - x, b, a)) / b;
 };
-const studentTP = (t, df) => {
+export const studentTP = (t, df) => {
   if (!Number.isFinite(t) || !(df > 0)) return 1;
   if (df > 1e4) return normP(t);
   return Math.max(0, Math.min(1, betainc(df / (df + t * t), df / 2, 0.5)));

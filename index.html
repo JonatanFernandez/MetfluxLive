@@ -223,7 +223,15 @@
       <section id="secRna" class="fold" data-task="data">
         <h2><span data-i18n="data.rnaTitle"></span> <a class="link" data-docs="contexts" target="_blank" data-i18n="obj.help"></a></h2>
         <p class="hint" data-i18n="data.rnaHint"></p>
-        <button id="rnaOpen" data-i18n="rna.open" data-i18n-title="rna.openTitle"></button>
+        <div class="stack">
+          <button id="rnaOpen" data-i18n="rna.open" data-i18n-title="rna.openTitle"></button>
+          <button id="regOpen" data-i18n="reg.open" data-i18n-title="reg.openTitle"></button>
+        </div>
+        <p class="hint" id="regNote"></p>
+        <div class="row" id="regBar" hidden>
+          <span id="regMarkTxt" class="hint grow"></span>
+          <button id="regClear" class="link" data-i18n="reg.clear"></button>
+        </div>
       </section>
     </aside>
     <div class="resizer" id="resLeft" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-title="h.resize"></div>
@@ -453,6 +461,17 @@
       <p class="hint" id="mtbStatus"></p>
       <div id="mtbOut" hidden></div>
       <details id="mtbUnmappedBox" hidden><summary id="mtbUnmappedH"></summary><div id="mtbUnmapped"></div></details>
+    </form>
+  </dialog>
+  <dialog id="regDialog" class="editor">
+    <form method="dialog" id="regForm">
+      <header><h3 data-i18n="reg.title"></h3><a class="link" data-docs="regulators" target="_blank" data-i18n="obj.help"></a><button class="icon" value="cancel" data-i18n-aria="h.close">✕</button></header>
+      <details class="rna-how"><summary data-i18n="reg.howH"></summary><div data-i18n-html="reg.how"></div></details>
+      <label class="rna-file"><span data-i18n="reg.file"></span> <input id="regFile" type="file" accept=".tsv,.tab,.txt,.csv,text/plain,text/csv,text/tab-separated-values"></label>
+      <textarea id="regText" rows="6" spellcheck="false" data-i18n-ph="reg.paste"></textarea>
+      <div class="row"><button type="button" id="regRun" class="primary" data-i18n="reg.run"></button><span id="regMeta" class="hint grow"></span></div>
+      <p class="hint" id="regStatus"></p>
+      <div id="regOut" hidden></div>
     </form>
   </dialog>
   <dialog id="methodsDialog">

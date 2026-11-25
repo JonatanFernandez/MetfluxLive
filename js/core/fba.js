@@ -88,7 +88,10 @@ export class FbaProblem {
       lo[j] = Math.max(lb, 0); up[j] = Math.max(ub, 0);
       lo[nRxns + j] = Math.max(-ub, 0); up[nRxns + j] = Math.max(-lb, 0);
     }
-    sources.forEach((s, i) => { up[n2 + i] = s.max; });
+    // An injection is normally a free supply capped at `max`. `min` pins it instead, which is how an
+    // endogenous flux the cell does not choose -- protein turnover, glycogen mobilisation -- is expressed:
+    // with min = max the column carries exactly that flux and its zero parsimonious cost cannot matter.
+    sources.forEach((s, i) => { up[n2 + i] = s.max; lo[n2 + i] = Math.min(s.min || 0, s.max); });
     const all = { kind: "range", from: 0, to: this.numCols - 1 };
     M.changeColsBounds(all, lo, up);
 
