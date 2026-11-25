@@ -70,7 +70,8 @@ because it uses ES modules, a Web Worker and WebAssembly). No internet connectio
 - **Regulators from differential RNA-seq (*Interpret*)** — paste a differential expression table (gene + log2FC or
   signed statistic) to score transcription factor (TF) activities using sparse exact Univariate Linear Model (ULM,
   equivalent to decoupleR; Badia-i-Mompel et al. 2022) against signed regulons bundled for **Human-GEM** (917 TFs,
-  CollecTRI via OmniPath, CC BY-SA 4.0), **Mouse-GEM** (838 TFs, CollecTRI orthology, CC BY-SA 4.0), and
+  CollecTRI via OmniPath, CC BY-SA 4.0), **Mouse-GEM** (838 TFs, CollecTRI orthology, CC BY-SA 4.0),
+  **Rat-GEM** (837 TFs, CollecTRI orthology, CC BY-SA 4.0; thinner coverage, 425 metabolic target genes) and
   **E. coli iML1515** (239 TFs, RegulonDB v14.5.1, academic licence). When paired with intracellular metabolomics,
   MetfluxLive separates **transcriptional** from **post-transcriptional / allosteric** metabolic bottlenecks, traces
   3-step `TF → mRNA → metabolite` chains, highlights TF-regulated reactions on the map, and tests TF-driven enzyme
@@ -180,8 +181,9 @@ application and live in a separate repository: **[MetfluxTools](https://github.c
 (version 26.0, CC BY-SA 4.0) and is distributed under
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), with attribution to the Human Protein Atlas;
 its cell line descriptions come from Cellosaurus 57.0 (CC BY 4.0). `data/mouse-gem/contexts.json` is derived
-from Bgee 15.2 and is CC0. `data/human-gem/regulons.json` and `data/mouse-gem/regulons.json` are derived from
-CollecTRI (Müller-Dott et al. 2023) via OmniPath and distributed under CC BY-SA 4.0.
+from Bgee 15.2 and is CC0. `data/human-gem/regulons.json`, `data/mouse-gem/regulons.json` and
+`data/rat-gem/regulons.json` are derived from CollecTRI (Müller-Dott et al. 2023) via OmniPath and distributed
+under CC BY-SA 4.0; the mouse and rat networks are CollecTRI mapped by orthology, not curated in those species.
 `data/ecoli-gem/regulons.json` is derived from RegulonDB v14.5.1 (Salgado et al. 2023, CCG-UNAM; academic licence).
 The licence is also written inside each file (`meta.license`).
 `data/tasks/metabolicTasks_Essential.txt` is copied unchanged from Human-GEM 2.1.1 (CC BY 4.0, Robinson et al. 2020);
@@ -282,6 +284,22 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # show the atom
 ```
 
 ### Limitations
+
+- **Regulatory networks cover four of the eight models.** Human, mouse, rat and *E. coli* have signed
+  TF → target networks; *Drosophila*, *C. elegans*, zebrafish and yeast do not, and this is a limit of the
+  sources rather than of the application. Everything the regulatory layer does rests on each edge carrying a
+  **sign**: the predicted direction is the regulator's own change times the sign of the edge, so without it the
+  direction on the map, the concordance with metabolomics and the up/down reading all collapse, and only a
+  weaker "is this regulon coherently perturbed" question survives. CollecTRI, which supplies human, mouse and
+  rat, serves no other organism (the API rejects 7227, 6239 and 7955). For *Drosophila* and *C. elegans* the
+  available resources are REDfly (curated cis-regulatory **sequences**, whose predicted modules are not even
+  linked to target genes) and modERN (ChIP-seq binding profiles, and binding is not regulation); a sign could be
+  **derived** from modERN's RNAi knockdown series, which is legitimate but conflates direct with indirect
+  targets and comes from one assay in whole embryos, so it would not be of comparable quality and would have to
+  be labelled as such. YEASTRACT+ holds 215,398 associations for yeast, but 76.9 % rest on expression evidence
+  only, which has the same indirectness problem and would need filtering by binding evidence, plus a licence
+  check. For zebrafish we found nothing usable. Adding any of these is pending a source good enough to justify
+  presenting it beside the curated ones.
 
 - FBA uses neither concentrations nor kinetics: concentration only sets the maximum uptake. The default
   `Vmax`/`Km` values (`js/core/medium.js`) are orders of magnitude for cultured mammalian cells.
@@ -415,7 +433,8 @@ porque usa módulos ES, un Web Worker y WebAssembly). No necesita conexión.
   (gen + log2FC o estadístico con signo) para puntuar la actividad de factores de transcripción (TF) mediante
   modelo lineal univariante disperso exacto (ULM, equivalente a decoupleR; Badia-i-Mompel et al. 2022) frente a
   regulones con signo incluidos para **Human-GEM** (917 TFs, CollecTRI vía OmniPath, CC BY-SA 4.0), **Mouse-GEM**
-  (838 TFs, ortología CollecTRI, CC BY-SA 4.0) y **E. coli iML1515** (239 TFs, RegulonDB v14.5.1, licencia
+  (838 TFs, ortología CollecTRI, CC BY-SA 4.0), **Rat-GEM** (837 TFs, ortología CollecTRI, CC BY-SA 4.0; cobertura
+  más fina, 425 genes metabólicos diana) y **E. coli iML1515** (239 TFs, RegulonDB v14.5.1, licencia
   académica). Al combinarse con metabolómica intracelular, MetfluxLive distingue cuellos de botella
   **transcripcionales** de **postranscripcionales / alostéricos**, traza cadenas de 3 pasos
   `TF → ARNm → metabolito`, marca las reacciones reguladas en el mapa y prueba en FBA el escalado enzimático
@@ -630,6 +649,22 @@ tools/.venv/bin/python tools/inspect_map.py human-gem MAR04145   # ver el mapa a
 ```
 
 ### Limitaciones
+
+- **Las redes regulatorias cubren cuatro de los ocho modelos.** Humano, ratón, rata y *E. coli* tienen redes
+  factor → diana con signo; *Drosophila*, *C. elegans*, pez cebra y levadura no, y es una limitación de las
+  fuentes, no de la aplicación. Todo lo que hace la capa regulatoria descansa en que cada arista lleve
+  **signo**: la dirección predicha es el cambio del propio regulador por el signo de la arista, así que sin él
+  se caen la dirección en el mapa, la concordancia con metabolómica y la lectura al alza o a la baja, y solo
+  sobrevive la pregunta más débil de si un regulón está coherentemente alterado. CollecTRI, que surte a humano,
+  ratón y rata, no sirve ningún otro organismo (la API rechaza 7227, 6239 y 7955). Para *Drosophila* y
+  *C. elegans* lo disponible es REDfly (**secuencias** cis-reguladoras curadas, cuyos módulos predichos ni
+  siquiera están ligados a genes diana) y modERN (perfiles de unión por ChIP-seq, y unirse no es regular); el
+  signo podría **derivarse** de las series de RNAi de modERN, lo cual es legítimo pero confunde dianas directas
+  con indirectas y procede de un único ensayo en embrión entero, así que no sería de calidad comparable y
+  habría que etiquetarlo como tal. YEASTRACT+ tiene 215.398 asociaciones para levadura, pero el 76,9 % se apoya
+  solo en evidencia de expresión, con el mismo problema de indirección, y habría que filtrarlas por evidencia de
+  unión y comprobar la licencia. Para pez cebra no encontramos nada utilizable. Añadir cualquiera de estas
+  queda pendiente de una fuente lo bastante buena como para presentarla junto a las curadas.
 
 - FBA no usa concentraciones ni cinéticas: la concentración solo fija la captación máxima. Los valores
   `Vmax`/`Km` por defecto (`js/core/medium.js`) son órdenes de magnitud para células de mamífero en cultivo.

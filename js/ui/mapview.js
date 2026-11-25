@@ -21,7 +21,7 @@ const THEMES = {
     inactiveEdge: "rgba(125,145,190,0.13)", structEdge: "rgba(125,145,190,0.10)", guide: "rgba(125,145,190,0.25)", guideText: "rgba(147,162,198,0.9)",
     metOn: "#1d3350", metOff: "#141c30", rxnOn: "#e8eefc", rxnTransport: "#9fb4d8", rxnOff: "#2a3552",
     labelOn: "#eef3ff", labelOff: "rgba(170,185,215,0.6)", rxnLabelOn: "#b8c6e6", rxnLabelOff: "rgba(140,155,190,0.5)", groupLabelOff: "rgba(165,180,212,0.62)",
-    hover: "rgba(255,255,255,0.55)", selected: "#ffffff", pulse: [255, 255, 255], gene: "#b48cff", ko: "#ff5d6c", blocked: "#6b768f", flexFix: "#5fd38d", flexOpt: "#ffbe3c", rev: "#e15bd8",
+    hover: "rgba(255,255,255,0.55)", selected: "#ffffff", pulse: [255, 255, 255], gene: "#b48cff", regUp: "#3ddc97", regDown: "#ffa03c", ko: "#ff5d6c", blocked: "#6b768f", flexFix: "#5fd38d", flexOpt: "#ffbe3c", rev: "#e15bd8",
     groupOff: "#151d33", groupRing: "rgba(235,242,255,0.9)", groupRingOff: "rgba(130,148,190,0.45)", groupListOnly: "rgba(160,175,210,0.45)",
     groupFill: (s) => `rgb(${28 + 30 * s},${60 + 90 * s},${92 + 110 * s})`, unknown: [70, 80, 108],
   },
@@ -30,7 +30,7 @@ const THEMES = {
     inactiveEdge: "rgba(90,105,140,0.18)", structEdge: "rgba(90,105,140,0.13)", guide: "rgba(90,105,140,0.3)", guideText: "rgba(95,108,135,0.95)",
     metOn: "#d3e3f0", metOff: "#eef1f6", rxnOn: "#3a4560", rxnTransport: "#7f8fb2", rxnOff: "#c9d0dd",
     labelOn: "#263046", labelOff: "rgba(90,102,128,0.65)", rxnLabelOn: "#4a5672", rxnLabelOff: "rgba(110,122,148,0.55)", groupLabelOff: "rgba(95,108,135,0.7)",
-    hover: "rgba(40,50,70,0.45)", selected: "#283044", pulse: [40, 60, 90], gene: "#8d68d6", ko: "#d04452", blocked: "#9aa3b4", flexFix: "#2f8a52", flexOpt: "#b26f0e", rev: "#b0309f",
+    hover: "rgba(40,50,70,0.45)", selected: "#283044", pulse: [40, 60, 90], gene: "#8d68d6", regUp: "#0e8f63", regDown: "#b55309", ko: "#d04452", blocked: "#9aa3b4", flexFix: "#2f8a52", flexOpt: "#b26f0e", rev: "#b0309f",
     groupOff: "#e6eaf1", groupRing: "rgba(45,62,92,0.75)", groupRingOff: "rgba(120,134,165,0.45)", groupListOnly: "rgba(120,134,165,0.45)",
     groupFill: (s) => `rgb(${222 - 150 * s},${234 - 100 * s},${244 - 60 * s})`, unknown: [196, 202, 214],
   },
@@ -132,6 +132,8 @@ export function enrichColor(e, alpha = 1) {
 
 /** Colour that marks a reaction running the other way in B ("A → B" view). */
 export const revColor = () => TH.rev;
+/** The two regulon ring colours, for the legend. */
+export const regColors = () => ({ up: TH.regUp, down: TH.regDown, mixed: TH.gene });
 
 // flux change against the reference: blue (down) - slate (same) - orange (up) by default
 export function deltaColor(d, alpha = 1) {
@@ -229,6 +231,7 @@ export class MapView {
     // "change" (A → B view): colour = change of size, width = |B − A|, reversals / on / off marked apart (core/change.js)
     this.change = d.mode === "change" && !this.energy && !this.dlabel;
     this.mtbOn = !!(d.mtb || d.mtbGlobal);
+    this.rnaOn = !!(d.rna || d.rnaGlobal);
     this.mode = this.dlabel || this.energy || this.change ? "delta" : d.mode || "flux";
     this.tracerOn = this.mode === "tracer";
     this.masked = !!(d.mask || d.gHas);
@@ -252,7 +255,7 @@ export class MapView {
       }
       let tmax = 0;
       for (const n of sc.nodes) if (n.type === 0 && d.turnover) tmax = Math.max(tmax, d.turnover[n.ref], chg && d.refTurnover ? d.refTurnover[n.ref] : 0);
-      const mtb = d.mtb || null;
+      const mtb = d.mtb || null, rna = d.rna || null;
       for (const n of sc.nodes) {
         if (n.type === 0) {
           n.flux = d.turnover ? d.turnover[n.ref] : 0; n.s = logScale(n.flux, tmax);
@@ -281,6 +284,10 @@ export class MapView {
           n.fx = d.flex ? d.flex.get(n.ref)?.cls : undefined; // flux variability class (FVA of the pathway)
           n.mtbObs = !!(mtb && mtb.obsRxns.has(n.ref));
           n.mtbTop = !!(mtb && mtb.topSteps.has(n.ref));
+          const rfc = rna ? rna.fcByRxn.get(n.ref) : undefined;
+          n.rnaFc = rfc !== undefined ? rfc : NaN;
+          n.rnaSig = !!(rna && rna.sigRxns.has(n.ref));
+          n.rnaIso = !!(rna && rna.isoRxns.has(n.ref));
         }
       }
       if (d.dG) { // reactions coloured by dG'm in the direction they run: -40 kJ/mol and below is full red
@@ -317,13 +324,15 @@ export class MapView {
     } else if (sc.kind === "global") {
       let max = 0;
       for (const n of sc.nodes) { n.flux = d.gFlux ? d.gFlux[n.ref] : 0; if (n.flux > max) max = n.flux; }
-      const mg = d.mtbGlobal || null;
+      const mg = d.mtbGlobal || null, rg = d.rnaGlobal || null;
       for (const n of sc.nodes) {
         n.s = logScale(n.flux, max); n.e = d.gE ? d.gE[n.ref] : 0; n.d = d.energy ? d.energy[n.ref] : d.gD ? d.gD[n.ref] : 0;
         n.hidden = !!d.gHas && !d.gHas[n.ref];
         n.mtbFc = mg ? mg.medFc[n.ref] : NaN;
         n.mtbObs = !!(mg && mg.hasObs[n.ref]);
         n.mtbTop = !!(mg && mg.hasTop[n.ref]);
+        n.rnaFc = rg ? rg.medFc[n.ref] : NaN;
+        n.rnaN = rg ? rg.count[n.ref] : 0;
       }
       const byRef = new Map(sc.nodes.map((n, i) => [n.ref, i]));
       const fmax = d.flows && d.flows.length ? d.flows[0].flow : 0;
@@ -335,7 +344,13 @@ export class MapView {
   }
 
   /** A node is drawn when it passes the filter and either carries flux or inactive ones are shown. */
-  _vis(n) { return !n.hidden && (this.options.inactive || n.s > 0 || this.masked || this.scene.kind !== "sub" || (this.mtbOn && (Number.isFinite(n.mtbFc) || n.mtbObs || n.mtbTop))); }
+  _vis(n) {
+    return !n.hidden && (
+      this.options.inactive || n.s > 0 || this.masked || this.scene.kind !== "sub"
+      || (this.mtbOn && (Number.isFinite(n.mtbFc) || n.mtbObs || n.mtbTop))
+      || (this.rnaOn && Number.isFinite(n.rnaFc) && Math.abs(n.rnaFc) >= 0.35)
+    );
+  }
 
   visibleCount() { let k = 0; for (const n of this.scene.nodes) if (this._vis(n)) k++; return k; }
 
@@ -662,18 +677,29 @@ export class MapView {
         }
       } else {
         ctx.save(); ctx.translate(sx[i], sy[i]); ctx.rotate(Math.PI / 4);
-        ctx.fillStyle = this.mode === "delta" ? this._dc(n.lost ? -1 : n.d, n.s ? 1 : 0.7) : n.s ? (n.transport ? TH.rxnTransport : TH.rxnOn) : TH.rxnOff;
-        if (n.blk && !n.s) ctx.fillStyle = TH.blocked;
+        const hasRna = this.rnaOn && Number.isFinite(n.rnaFc);
+        const rnaCol = hasRna ? deltaColor(Math.max(-1, Math.min(1, n.rnaFc / 2))) : null;
+        ctx.fillStyle = this.mode === "delta" ? this._dc(n.lost ? -1 : n.d, n.s ? 1 : 0.7) : hasRna ? rnaCol : n.s ? (n.transport ? TH.rxnTransport : TH.rxnOn) : TH.rxnOff;
+        if (n.blk && !n.s && !hasRna) ctx.fillStyle = TH.blocked;
         if (this.change && n.ck === "off") { // active only in A: hollow
           ctx.fillStyle = TH.halo; ctx.fillRect(-r, -r, 2 * r, 2 * r);
           ctx.strokeStyle = this._dc(-1); ctx.lineWidth = 1.8; ctx.strokeRect(-r, -r, 2 * r, 2 * r);
         } else if (this.mtbOn && !n.mtbObs) { // not observable on both sides by the metabolomics panel
-          ctx.globalAlpha = a * 0.55;
-          ctx.fillStyle = TH.halo; ctx.fillRect(-r, -r, 2 * r, 2 * r);
-          ctx.strokeStyle = TH.rxnOff; ctx.lineWidth = 1.2; ctx.setLineDash([2.5, 2]);
+          ctx.globalAlpha = a * (hasRna ? 0.88 : 0.55);
+          ctx.fillStyle = hasRna ? rnaCol : TH.halo; ctx.fillRect(-r, -r, 2 * r, 2 * r);
+          ctx.strokeStyle = hasRna && n.rnaSig ? TH.selected : TH.rxnOff; ctx.lineWidth = 1.2; ctx.setLineDash([2.5, 2]);
           ctx.strokeRect(-r, -r, 2 * r, 2 * r); ctx.setLineDash([]);
-        } else ctx.fillRect(-r, -r, 2 * r, 2 * r);
+        } else {
+          ctx.fillRect(-r, -r, 2 * r, 2 * r);
+          if (hasRna && n.rnaSig && this.mode !== "delta") {
+            ctx.strokeStyle = TH.selected; ctx.lineWidth = 1.3; ctx.strokeRect(-r, -r, 2 * r, 2 * r);
+          }
+        }
         ctx.restore();
+        if (this.rnaOn && n.rnaIso) { // divergent OR-branch isoenzyme switch
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 3.5, 0, 6.283);
+          ctx.strokeStyle = TH.rev; ctx.lineWidth = 1.8; ctx.setLineDash([3, 2]); ctx.stroke(); ctx.setLineDash([]);
+        }
         if (this.mtbOn && n.mtbTop) { // candidate bottleneck step from metabolomics
           ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 4, 0, 6.283);
           ctx.strokeStyle = TH.flexOpt; ctx.lineWidth = 2.6; ctx.stroke();
@@ -705,9 +731,18 @@ export class MapView {
           ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 3, 0, 6.283);
           ctx.strokeStyle = TH.blocked; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]);
         }
-        if (this.marks && this.marks.has(n.ref)) { // reactions of the selected gene
+        if (this.marks && this.marks.has(n.ref)) {
+          // Reactions of the selected gene, or of a marked regulon. With markDir the ring also says which
+          // way the regulator pushes the step, which is the whole point of marking a regulon: a double ring
+          // in green for up, amber for down, and the plain violet ring when the targets disagree.
+          const d = this.markDir ? this.markDir.get(n.ref) : undefined;
+          ctx.strokeStyle = d > 0 ? TH.regUp : d < 0 ? TH.regDown : TH.gene;
           ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 6, 0, 6.283);
-          ctx.strokeStyle = TH.gene; ctx.lineWidth = 2; ctx.stroke();
+          ctx.lineWidth = d === undefined ? 2 : 2.6; ctx.stroke();
+          if (d > 0 || d < 0) { // second, tighter ring: visible at a glance among the other rings
+            ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 2.6, 0, 6.283);
+            ctx.lineWidth = 1.4; ctx.stroke();
+          }
         }
         if (n.pert !== undefined) { // knocked out / knocked down
           ctx.beginPath(); ctx.arc(sx[i], sy[i], r * 1.5 + 3, 0, 6.283);
@@ -831,11 +866,33 @@ export class MapView {
         ctx.strokeStyle = n.mtbObs ? TH.groupRing : TH.groupRingOff;
         if (!meas) ctx.setLineDash([4, 3]);
         ctx.stroke(); ctx.setLineDash([]);
+        if (this.rnaOn && Number.isFinite(n.rnaFc)) { // outer transcriptional ring paired with metabolomics fill
+          const rdc = Math.max(-1, Math.min(1, n.rnaFc / 1.5));
+          ctx.globalAlpha = a * 0.92;
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r + 3.2, 0, 6.283);
+          ctx.strokeStyle = deltaColor(rdc); ctx.lineWidth = 2.4; ctx.stroke();
+        }
         if (n.mtbTop) { // pathway contains a candidate bottleneck step
           ctx.globalAlpha = a;
-          ctx.beginPath(); ctx.arc(sx[i], sy[i], r + 4, 0, 6.283);
+          ctx.beginPath(); ctx.arc(sx[i], sy[i], r + (this.rnaOn && Number.isFinite(n.rnaFc) ? 6.5 : 4), 0, 6.283);
           ctx.strokeStyle = TH.flexOpt; ctx.lineWidth = 2.6; ctx.stroke();
         }
+      } else if (this.rnaOn && !delta) {
+        const meas = Number.isFinite(n.rnaFc);
+        const rdc = meas ? Math.max(-1, Math.min(1, n.rnaFc / 1.5)) : 0;
+        if (meas && Math.abs(rdc) > 0.1) {
+          const g = ctx.createRadialGradient(sx[i], sy[i], r * 0.4, sx[i], sy[i], r * (1.45 + Math.abs(rdc)));
+          g.addColorStop(0, deltaColor(rdc, 0.42)); g.addColorStop(1, TH.blend === "lighter" ? "rgba(0,0,0,0)" : "rgba(255,255,255,0)");
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx[i], sy[i], r * (1.45 + Math.abs(rdc)), 0, 6.283); ctx.fill();
+        }
+        ctx.beginPath(); ctx.arc(sx[i], sy[i], r, 0, 6.283);
+        ctx.globalAlpha = a * (meas ? 1 : 0.45);
+        ctx.fillStyle = meas ? deltaColor(rdc) : TH.groupOff;
+        ctx.fill();
+        ctx.lineWidth = n.s > 0 ? 1.8 : 1.2;
+        ctx.strokeStyle = n.s > 0 ? TH.groupRing : TH.groupRingOff;
+        if (!meas) ctx.setLineDash([4, 3]);
+        ctx.stroke(); ctx.setLineDash([]);
       } else {
         if (n.s > 0) {
           const g = ctx.createRadialGradient(sx[i], sy[i], r * 0.4, sx[i], sy[i], r * (1.5 + n.s));

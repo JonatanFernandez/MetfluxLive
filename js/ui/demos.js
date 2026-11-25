@@ -108,6 +108,7 @@ export const DEMOS = [
     actions: [
       ["closeDialogs"],
       ["task", "sim"],
+      ["context", null, "complex"],
       ["medium", "defaultSerum"],
       ["measured", "none"],
       ["objective", "biomassNoCof"],
@@ -137,6 +138,7 @@ export const DEMOS = [
     actions: [
       ["closeDialogs"],
       ["task", "sim"],
+      ["context", null, "complex"],
       ["medium", "defaultSerum"],
       ["measured", "nci60"],
       ["objective", "biomassNoCof"],
@@ -167,7 +169,9 @@ export const DEMOS = [
     actions: [
       ["closeDialogs"],
       ["task", "sim"],
+      ["context", null, "complex"],
       ["medium", "dmem"],
+      ["measured", "none"],
       ["objective", "biomassNoCof"],
       ["clearPerturb"],
       ["run"],
@@ -197,7 +201,9 @@ export const DEMOS = [
     actions: [
       ["closeDialogs"],
       ["task", "sim"],
+      ["context", null, "complex"],
       ["medium", "defaultSerum"],
+      ["measured", "hek293"],
       ["objective", "biomassNoCof"],
       ["clearPerturb"],
       ["run"],
@@ -227,6 +233,13 @@ export const DEMOS = [
     cite: "DepMap Public 26Q3 RNA-seq TPM (CC BY 4.0) for HCT116 colon carcinoma (ACH-000971): 33 expressed core enzymes and 10 silenced tissue-specific genes.",
     actions: [
       ["closeDialogs"],
+      ["task", "sim"],
+      ["context", null, "complex"],
+      ["medium", "defaultSerum"],
+      ["measured", "none"],
+      ["objective", "biomassNoCof"],
+      ["clearPerturb"],
+      ["run"],
       ["task", "data"],
       ["open", "rna"],
       ["loadRnaText", RNA_TABLE, "HCT116_DepMap26Q3.tsv"],
@@ -248,6 +261,13 @@ export const DEMOS = [
     actions: [
       ["closeDialogs"],
       ["model", "ecoli-gem"],
+      ["task", "sim"],
+      ["context", null, "complex"],
+      ["medium", "m9glcAnaer"],
+      ["measured", "ecoliGlcAnaer"],
+      ["objective", "biomass"],
+      ["clearPerturb"],
+      ["run"],
       ["task", "data"],
       ["open", "reg"],
       ["fill", "regText", REG_TABLE],
@@ -272,6 +292,11 @@ export const demoById = (id) => DEMOS.find((d) => d.id === id);
  * Replay a demo's actions through the application, then walk through it.
  */
 export async function runDemo(demo, api) {
+  // `needs.model` is a promise to the reader, so the runner keeps it rather than trusting each example to
+  // carry a "model" action of its own. Only the E. coli one ever did, so after running it every other example
+  // would have replayed on E. coli: the picker asks whether to switch organism but cannot switch it by itself.
+  // When the model is already loaded this costs nothing (the handler compares the slug first).
+  if (demo.needs?.model) await api.model(demo.needs.model);
   for (const [what, ...args] of demo.actions) {
     const fn = api[what];
     if (!fn) { api.note?.(`demo ${demo.id}: no handler for "${what}"`); continue; }

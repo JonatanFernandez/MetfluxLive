@@ -229,9 +229,10 @@
         </div>
         <p class="hint" id="regNote"></p>
         <div class="row" id="regBar" hidden>
-          <span id="regMarkTxt" class="hint grow"></span>
+          <label class="check grow"><input id="regShowMap" type="checkbox" checked> <span data-i18n="reg.showMap"></span></label>
           <button id="regClear" class="link" data-i18n="reg.clear"></button>
         </div>
+        <p class="hint" id="regMarkTxt"></p>
       </section>
     </aside>
     <div class="resizer" id="resLeft" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-title="h.resize"></div>
@@ -469,7 +470,14 @@
       <details class="rna-how"><summary data-i18n="reg.howH"></summary><div data-i18n-html="reg.how"></div></details>
       <label class="rna-file"><span data-i18n="reg.file"></span> <input id="regFile" type="file" accept=".tsv,.tab,.txt,.csv,text/plain,text/csv,text/tab-separated-values"></label>
       <textarea id="regText" rows="6" spellcheck="false" data-i18n-ph="reg.paste"></textarea>
-      <div class="row"><button type="button" id="regRun" class="primary" data-i18n="reg.run"></button><span id="regMeta" class="hint grow"></span></div>
+      <div class="row"><div class="row" id="regFluxRow">
+            <label for="regFluxMethod" data-i18n="reg.fluxMethod"></label>
+            <select id="regFluxMethod"></select>
+            <select id="regCondA" hidden></select>
+            <select id="regCondB" hidden></select>
+          </div>
+          <p class="hint" id="regFluxWhy"></p>
+          <button type="button" id="regRun" class="primary" data-i18n="reg.run"></button><span id="regMeta" class="hint grow"></span></div>
       <p class="hint" id="regStatus"></p>
       <div id="regOut" hidden></div>
     </form>

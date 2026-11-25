@@ -114,6 +114,50 @@ export class Simulator {
   }
 
   /**
+   * Counterfactual FBA screen for regulator perturbations: each entry in `pertList` is a Map<rxn, activity 0..1>
+   * (already evaluated through GPR rules so redundant isoenzymes stay at 1). Runs pFBA under the current medium,
+   * measured fluxes, objective and cell-type context so the resulting flux vectors yield consistent process-level
+   * deltas (ATP, NADPH, redox, protein precursors, objective, or any metabolite turnover).
+   * @param pertList Array<Map<number, number>>
+   * @returns { base: { status, objective, v }, results: Array<{ status, objective, v, relaxed }> }
+   */
+  async screenRegulators(cfg, supplies, pertList, refV = null, onProgress = null) {
+    const base = { ...cfg, parsimonious: true, perturb: [] };
+    const bg = cfg.perturb?.length && refV ? this._caps(cfg.perturb, refV) : null;
+    const r0 = await this._solve(base, supplies, null, null, bg);
+    const baseV = r0.status === "optimal" ? r0.v : refV;
+    const out = [];
+    for (let i = 0; i < pertList.length; i++) {
+      const pert = pertList[i];
+      if (!pert || !pert.size) {
+        out.push({ status: r0.status, objective: r0.status === "optimal" ? r0.objective : 0, v: baseV, relaxed: !!r0.relaxed, unchanged: true });
+      } else {
+        const caps = new Map(bg || []);
+        let anyBound = false;
+        for (const [j, a] of pert) {
+          const v0 = Math.abs(baseV ? baseV[j] : 0);
+          if (a <= 0) {
+            caps.set(j, 0);
+            if (v0 > 1e-9) anyBound = true;
+          } else if (v0 > 1e-9 && a < 0.999) {
+            const c = a * v0;
+            caps.set(j, caps.has(j) ? Math.min(caps.get(j), c) : c);
+            anyBound = true;
+          }
+        }
+        if (!anyBound) {
+          out.push({ status: r0.status, objective: r0.status === "optimal" ? r0.objective : 0, v: baseV, relaxed: !!r0.relaxed, unchanged: true });
+        } else {
+          const r = await this._solve(base, supplies, null, null, caps);
+          out.push({ status: r.status, objective: r.status === "optimal" ? r.objective : 0, v: r.status === "optimal" ? r.v : null, relaxed: !!r.relaxed });
+        }
+      }
+      if (onProgress && onProgress(i + 1, pertList.length) === false) break;
+    }
+    return { base: { status: r0.status, objective: r0.status === "optimal" ? r0.objective : 0, v: baseV }, results: out };
+  }
+
+  /**
    * Least-absolute-deviation fit of measured exchange rates to the network (js/core/fitexchange.js):
    * which rates are consistent with each other and, when they are not, which ones have to give way.
    * @param params { lb, ub, measurements: [{ rxn, dir, rate, sigma, met }], minSigma? }

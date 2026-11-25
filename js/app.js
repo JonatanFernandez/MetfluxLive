@@ -8,11 +8,13 @@ import { buildMetIndex, resolveMetabolite, suggestMetabolites } from "./core/met
 import { DEMOS, demoById, runDemo } from "./ui/demos.js";
 import { parseWideTable, splitByPattern, contrast, normaliseByMedian, metaboliteNetwork, observability,
   bottlenecks, pathwayShifts, ratioChanges, permutationNull, deltaDeltaG } from "./core/metcontrast.js";
-import { parseRnaDiffTable, inferRegulatorsMultiOmic } from "./core/reginfer.js";
+import { parseRnaDiffTable, inferRegulatorsMultiOmic, jointFluxTest, regulonRoutes, summarizeRnaOnModel, computeMultiOmicDiscrepancies,
+  PROCESS_KEYS, rankRegulatorsByProcess, tfProcessProfile, metaboliteRegulators, pathwayRegulators, activeTfsForReaction,
+  buildTfCounterfactualPerturbation, evaluateCounterfactualEffect } from "./core/reginfer.js";
 import { gprActivity } from "./core/gpr.js";
 import { loadContexts, offGenes, blockedReactions, offGenesOf, ContextIndex, taskName } from "./core/contexts.js";
 import { ModelIndex, fmtFlux, fmtTime, escapeHtml as esc } from "./modelindex.js";
-import { MapView, compColor, setCompAliases, enrichColor, deltaColor, energyColor, setMapTheme, revColor } from "./ui/mapview.js";
+import { MapView, compColor, setCompAliases, enrichColor, deltaColor, energyColor, setMapTheme, revColor, regColors} from "./ui/mapview.js";
 import { fluxChange, FLUX_EPS } from "./core/change.js";
 import { loadLook, applyLook, openLookDialog } from "./ui/look.js";
 import { OBJECTIVES, OBJECTIVE_GROUPS, objectiveIndex, isGrowthRxn } from "./core/objectives.js";
@@ -157,6 +159,10 @@ async function loadModel(slug, opts = {}) {
     S.scenes = {}; S.subScenes = new Map(); S.cell = undefined; S.depth = null;
     setCompAliases(S.index.compRole, S.index.membraneOf);
     try { localStorage.setItem("metflux.model", slug); } catch { /* ignore */ }
+    // Keep the picker in step. When the change came from the picker the browser has already moved it, but a
+    // programmatic load -- a worked example switching organism, a restored session -- leaves it naming the
+    // model that is no longer loaded.
+    $("modelSelect").value = slug;
     $("groupSel").querySelector('[value="cell"]').disabled = !cellLayout();
     if (!cellLayout() && S.grouping === "cell") S.grouping = "pathway";
     $("groupSel").value = S.grouping;
@@ -514,7 +520,9 @@ function renderCrumbs() {
   if (S.view.kind === "focus") {
     const sep = document.createElement("span"); sep.className = "sep"; sep.textContent = "›";
     const cur = document.createElement("span"), cn = S.view.center;
-    cur.textContent = t("crumb.focus", { n: cn.type === "met" ? S.index.metName(cn.ref) : S.model.rxns[cn.ref].n });
+    cur.textContent = cn.type === "regulon"
+      ? t("crumb.regulon", { tf: cn.ref })
+      : t("crumb.focus", { n: cn.type === "met" ? S.index.metName(cn.ref) : S.model.rxns[cn.ref].n });
     c.append(sep, cur);
   } else if (S.view.kind !== "global") {
     const sep = document.createElement("span"); sep.className = "sep"; sep.textContent = "›";
@@ -561,8 +569,12 @@ function navGo(dir) {
   try {
     const v = st.view;
     if (v.kind === "global") openGlobal();
-    else if (v.kind === "focus") openFocus(v.center);
-    else openSubsystem(v.ss, true, v.grp ?? null);
+    else if (v.kind === "focus") {
+      if (v.center?.type === "regulon") {
+        const rxns = REG.result?.tfs.find((x) => x.tf === v.center.ref)?.metRxns || REG.markedRxns;
+        if (!rxns?.size || !openRegulonView(rxns, true, v.center.ref, v.center.routeIdx ?? 0)) openGlobal();
+      } else openFocus(v.center);
+    } else openSubsystem(v.ss, true, v.grp ?? null);
     S.sel = st.sel;
     map.cam = { ...st.cam }; map.camTarget = null;
     applyGhosts();
@@ -619,6 +631,196 @@ function applyGhosts(force = false) {
  * use it on the right, inactive ones below, and their other metabolites further out. Reaction: its substrates on the
  * left, products on the right, and the reactions with flux that make or use them further out.
  */
+/**
+ * A map laid out around a marked regulon, the way the adaptive view lays one out around a clicked node.
+ *
+ * A regulon is far too big to draw whole -- ArcA reaches 291 reactions -- so this takes the regulated steps
+ * that actually carry flux in the current solution, largest first, which are the ones the regulator is in a
+ * position to change. The reactions go on a ring; each metabolite sits at the centroid of the reactions that
+ * use it, so anything shared pulls into the middle and the shared metabolites become the centre of the
+ * picture. Currency metabolites are left out, as everywhere else, or ATP would tie everything to everything.
+ */
+function regulonScene(rxns, limit = 16, routeIdx = 0) {
+  const { model, index } = S, f = frame(), cur = index.currency;
+  const rnaFc = REG.rnaSummary?.fcByRxn || null;
+  const fluxOf = (j) => (f?.v ? Math.abs(f.v[j]) : 0);
+  const mrnaOf = (j) => (rnaFc && rnaFc.has(j) ? Math.abs(rnaFc.get(j)) : 0);
+
+  // Include both flux-carrying regulated reactions AND strongly DE regulated reactions (|log2FC| >= 0.5)
+  // so transcriptional programs that FBA currently leaves at zero flux are still visible.
+  const active = [...rxns].filter((j) => fluxOf(j) > 1e-9 || mrnaOf(j) >= 0.5);
+  const pool = active.length >= 2 ? active : [...rxns];
+  const { routes, scattered } = regulonRoutes(pool, model, cur, 2);
+
+  // Rank contiguous routes by combined flux + transcriptional activity (tie-breaking by length)
+  const rankedRoutes = routes
+    .map((rt) => ({
+      rt,
+      score: rt.reduce((s, j) => s + (fluxOf(j) > 1e-9 ? 2 + Math.log10(1 + fluxOf(j)) : 0) + mrnaOf(j), 0),
+    }))
+    .sort((a, b) => (b.score - a.score) || (b.rt.length - a.rt.length))
+    .map((x) => x.rt);
+
+  const sortedScattered = scattered.slice().sort((a, b) => (fluxOf(b) - fluxOf(a)) || (mrnaOf(b) - mrnaOf(a)));
+  REG.routes = { routes: rankedRoutes, scattered: sortedScattered };
+
+  // Decide which subset to render based on routeIdx (0..k-1 = specific contiguous route, "scattered" = scattered, "all" = top across routes)
+  let picked = [], isContiguous = false;
+  if (routeIdx === "scattered") {
+    picked = sortedScattered.slice(0, limit);
+  } else if (typeof routeIdx === "number" && rankedRoutes[routeIdx]) {
+    picked = rankedRoutes[routeIdx];
+    isContiguous = true;
+  } else if (rankedRoutes.length) {
+    picked = rankedRoutes[0];
+    isContiguous = true;
+    routeIdx = 0;
+  } else {
+    picked = (sortedScattered.length ? sortedScattered : pool.slice().sort((a, b) => (fluxOf(b) - fluxOf(a)) || (mrnaOf(b) - mrnaOf(a)))).slice(0, limit);
+  }
+  REG.routeIdx = routeIdx;
+  if (!picked.length) return null;
+
+  // Build adjacency graph inside `picked` through shared non-currency metabolites
+  const pset = new Set(picked);
+  const adj = new Map(picked.map((j) => [j, new Set()]));
+  const byMet = new Map();
+  for (const j of picked) {
+    for (const m of model.rxns[j].m) {
+      if (cur[model.mets[m].b]) continue;
+      if (!byMet.has(m)) byMet.set(m, []);
+      byMet.get(m).push(j);
+    }
+  }
+  for (const js of byMet.values()) {
+    for (let a = 0; a < js.length; a++) for (let b = a + 1; b < js.length; b++) {
+      adj.get(js[a]).add(js[b]); adj.get(js[b]).add(js[a]);
+    }
+  }
+
+  // BFS layering from the natural entry reaction (lowest degree, preferring highest flux/mRNA)
+  const layerOf = new Map();
+  const ordered = [];
+  const start = [...picked].sort((a, b) => (adj.get(a).size - adj.get(b).size) || (fluxOf(b) - fluxOf(a)) || (mrnaOf(b) - mrnaOf(a)))[0];
+  const q = [start];
+  layerOf.set(start, 0);
+  while (q.length && ordered.length < limit) {
+    const u = q.shift();
+    ordered.push(u);
+    const l = layerOf.get(u);
+    const nexts = [...adj.get(u)].filter((w) => pset.has(w) && !layerOf.has(w)).sort((a, b) => (fluxOf(b) - fluxOf(a)) || (mrnaOf(b) - mrnaOf(a)));
+    for (const w of nexts) { layerOf.set(w, l + 1); q.push(w); }
+  }
+  for (const j of picked) {
+    if (ordered.length >= limit) break;
+    if (!layerOf.has(j)) { layerOf.set(j, 0); ordered.push(j); }
+  }
+  picked = ordered;
+
+  const nodes = [], edges = [], metAt = new Map(), rxnAt = new Map();
+  const seen = new Map();
+  for (const j of picked) for (const m of model.rxns[j].m) if (!cur[model.mets[m].b]) seen.set(model.mets[m].b, (seen.get(model.mets[m].b) || 0) + 1);
+
+  if (isContiguous && picked.length >= 2) {
+    // Directional left-to-right layered pathway layout: reactions sit in columns by BFS depth
+    const byLayer = new Map();
+    for (const j of picked) {
+      const l = layerOf.get(j) || 0;
+      if (!byLayer.has(l)) byLayer.set(l, []);
+      byLayer.get(l).push(j);
+    }
+    const layers = [...byLayer.keys()].sort((a, b) => a - b);
+    const DX = 4.6, DY = 3.2;
+    const midL = (layers.length - 1) / 2;
+    layers.forEach((l, li) => {
+      const col = byLayer.get(l);
+      const midR = (col.length - 1) / 2;
+      col.forEach((j, ri) => {
+        const r = model.rxns[j];
+        rxnAt.set(j, nodes.length);
+        nodes.push({ type: 1, ref: j, x: (li - midL) * DX, y: (ri - midR) * DY, label: r.n && r.n.length <= 26 ? r.n : r.id });
+      });
+    });
+
+    // Place shared metabolites cleanly between their reactions, private metabolites slightly above/below
+    const users = new Map();
+    for (const j of picked) for (const m of model.rxns[j].m) {
+      if (cur[model.mets[m].b]) continue;
+      if (!users.has(m)) users.set(m, []);
+      users.get(m).push(j);
+    }
+    const privSlot = new Map();
+    const pairSlot = new Map();
+    for (const [m, js] of users) {
+      let x = 0, y = 0;
+      if (js.length === 1) {
+        const j = js[0], rn = nodes[rxnAt.get(j)];
+        const r = model.rxns[j], coef = r.c[r.m.indexOf(m)] || 0, v = f?.v ? f.v[j] : 0;
+        const isProd = v < -1e-9 ? coef < 0 : coef > 0;
+        const k = (privSlot.get(j) || 0);
+        privSlot.set(j, k + 1);
+        const side = k % 2 === 0 ? -1 : 1;
+        const tier = Math.floor(k / 2);
+        x = rn.x + (isProd ? 1.15 : -1.15);
+        y = rn.y + side * (1.25 + tier * 0.85);
+      } else {
+        for (const j of js) { const rn = nodes[rxnAt.get(j)]; x += rn.x; y += rn.y; }
+        x /= js.length; y /= js.length;
+        const pk = js.slice().sort((a, b) => a - b).join(",");
+        const k = pairSlot.get(pk) || 0;
+        pairSlot.set(pk, k + 1);
+        if (k > 0) y += (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.95;
+      }
+      const met = model.mets[m];
+      metAt.set(m, nodes.length);
+      nodes.push({ type: 0, ref: m, x, y, label: model.bases[met.b].n + (seen.get(met.b) > 1 ? ` [${met.c}]` : ""), comp: met.c });
+    }
+  } else {
+    // Fallback ring layout for scattered reactions without shared metabolites
+    const R = 6.5;
+    picked.forEach((j, k) => {
+      const a = (k / picked.length) * 6.283 - Math.PI / 2;
+      const r = model.rxns[j];
+      rxnAt.set(j, nodes.length);
+      nodes.push({ type: 1, ref: j, x: R * Math.cos(a), y: R * Math.sin(a), label: r.n && r.n.length <= 26 ? r.n : r.id });
+    });
+    const users = new Map();
+    for (const j of picked) for (const m of model.rxns[j].m) {
+      if (cur[model.mets[m].b]) continue;
+      if (!users.has(m)) users.set(m, []);
+      users.get(m).push(j);
+    }
+    for (const [m, js] of users) {
+      let x = 0, y = 0;
+      for (const j of js) { const n = nodes[rxnAt.get(j)]; x += n.x; y += n.y; }
+      x /= js.length; y /= js.length;
+      if (js.length === 1) { x *= 1.42; y *= 1.42; }
+      else { const pull = Math.min(1, 2 / js.length); x *= pull; y *= pull; }
+      const met = model.mets[m];
+      metAt.set(m, nodes.length);
+      nodes.push({ type: 0, ref: m, x, y, label: model.bases[met.b].n + (seen.get(met.b) > 1 ? ` [${met.c}]` : ""), comp: met.c });
+    }
+  }
+
+  for (const j of picked) {
+    const r = model.rxns[j], ri = rxnAt.get(j);
+    r.m.forEach((m, q) => { if (metAt.has(m)) edges.push({ r: ri, m: metAt.get(m), coef: r.c[q] }); });
+  }
+  return { kind: "sub", ss: -1, focus: true, regulon: true, nodes, edges };
+}
+
+/** Show the map centred on the marked regulon (or one of its contiguous routes). */
+function openRegulonView(rxns, skipPush = false, tfName = REG.markedTf, routeIdx = 0) {
+  const sc = regulonScene(rxns, 16, routeIdx);
+  if (!sc) return false;
+  if (!skipPush) navPush();
+  S.view = { kind: "focus", ss: -1, center: { type: "regulon", ref: tfName, routeIdx: REG.routeIdx } };
+  $("listView").hidden = true;
+  map.setScene(sc);
+  renderCrumbs();
+  return true;
+}
+
 function focusScene(center) {
   const { model, index } = S, f = frame(), cur = index.currency;
   const nodes = [], edges = [], metAt = new Map(), rxnAt = new Map();
@@ -1089,8 +1291,30 @@ function mtbRenderUnmapped(rows) {
 // Validated on E. coli single & double TF knockouts (GSE153906 / GSE195954); metabolomics-only TF inference
 // is intentionally omitted because whole-sample permutation testing showed it is underpowered.
 
-const REG_MODELS = new Set(["human-gem", "mouse-gem", "ecoli-gem"]);
-const REG = { data: null, slug: null, rnaMap: null, result: null, markedTf: null, markedRxns: null };
+const REG_MODELS = new Set(["human-gem", "mouse-gem", "rat-gem", "ecoli-gem"]);
+const REG = { data: null, slug: null, rnaMap: null, result: null, rnaSummary: null, overlay: true, markedTf: null, markedRxns: null, joint: null, routes: null, routeIdx: 0, sortProc: "ulm", sortMet: -1, fbaImpact: null, fbaBusy: null };
+
+function rnaMapData(kind) {
+  if (!REG.overlay || !REG.rnaSummary || !S.model) return null;
+  if (kind === "sub") return REG.rnaSummary;
+  const G = groups();
+  const buckets = Array.from({ length: G.n }, () => []);
+  for (const [j, fc] of REG.rnaSummary.fcByRxn) {
+    const g = G.groupOf[j];
+    if (g >= 0) buckets[g].push(fc);
+  }
+  const medFc = new Float64Array(G.n).fill(NaN);
+  const count = new Int32Array(G.n);
+  for (let g = 0; g < G.n; g++) {
+    const arr = buckets[g];
+    if (!arr.length) continue;
+    arr.sort((a, b) => a - b);
+    const mid = arr.length >> 1;
+    medFc[g] = arr.length % 2 ? arr[mid] : 0.5 * (arr[mid - 1] + arr[mid]);
+    count[g] = arr.length;
+  }
+  return { medFc, count };
+}
 
 function updateRegButton() {
   const btn = $("regOpen");
@@ -1111,8 +1335,13 @@ async function loadRegulons() {
 }
 
 function regClear(redraw = true) {
-  REG.rnaMap = null; REG.result = null; REG.markedTf = null; REG.markedRxns = null;
+  if (REG.fbaBusy) REG.fbaBusy.stop = true;
+  REG.rnaMap = null; REG.result = null; REG.rnaSummary = null; REG.overlay = false;
+  REG.markedTf = null; REG.markedRxns = null; REG.joint = null; REG.routes = null; REG.routeIdx = 0;
+  REG.sortProc = "ulm"; REG.sortMet = -1; REG.fbaImpact = null; REG.fbaBusy = null;
+  map.markDir = null;
   if ($("regBar")) $("regBar").hidden = true;
+  if ($("regShowMap")) $("regShowMap").checked = false;
   if ($("regNote")) $("regNote").textContent = "";
   if ($("regMarkTxt")) $("regMarkTxt").textContent = "";
   if ($("regText")) $("regText").value = "";
@@ -1130,6 +1359,7 @@ async function openRegDialog() {
     $("regOut").hidden = true; $("regOut").textContent = ""; $("regStatus").textContent = "";
   }
   $("regMeta").textContent = t("reg.loading");
+  renderFluxMethods();
   $("regDialog").showModal();
   const data = await loadRegulons();
   if (!data) { $("regMeta").textContent = t("reg.noModel"); return; }
@@ -1156,6 +1386,16 @@ async function regRun() {
   const offSet = ctx && S.base?.model?.genes ? new Set([...offGenes(ctx, S.base.model.genes)].map((g) => g.toLowerCase())) : null;
   const hasMtb = !!MTB.result;
   if (hasMtb) MTB.net ??= metaboliteNetwork(S.model, S.layout);
+  // the flux axis, if the user chose a method for it
+  const sel = $("regFluxMethod");
+  const method = sel && !sel.disabled ? sel.value : "";
+  let fluxPair = null;
+  if (method) {
+    status.textContent = t("reg.solvingFlux");
+    try { fluxPair = await fluxForRegulators(method, $("regCondA")?.value, $("regCondB")?.value); }
+    catch { fluxPair = null; }
+    status.textContent = "";
+  }
   const res = inferRegulatorsMultiOmic(
     S.model,
     hasMtb ? MTB.net : null,
@@ -1165,16 +1405,28 @@ async function regRun() {
     parsed.map,
     {
       thermo: S.base?.thermo?.rxns || null,
-      flux: frame()?.v || null,
+      flux: fluxPair,
+      fluxVec: frame()?.v || null,
       offGenes: offSet,
       bottleneckSteps: hasMtb ? MTB.result.steps.slice(0, 12) : [],
     },
   );
   REG.rnaMap = parsed.map;
   REG.result = res;
+  REG.rnaSummary = summarizeRnaOnModel(S.model, parsed.map, res, { offGenes: offSet });
+  REG.overlay = true;
+  REG.fbaImpact = null;
+  if ($("regBar")) $("regBar").hidden = false;
+  if ($("regShowMap")) $("regShowMap").checked = true;
+  // one joint test per regulator, computed once. It returns p = null, with a reason, whenever the question
+  // cannot be asked honestly -- which is most of the time, and is the point.
+  REG.joint = new Map();
+  if (res.flux) for (const e of res.tfs.slice(0, 40)) REG.joint.set(e.tf, jointFluxTest(e, res, 2000));
   out.hidden = false;
   regRender();
   if (MTB.result) mtbRender();
+  applyFrame();
+  renderDetails();
 }
 
 function regMarkTf(tfName) {
@@ -1185,8 +1437,10 @@ function regMarkTf(tfName) {
   $("regMarkTxt").textContent = t("reg.marked", { tf: entry.tf, n: entry.metRxns.size });
   $("regBar").hidden = false;
   $("regDialog").close();
-  // Jump to the pathway containing the most regulated reactions if we are in global view
-  if (S.view.kind === "global") {
+  // Centre the map on the regulon itself rather than on whichever single pathway holds most of it: a
+  // regulon crosses pathways, and that is usually the interesting part. Falling back to the busiest
+  // pathway keeps the old behaviour when the regulon has nothing to draw.
+  if (!openRegulonView(entry.metRxns) && S.view.kind === "global") {
     const counts = new Map();
     for (const j of entry.metRxns) {
       const ss = S.model.rxns[j]?.ss;
@@ -1197,6 +1451,7 @@ function regMarkTf(tfName) {
   }
   S.sel = null;
   map.marks = REG.markedRxns;
+  map.markDir = entry.metRxnDir || null;
   applyFrame();
   renderDetails();
 }
@@ -1243,36 +1498,221 @@ async function regTestTf(tfName) {
   $("regMarkTxt").textContent = t("reg.marked", { tf: entry.tf, n: entry.metRxns.size });
   $("regBar").hidden = false;
   map.marks = REG.markedRxns;
+  map.markDir = entry.metRxnDir || null;
   setTask("cmp");
   applyFrame();
   renderDetails();
 }
 
+function regProcessOpts() {
+  return { objective: S.cfg.objective, biomassRxn: S.index?.biomassRxn ?? -1 };
+}
+
+function regProcessSpec() {
+  return REG.sortProc === "met" && REG.sortMet >= 0 ? { kind: "met", base: REG.sortMet } : REG.sortProc;
+}
+
+/** Active non-currency metabolites sorted by turnover on the current flux frame, for the process dropdown. */
+function activeMetChoices(f) {
+  if (!S.model || !f?.v) return [];
+  const { model, index } = S, turn = new Float64Array(model.bases.length);
+  model.rxns.forEach((r, j) => {
+    const vj = f.v[j];
+    if (!vj || r.removed || r.m.length < 2) return;
+    const byB = new Map();
+    for (let k = 0; k < r.m.length; k++) {
+      const b = model.mets[r.m[k]].b;
+      if (!index.currency[b]) byB.set(b, (byB.get(b) || 0) + r.c[k] * vj);
+    }
+    for (const [b, net] of byB) if (net > 1e-9) turn[b] += net;
+  });
+  const out = [];
+  for (let b = 0; b < turn.length; b++) if (turn[b] > 1e-6) out.push({ base: b, name: model.bases[b].n, turnover: turn[b] });
+  out.sort((a, b) => b.turnover - a.turnover);
+  return out.slice(0, 45);
+}
+
+/** Format a Level 2 counterfactual FBA effect-size badge for `tfName` on `processSpec` (if already computed). */
+function fbaBadgeHtml(tfName, processSpec) {
+  const imp = REG.fbaImpact;
+  if (!imp || imp.result !== S.result || !imp.byTf?.has(tfName)) return "";
+  const rec = imp.byTf.get(tfName);
+  if (rec.mode === "none") return "";
+  const eff = evaluateCounterfactualEffect(S.model, imp.base.v, rec.res?.v, imp.base.objective, rec.res?.objective, processSpec, regProcessOpts());
+  if (!eff) return "";
+  const pct = Math.round(100 * eff.relDelta);
+  const sgn = pct > 0 ? "+" : "";
+  const lbl = rec.mode === "induced"
+    ? t("reg.fbaDep", { x: `${sgn}${pct} %` })
+    : t("reg.fbaLoss", { x: `${sgn}${pct} %` });
+  const tip = t(rec.mode === "induced" ? "reg.fbaDepTip" : "reg.fbaLossTip", { g: rec.nGenes, r: rec.nRxns, x: `${sgn}${pct} %` });
+  return `<span class="reg-fba-tag${pct < -2 ? " down" : ""}" title="${esc(tip)}">${esc(lbl)}</span>`;
+}
+
+/** Compact chips showing which core metabolic processes (`atp`, `nadph`, `redox`, `protein`, `obj`) a TF affects. */
+function tfProfileHtml(entry, f, interactive = false) {
+  if (!entry || !f?.v || !REG.result) return "";
+  const prof = tfProcessProfile(S.model, REG.result, REG.rnaSummary, f.v, entry, regProcessOpts());
+  if (!prof.length) return "";
+  return `<div class="reg-proc-chips">` + prof.map((p) => {
+    const pct = Math.round(100 * p.totalShare);
+    const pushPct = Math.round(100 * p.netPush);
+    const dirCls = p.netPush > 0.02 ? " up" : p.netPush < -0.02 ? " down" : "";
+    const arrow = p.netPush > 0.02 ? "&uarr;" : p.netPush < -0.02 ? "&darr;" : "&middot;";
+    const imp = REG.fbaImpact && REG.fbaImpact.result === S.result ? REG.fbaImpact.byTf?.get(entry.tf) : null;
+    let fbaBit = "";
+    if (imp && imp.mode !== "none") {
+      const eff = evaluateCounterfactualEffect(S.model, REG.fbaImpact.base.v, imp.res?.v, REG.fbaImpact.base.objective, imp.res?.objective, p.key, regProcessOpts());
+      if (eff) { const fp = Math.round(100 * eff.relDelta); fbaBit = ` · FBA ${fp > 0 ? "+" : ""}${fp}%`; }
+    }
+    const tip = t("reg.procChipTip", {
+      proc: t("reg.proc." + p.key),
+      cov: pct,
+      push: `${pushPct > 0 ? "+" : ""}${pushPct}`,
+      n: p.nActiveRxns,
+    }) + fbaBit;
+    const attr = interactive ? ` data-regproc="${p.key}"` : "";
+    return `<span class="reg-proc-chip${dirCls}"${attr} title="${esc(tip)}">${esc(t("reg.procShort." + p.key))} <b>${pct}%</b> ${arrow}${fbaBit ? `<small>${esc(fbaBit)}</small>` : ""}</span>`;
+  }).join("") + `</div>`;
+}
+
+/** Level 2: run counterfactual pFBA screens for the top 12 TFs in the Web Worker and cache the flux vectors. */
+async function regFbaImpactRun() {
+  if (REG.fbaBusy) { REG.fbaBusy.stop = true; return; }
+  const f = frame();
+  if (!REG.result || S.mode !== "steady" || !f || f.status !== "optimal") {
+    const st = $("regFbaStatus");
+    if (st) st.textContent = t("scr.needSteady");
+    return;
+  }
+  const spec = regProcessSpec();
+  const ranked = REG.sortProc !== "ulm"
+    ? rankRegulatorsByProcess(S.model, REG.result, REG.rnaSummary, f.v, spec, regProcessOpts()).items.map((x) => x.entry)
+    : REG.result.tfs;
+  const targets = ranked.slice(0, 12);
+  if (!targets.length) return;
+
+  const ctx = currentContext();
+  const offSet = ctx && S.base?.model?.genes ? offGenes(ctx, S.base.model.genes) : null;
+  const built = targets.map((e) => ({ entry: e, ...buildTfCounterfactualPerturbation(S.model, e, offSet) }));
+  const pertList = built.map((b) => b.pert);
+  const cfg = runCfg();
+  const pref = "pertRef" in f ? f.pertRef : f.ref;
+  const refV = cfg.perturb?.length ? (pref?.v || f.v) : null;
+
+  const busy = (REG.fbaBusy = { stop: false });
+  const btn = $("regFbaBtn"), st = $("regFbaStatus");
+  if (btn) btn.textContent = t("scr.stop");
+  if (st) st.textContent = t("reg.fbaProg", { done: 0, total: built.length });
+  setProgress(0);
+  try {
+    const screen = await S.sim.screenRegulators(cfg, S.supplies, pertList, refV, (done, total) => {
+      if ($("regFbaStatus")) $("regFbaStatus").textContent = t("reg.fbaProg", { done, total });
+      setProgress(done / total);
+      return !busy.stop;
+    });
+    if (!busy.stop && screen.results.length === built.length) {
+      const byTf = new Map();
+      built.forEach((b, i) => byTf.set(b.entry.tf, { mode: b.mode, nGenes: b.nGenes, nRxns: b.nRxns, res: screen.results[i] }));
+      REG.fbaImpact = { result: S.result, base: screen.base, byTf };
+    }
+  } catch (err) {
+    if ($("regFbaStatus")) $("regFbaStatus").textContent = err.message;
+  } finally {
+    if (REG.fbaBusy === busy) REG.fbaBusy = null;
+    setProgress(null);
+    if (REG.result) regRender();
+    renderDetails();
+  }
+}
+
 function regRender() {
   const res = REG.result;
   if (!res) return;
+  const f = frame();
   const fmtq = (q) => (q < 1e-4 ? q.toExponential(1) : q.toFixed(3));
   const sig = res.tfs.filter((x) => x.qRna < 0.05).length;
-  const top = res.tfs.slice(0, 14);
   const symSet = new Set(S.model.genes.flatMap((g) => [g[0]?.toLowerCase(), g[1]?.toLowerCase()]).filter(Boolean));
+  const hasFlux = !!(f?.v && f.status === "optimal");
+  const metChoices = hasFlux ? activeMetChoices(f) : [];
+  if (REG.sortProc === "met" && (!metChoices.length || !metChoices.some((m) => m.base === REG.sortMet))) {
+    REG.sortMet = metChoices[0]?.base ?? -1;
+  }
+  const hasFba = !!(REG.fbaImpact && REG.fbaImpact.result === S.result);
+  const spec = regProcessSpec();
 
-  const tfHtml = top.map((x) => {
-    const up = x.combinedScore >= 0;
-    const arrow = `<span class="reg-dir ${up ? "up" : "down"}">${up ? "↑" : "↓"}</span>`;
-    const sample = x.metGenes.slice(0, 4).map((g) => `${esc(g.gene)}(${g.log2fc > 0 ? "+" : ""}${g.log2fc.toFixed(1)})`).join(", ");
-    const chainTxt = res.hasMet && x.concordant.length
-      ? ` · <b>${t("reg.chains", { n: x.concordant.length })}</b>` : "";
-    const hasDown = x.metGenes.some((g) => g.log2fc <= -0.35 && symSet.has(g.gene.toLowerCase()));
-    return `<div class="mtb-step">${arrow}<b>${esc(x.tf)}</b>`
-      + ` <span class="val">t = ${x.zRna > 0 ? "+" : ""}${x.zRna.toFixed(2)}</span>`
-      + ` <span class="q">q ${fmtq(x.qRna)}</span>`
-      + `<span class="meta">${t("reg.tfMeta", { obs: x.nObsRna, tot: x.nTotalRna, met: x.metGenes.length, rxns: x.metRxns.size })}${chainTxt}`
-      + (sample ? `<br>${t("reg.topMet")}: ${sample}` : "") + `</span>`
-      + `<div class="mtb-step-acts">`
-      + (x.metRxns.size ? `<button type="button" class="link" data-regmark="${esc(x.tf)}">${t("reg.markMap")}</button>` : "")
-      + (hasDown ? `<button type="button" class="link" data-regtest="${esc(x.tf)}">${t("reg.testKd")}</button>` : "")
-      + `</div></div>`;
-  }).join("");
+  const procOptsHtml = ["ulm", ...PROCESS_KEYS, ...(metChoices.length ? ["met"] : [])]
+    .map((k) => `<option value="${k}"${REG.sortProc === k ? " selected" : ""}>${esc(t("reg.proc." + k))}</option>`)
+    .join("");
+  const metSelHtml = REG.sortProc === "met" && metChoices.length
+    ? `<select id="regProcMet">${metChoices.map((m) => `<option value="${m.base}"${REG.sortMet === m.base ? " selected" : ""}>${esc(m.name)}</option>`).join("")}</select>`
+    : "";
+  const procBarHtml = hasFlux
+    ? `<div class="reg-proc-bar">`
+      + `<label for="regProcSel">${t("reg.sortBy")}</label>`
+      + `<select id="regProcSel">${procOptsHtml}</select>${metSelHtml}`
+      + `<button type="button" id="regFbaBtn" class="link" title="${esc(t("reg.fbaBtnTip"))}">${t(REG.fbaBusy ? "scr.stop" : hasFba ? "reg.fbaAgain" : "reg.fbaBtn")}</button>`
+      + `</div><div class="hint" id="regFbaStatus">${hasFba ? t("reg.fbaDone", { n: REG.fbaImpact.byTf.size }) : ""}</div>`
+    : "";
+
+  let tfHtml = "", listHeading = `${t("reg.topTfs")} (${sig})`, procEmpty = false;
+  if (REG.sortProc === "ulm" || !hasFlux) {
+    const top = res.tfs.slice(0, 14);
+    tfHtml = top.map((x) => {
+      const up = x.combinedScore >= 0;
+      const arrow = `<span class="reg-dir ${up ? "up" : "down"}">${up ? "↑" : "↓"}</span>`;
+      const sample = x.metGenes.slice(0, 4).map((g) => `${esc(g.gene)}(${g.log2fc > 0 ? "+" : ""}${g.log2fc.toFixed(1)})`).join(", ");
+      const chainTxt = res.hasMet && x.concordant.length
+        ? ` · <b>${t("reg.chains", { n: x.concordant.length })}</b>` : "";
+      const hasDown = x.metGenes.some((g) => g.log2fc <= -0.35 && symSet.has(g.gene.toLowerCase()));
+      const profHtml = hasFlux ? tfProfileHtml(x, f, true) : "";
+      const objBadge = hasFba ? fbaBadgeHtml(x.tf, "obj") : "";
+      return `<div class="mtb-step">${arrow}<b>${esc(x.tf)}</b>`
+        + ` <span class="val">t = ${x.zRna > 0 ? "+" : ""}${x.zRna.toFixed(2)}</span>`
+        + ` <span class="q">q ${fmtq(x.qRna)}</span>${objBadge}`
+        + `<span class="meta">${t("reg.tfMeta", { obs: x.nObsRna, tot: x.nTotalRna, met: x.metGenes.length, rxns: x.metRxns.size })}${chainTxt}`
+        + (sample ? `<br>${t("reg.topMet")}: ${sample}` : "") + `</span>`
+        + profHtml
+        + `<div class="mtb-step-acts">`
+        + (x.metRxns.size ? `<button type="button" class="link" data-regmark="${esc(x.tf)}">${t("reg.markMap")}</button>` : "")
+        + (hasDown ? `<button type="button" class="link" data-regtest="${esc(x.tf)}">${t("reg.testKd")}</button>` : "")
+        + `</div></div>`;
+    }).join("");
+  } else {
+    const ranked = rankRegulatorsByProcess(S.model, res, REG.rnaSummary, f.v, spec, regProcessOpts());
+    const procLabel = REG.sortProc === "met" && REG.sortMet >= 0
+      ? S.model.bases[REG.sortMet]?.n || ""
+      : t("reg.proc." + REG.sortProc);
+    listHeading = `${t("reg.procRankTitle", { proc: esc(procLabel) })} (${ranked.items.length})`;
+    procEmpty = !ranked.items.length;
+    tfHtml = ranked.items.slice(0, 14).map((it) => {
+      const x = it.entry;
+      const up = it.netPush >= 0;
+      const dirCls = it.netPush > 0.01 ? "up" : it.netPush < -0.01 ? "down" : "";
+      const arrow = `<span class="reg-dir ${dirCls}">${it.netPush > 0.01 ? "↑" : it.netPush < -0.01 ? "↓" : "·"}</span>`;
+      const covPct = Math.round(100 * it.totalShare);
+      const pushPct = Math.round(100 * it.netPush);
+      const fbaTag = hasFba ? fbaBadgeHtml(it.tf, spec) : "";
+      const drvHtml = it.drivers.slice(0, 3).map((d) =>
+        `<span class="linkish" data-regrxn="${d.rxn}">${esc(d.name.slice(0, 32))}</span> (${Math.round(100 * d.share)}%${Number.isFinite(d.fc) ? `, ${fmtFc(d.fc)}` : ""})`
+      ).join(", ");
+      const ovHtml = it.sharedWith.length
+        ? `<div class="reg-overlap">${t("reg.sharedWith", { list: it.sharedWith.map((p) => `${p.tf} (${p.pct}%)`).join(", ") })}</div>`
+        : "";
+      const hasDown = x.metGenes.some((g) => g.log2fc <= -0.35 && symSet.has(g.gene.toLowerCase()));
+      return `<div class="mtb-step">${arrow}<b>${esc(it.tf)}</b>`
+        + ` <span class="val">${t("reg.covShort", { cov: covPct, push: `${pushPct > 0 ? "+" : ""}${pushPct}` })}</span>`
+        + ` <span class="q">t=${it.zRna.toFixed(1)}, q ${fmtq(it.qRna)}</span>${fbaTag}`
+        + `<div class="reg-cov-bar ${dirCls}"><i style="width:${Math.max(2, Math.min(100, covPct))}%"></i></div>`
+        + `<span class="meta">${t("reg.procMeta", { prod: Math.round(100 * it.prodShare), cons: Math.round(100 * it.consShare), n: it.nActiveRxns })}`
+        + (drvHtml ? `<br>${drvHtml}` : "") + `</span>`
+        + ovHtml
+        + `<div class="mtb-step-acts">`
+        + (x.metRxns.size ? `<button type="button" class="link" data-regmark="${esc(it.tf)}">${t("reg.markMap")}</button>` : "")
+        + (hasDown ? `<button type="button" class="link" data-regtest="${esc(it.tf)}">${t("reg.testKd")}</button>` : "")
+        + `</div></div>`;
+    }).join("");
+  }
 
   const mechHtml = res.hasMet && res.classifiedSteps.length
     ? `<details class="scr-group" open><summary>${t("reg.mechTitle")} (${res.classifiedSteps.length})</summary><div class="scr-list">`
@@ -1290,11 +1730,21 @@ function regRender() {
   $("regOut").innerHTML =
     `<div class="note">${t("reg.summary", { g: res.nRnaGenes, n: res.tfs.length, sig })} `
     + `${res.hasMet ? t("reg.linkedMet", { rxns: res.nObservableRxns }) : t("reg.rnaOnlyNote")}</div>`
-    + (top.length
-      ? `<details class="scr-group" open><summary>${t("reg.topTfs")} (${sig})</summary><div class="scr-list">${tfHtml}</div></details>`
-      : `<p class="hint">${t("reg.noTfs")}</p>`)
+    + procBarHtml
+    + (tfHtml
+      ? `<details class="scr-group" open><summary>${listHeading}</summary><div class="scr-list">${tfHtml}</div></details>`
+      : `<p class="hint">${t(procEmpty ? "reg.procNone" : "reg.noTfs")}</p>`)
     + mechHtml;
 
+  const pSel = $("regProcSel");
+  if (pSel) pSel.onchange = () => { REG.sortProc = pSel.value; regRender(); };
+  const mSel = $("regProcMet");
+  if (mSel) mSel.onchange = () => { REG.sortMet = +mSel.value; regRender(); };
+  const fBtn = $("regFbaBtn");
+  if (fBtn) fBtn.onclick = regFbaImpactRun;
+  $("regOut").querySelectorAll("[data-regproc]").forEach((el) => {
+    el.onclick = () => { REG.sortProc = el.dataset.regproc; regRender(); };
+  });
   $("regOut").querySelectorAll("[data-regmark]").forEach((b) => { b.onclick = () => regMarkTf(b.dataset.regmark); });
   $("regOut").querySelectorAll("[data-regtest]").forEach((b) => { b.onclick = () => regTestTf(b.dataset.regtest); });
   $("regOut").querySelectorAll("[data-regrxn]").forEach((el) => {
@@ -1314,6 +1764,91 @@ function regRender() {
 // ---------------------------------------------------------- exometabolomics ----
 // Concentrations measured in the spent medium -> exchange fluxes (js/core/exodata.js), and the fit of
 // those rates to the network (js/core/fitexchange.js). Everything runs in this browser.
+
+// ---------------------------------------------------------------- the flux axis of the cross-omic read ----
+// The regulatory inference can be told how the flux CHANGED between two states, and then asks whether the
+// steps a regulator controls move the way its targets' mRNA says they should. Where that change comes from
+// decides whether the comparison is evidence at all, so the user picks the method and the result carries the
+// label.
+
+/** Which flux methods this session can offer right now. */
+function fluxMethods() {
+  const out = [];
+  const f = frame();
+  if (f?.ref?.v) out.push({ id: "contrast", name: cmpNames(f) });
+  const conds = [...new Set((EXO.groups || []).map((g) => g.condition))];
+  if (conds.length >= 2) out.push({ id: "fitted", conds });
+  return out;
+}
+
+/** Solve once with the exchange rates measured for one condition of the spent-medium table. */
+async function exoFluxForCondition(cond) {
+  const groups = (EXO.groups || []).filter((g) => g.condition === cond);
+  const rows = groups.map((g) => {
+    const r = ratesFromReplicates(g);
+    const hit = exoResolve(g.metabolite);
+    return { rate: r.rate, met: hit.met };
+  }).filter((r) => r.met !== undefined && Number.isFinite(r.rate));
+  if (!rows.length) return null;
+  const cfg = {
+    ...S.cfg,
+    perturb: [...perturbActivities()],
+    measured: { items: rows.map((r) => ({ met: r.met, rate: +r.rate.toPrecision(4) })), tol: S.measured.tol ?? DEFAULT_TOL, ngam: S.measured.ngam, trace: S.measured.trace },
+    context: S.ctxBlock ? { id: S.context.id, mode: S.context.mode, block: S.ctxBlock } : undefined,
+  };
+  const res = await S.sim.runSteady(cfg, S.supplies, S.structures);
+  const fr = res?.frames?.[0];
+  return fr && /optimal/i.test(fr.status) ? fr.v : null;
+}
+
+/**
+ * Build the { v, vRef, source } the inference wants.
+ *  "contrast" -- the A/B already on screen. Honest about what it is: unless the difference between A and B is
+ *                itself measured, the flux change is the model's answer to a change the user imposed, so it
+ *                is labelled "contrast" and the joint test still declines.
+ *  "fitted"    -- two conditions of the spent-medium table, each solved against its own measured exchange
+ *                rates. This is the only one independent of the transcriptome, so it is the only one the
+ *                joint test will put a p-value on.
+ */
+async function fluxForRegulators(method, condA, condB) {
+  if (method === "contrast") {
+    const f = frame();
+    return f?.ref?.v ? { v: f.v, vRef: f.ref.v, source: "contrast" } : null;
+  }
+  if (method === "fitted") {
+    const [vRef, v] = await Promise.all([exoFluxForCondition(condA), exoFluxForCondition(condB)]);
+    return v && vRef ? { v, vRef, source: "fitted" } : null;
+  }
+  return null;
+}
+
+/** Fill the flux-method picker, and say in one line what each method would mean. */
+function renderFluxMethods() {
+  const sel = $("regFluxMethod"), why = $("regFluxWhy"), a = $("regCondA"), b = $("regCondB");
+  if (!sel) return;
+  const methods = fluxMethods();
+  sel.innerHTML = `<option value="">${t("reg.fluxNone")}</option>`
+    + methods.map((m) => `<option value="${m.id}">${esc(t("reg.flux." + m.id))}</option>`).join("");
+  sel.disabled = !methods.length;
+  const fitted = methods.find((m) => m.id === "fitted");
+  for (const el of [a, b]) {
+    if (!el) continue;
+    el.innerHTML = (fitted?.conds || []).map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  }
+  if (fitted && a && b && fitted.conds.length >= 2) { a.value = fitted.conds[0]; b.value = fitted.conds[1]; }
+  const explain = () => {
+    const v = sel.value;
+    const showConds = v === "fitted";
+    if (a) a.hidden = !showConds;
+    if (b) b.hidden = !showConds;
+    why.innerHTML = !methods.length ? t("reg.fluxWhyNone")
+      : v === "fitted" ? t("reg.fluxWhyFitted")
+      : v === "contrast" ? t("reg.fluxWhyContrast")
+      : t("reg.fluxWhyOff");
+  };
+  sel.onchange = explain;
+  explain();
+}
 
 const EXO = { groups: null, rates: null, unit: null, index: null, baseToMet: null, baseById: null, manual: null };
 
@@ -1935,7 +2470,7 @@ function applyFrame() {
   const mask = filt === "all" ? null : frameMask(f, filt);
   if (S.view.kind === "sub" || S.view.kind === "focus") {
     const pertA = f?.ref?.scen ? f.ref.scen.result.pert : null; // what A itself had knocked out (nothing for the unperturbed reference)
-    map.setData(f ? { v: mf.v, turnover: frameTurnover(mf), metE: mf.metE, uncertain: view === "a" ? null : f.uncertain, mode, mask, ref: f.ref?.v, refE: f.ref?.metE, refTurnover: view === "ab" ? refTurnover(f) : null, perturb: view === "a" ? pertA : S.result.pert, dG: S.quantity === "dg" ? S.flowData.dG : null, blocked: S.ctxBlock ? (S.ctxBlockSet ??= new Set(S.ctxBlock)) : null, qflux: view === "ab" ? null : cofactorRxnFlux(mf, S.quantity), flex: view !== "a" && S.flex && S.flex.result === S.result && S.flex.frameIdx === S.frameIdx ? S.flex.map : null, mtb: mtbMapData("sub") } : {});
+    map.setData(f ? { v: mf.v, turnover: frameTurnover(mf), metE: mf.metE, uncertain: view === "a" ? null : f.uncertain, mode, mask, ref: f.ref?.v, refE: f.ref?.metE, refTurnover: view === "ab" ? refTurnover(f) : null, perturb: view === "a" ? pertA : S.result.pert, dG: S.quantity === "dg" ? S.flowData.dG : null, blocked: S.ctxBlock ? (S.ctxBlockSet ??= new Set(S.ctxBlock)) : null, qflux: view === "ab" ? null : cofactorRxnFlux(mf, S.quantity), flex: view !== "a" && S.flex && S.flex.result === S.result && S.flex.frameIdx === S.frameIdx ? S.flex.map : null, mtb: mtbMapData("sub"), rna: rnaMapData("sub") } : {});
   } else if (S.view.kind === "global") {
     let gHas = null;
     if (mask) {
@@ -1949,7 +2484,7 @@ function applyFrame() {
       const D = S.flowData, refFl = cache[k] || (cache[k] = S.index.groupFlows(f.ref.v, f.ref.metE || new Float32Array(S.model.mets.length), G, null, { w: D.zeroW || (D.zeroW = new Float32Array(S.model.mets.length)), skipBase: D.noSkip }));
       fl = { ...fl, gD: Float32Array.from(fl.gE, (e, g) => Math.max(-1, Math.min(1, 3 * ((f.metE ? e : 0) - refFl.gE[g])))) };
     }
-    map.setData(f ? { ...fl, mode, gHas, minE: filt === "label" ? 0.005 : 0, energy: fl.energy ? fl.energy.g : null, mtbGlobal: mtbMapData("global") } : {});
+    map.setData(f ? { ...fl, mode, gHas, minE: filt === "label" ? 0.005 : 0, energy: fl.energy ? fl.energy.g : null, mtbGlobal: mtbMapData("global"), rnaGlobal: rnaMapData("global") } : {});
   } else renderListView(mask);
   $("emptyNote").hidden = !(mask && S.view.kind !== "list" && map.visibleCount() === 0);
   renderLegend(mode, view);
@@ -2015,6 +2550,20 @@ function renderLegend(mode, view = "b") {
       + `<div class="chl"><svg width="16" height="12" aria-hidden="true"><circle cx="8" cy="6" r="4.5" fill="var(--panel2)" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="2.5 2"/></svg><span>${t("mtb.legendUnmeas")}</span></div>`
       + (sub ? `<div class="chl"><svg width="16" height="12" aria-hidden="true"><rect x="4.5" y="2.5" width="7" height="7" transform="rotate(45 8 6)" fill="var(--panel)" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="2.2 1.8"/></svg><span>${t("mtb.legendUnobs")}</span></div>` : "")
       + `<div class="chl"><svg width="16" height="12" aria-hidden="true"><circle cx="8" cy="6" r="4.8" fill="none" stroke="var(--hot)" stroke-width="2"/></svg><span>${t("mtb.legendTop")}</span></div>`;
+  }
+  if (REG.overlay && REG.rnaSummary) {
+    h += `<div style="margin-top:6px"><b style="color:var(--text)">${t("rna.legendTitle")}</b></div>`
+      + ramp([-1, -0.5, 0, 0.5, 1].map((x) => deltaColor(x)), ["÷4 (−2)", "÷2", "0", "×2", "×4 (+2)"])
+      + `<div class="chl"><svg width="16" height="12" aria-hidden="true"><rect x="4.5" y="2.5" width="7" height="7" transform="rotate(45 8 6)" fill="${deltaColor(0.7)}" stroke="var(--text)" stroke-width="1.1"/></svg><span>${t(sub ? "rna.legendRxn" : (MTB.overlay && MTB.result ? "rna.legendRing" : "rna.legendPath"))}</span></div>`
+      + (sub && REG.rnaSummary.isoSwitches.length ? `<div class="chl"><svg width="16" height="12" aria-hidden="true"><circle cx="8" cy="6" r="4.6" fill="none" stroke="${revColor()}" stroke-width="1.8" stroke-dasharray="2.8 2"/></svg><span>${t("rna.legendIso")}</span></div>` : "");
+  }
+  if (REG.markedTf) {
+    const rc = regColors();
+    const ring = (c) => `<svg width="16" height="12" aria-hidden="true"><circle cx="8" cy="6" r="4.6" fill="none" stroke="${c}" stroke-width="2"/></svg>`;
+    h += `<div style="margin-top:6px"><b style="color:var(--text)">${t("legend.regTitle", { tf: esc(REG.markedTf) })}</b></div>`
+      + `<div class="chl">${ring(rc.up)}${t("legend.regUp")}</div>`
+      + `<div class="chl">${ring(rc.down)}${t("legend.regDown")}</div>`
+      + `<div class="chl">${ring(rc.mixed)}${t("legend.regMixed")}</div>`;
   }
   if (view === "a") h += `<div class="chnote">${t("legend.viewA", { a: esc(cmpNames(frame()).a), b: esc(cmpNames(frame()).b) })}</div>`;
   if (sub && S.result?.pert?.size) h += `<div>${t("legend.pert")}</div>`;
@@ -2841,11 +3390,13 @@ function bars(rows, color, wide = false) {
 function wireGo(root) {
   root.querySelectorAll("[data-go]").forEach((elx) => {
     elx.addEventListener("click", () => {
-      const [k, id] = elx.dataset.go.split(":");
+      const raw = elx.dataset.go, i = raw.indexOf(":");
+      const k = raw.slice(0, i), id = raw.slice(i + 1);
       if (k === "rxn") gotoReaction(+id);
       else if (k === "met") gotoMet(+id);
       else if (k === "sub") openSubsystem(+id);
       else if (k === "base") gotoBase(+id);
+      else if (k === "gene") { S.sel = { type: "gene", sym: id }; renderDetails(); }
     });
   });
 }
@@ -3402,6 +3953,162 @@ function cofactorHtml(f) {
 }
 
 /** A few plain sentences about the result, built from the same numbers as the panels below. */
+/**
+ * What a marked regulon is doing, for the summary sidebar. A regulon can hold hundreds of reactions
+ * (ArcA reaches 291), so the list is the ones carrying flux in the current solution, largest first:
+ * those are the steps where the regulator is actually able to change something. The rest are counted.
+ */
+const fmtFc = (x) => (Math.abs(x) < 0.005 ? "0.00" : (x > 0 ? "+" : "−") + Math.abs(x).toFixed(2));
+
+function regulonSummaryHtml(f) {
+  const e = REG.result?.tfs.find((x) => x.tf === REG.markedTf);
+  if (!e || !REG.markedRxns?.size) return "";
+  const { model } = S, dir = REG.markedRxns;
+  let up = 0, down = 0, unclear = 0;
+  for (const j of dir) { const d = e.metRxnDir?.get(j); if (d > 0) up++; else if (d < 0) down++; else unclear++; }
+
+  const rnaInfo = REG.rnaSummary?.rxnInfo;
+  const rows = [...dir]
+    .map((j) => ({ j, v: f?.v ? f.v[j] : 0, d: e.metRxnDir?.get(j) ?? 0, fc: rnaInfo?.get(j)?.fc ?? NaN }))
+    .filter((x) => Math.abs(x.v) > 1e-9 || (Number.isFinite(x.fc) && Math.abs(x.fc) >= 0.75))
+    .sort((a, b) => (Math.abs(b.v) > 1e-9 ? 1 : 0) - (Math.abs(a.v) > 1e-9 ? 1 : 0) || Math.abs(b.v) - Math.abs(a.v) || Math.abs(b.fc || 0) - Math.abs(a.fc || 0));
+  const shown = rows.slice(0, 12);
+  const arrow = (d) => (d > 0 ? "&uarr;" : d < 0 ? "&darr;" : "&middot;");
+  const cls = (d) => (d > 0 ? "reg-up" : d < 0 ? "reg-down" : "reg-mixed");
+
+  const act = e.zRna >= 0 ? "up" : "down";
+  let h = `<h4>${t("reg.sumTitle")}${small(esc(e.tf))}</h4>`
+    + `<div class="reg-head"><span class="reg-act ${act}">${t("reg.act." + act)}</span>`
+    + `<span class="hint">t = ${e.zRna.toFixed(2)}${Number.isFinite(e.qRna) ? `, q = ${e.qRna < 1e-4 ? e.qRna.toExponential(1) : e.qRna.toFixed(3)}` : ""}</span></div>`
+    + `<div class="reg-counts"><span class="reg-up">${arrow(1)} ${t("reg.nUp", { n: up })}</span>`
+    + `<span class="reg-down">${arrow(-1)} ${t("reg.nDown", { n: down })}</span>`
+    + (unclear ? `<span class="reg-mixed">${arrow(0)} ${t("reg.nMixed", { n: unclear })}</span>` : "")
+    + `</div>`
+    + (f?.v ? tfProfileHtml(e, f, false) : "")
+    + `<p class="hint">${t("reg.sumHow", { n: e.nMetTargets, r: dir.size })}</p>`;
+
+  // Ad-hoc contiguous route selector when the regulon spans multiple connected stretches
+  if (REG.routes && (REG.routes.routes.length > 1 || (REG.routes.routes.length >= 1 && REG.routes.scattered.length))) {
+    const inReg = S.view.center?.type === "regulon";
+    const pills = REG.routes.routes.slice(0, 6).map((rt, idx) =>
+      `<button data-regroute="${idx}" class="${inReg && REG.routeIdx === idx ? "on" : ""}">${t("reg.route", { i: idx + 1, n: rt.length })}</button>`
+    );
+    if (REG.routes.scattered.length) {
+      pills.push(`<button data-regroute="scattered" class="${inReg && REG.routeIdx === "scattered" ? "on" : ""}">${t("reg.scattered", { n: REG.routes.scattered.length })}</button>`);
+    }
+    h += `<div class="reg-routes">${pills.join("")}</div><p class="hint">${t("reg.routesHint")}</p>`;
+  }
+
+  // the flux axis, when one was supplied
+  if (REG.result?.flux) {
+    const fx = REG.result.flux;
+    const tot = e.fluxAgree + e.fluxDisagree;
+    h += `<div class="reg-flux"><b>${t("reg.fluxTitle")}</b>${small(t("reg.fluxSrc." + fx.source))}</div>`;
+    if (tot) {
+      h += `<div class="reg-counts"><span class="reg-up">${t("reg.fluxAgree", { n: e.fluxAgree })}</span>`
+        + `<span class="reg-down">${t("reg.fluxDisagree", { n: e.fluxDisagree })}</span>`
+        + (e.fluxIdle ? `<span class="reg-mixed">${t("reg.fluxIdle", { n: e.fluxIdle })}</span>` : "") + `</div>`;
+      const jt = REG.joint?.get(e.tf);
+      h += jt?.p !== null && jt
+        ? `<p class="hint">${t("reg.jointP", { p: jt.p < 1e-3 ? jt.p.toExponential(1) : jt.p.toFixed(3), k: jt.observed, n: jt.n })}</p>`
+        : `<p class="hint">${t("reg.jointNo." + (jt?.reason || "noFlux"))}</p>`;
+    } else h += `<p class="hint">${t("reg.fluxNoneMoved")}</p>`;
+  }
+
+  if (!shown.length) return h + `<div class="note">${t("reg.noneCarry")}</div>`;
+  h += `<div class="reg-list">` + shown.map((x) => {
+    const r = model.rxns[x.j];
+    const drivers = (e.rxnDrivers?.get(x.j) || []).slice(0, 3)
+      .map((g) => `${esc(g.gene)}<span class="reg-sign">${g.regSign > 0 ? "+" : "&minus;"}</span>`).join(", ");
+    const fcBadge = Number.isFinite(x.fc) ? `<span class="rna-badge">${fmtFc(x.fc)}</span>` : "";
+    return `<div class="reg-row ${cls(x.d)}" data-regrxn="${x.j}" title="${esc(r.n || r.id)}">`
+      + `<span class="reg-arrow">${arrow(x.d)}</span>`
+      + `<span class="nm">${esc((r.n || r.id).slice(0, 44))}</span>`
+      + `<span class="val">${Math.abs(x.v) > 1e-9 ? fmtFlux(x.v) : "0"}${fcBadge}</span>`
+      + (drivers ? `<span class="reg-genes">${drivers}</span>` : "") + `</div>`;
+  }).join("") + `</div>`;
+  if (rows.length > shown.length) h += `<div class="hint">${t("reg.more", { n: rows.length - shown.length })}</div>`;
+  const idle = dir.size - rows.filter((x) => Math.abs(x.v) > 1e-9).length;
+  if (idle > 0) h += `<div class="hint">${t("reg.idle", { n: idle })}</div>`;
+  return h;
+}
+
+/**
+ * Multi-omic RNA-seq overview for the summary sidebar:
+ *  - top transcriptionally shifted pathways,
+ *  - OR-branch isoenzyme switches (e.g. LDHA ↑ / LDHB ↓),
+ *  - multi-omic discrepancies & convergences (induced-idle enzymes, post-transcriptional bottlenecks, concordant steps).
+ */
+function rnaOverviewHtml(f) {
+  const rs = REG.rnaSummary, { model } = S;
+  if (!rs || !rs.nMeasuredRxns) return "";
+  let h = `<h4>${t("rna.ovTitle")}${small(t("rna.ovMeta", { n: rs.nMeasuredRxns, p: rs.pathways.length }))}</h4>`;
+
+  // 1. Transcriptionally shifted pathways
+  if (rs.pathways.length) {
+    const topP = rs.pathways.slice(0, 6);
+    h += `<details class="rna-sec" open><summary>${t("rna.ovPaths")} (${rs.pathways.length})</summary><div class="reg-list">`
+      + topP.map((p) => {
+        const up = p.meanFc >= 0;
+        return `<div class="reg-row ${up ? "reg-up" : "reg-down"}" data-go="sub:${p.ss}" title="${esc(p.name)}">`
+          + `<span class="reg-arrow">${up ? "&uarr;" : "&darr;"}</span>`
+          + `<span class="nm">${esc(p.name)}</span>`
+          + `<span class="val">${fmtFc(p.meanFc)}<span class="rna-badge">&uarr;${p.nUp}/&darr;${p.nDown}</span></span></div>`;
+      }).join("") + `</div></details>`;
+  }
+
+  // 2. OR-branch isoenzyme switches
+  if (rs.isoSwitches.length) {
+    h += `<details class="rna-sec" open><summary>${t("rna.ovIso")} (${rs.isoSwitches.length})</summary><div class="reg-list">`
+      + rs.isoSwitches.slice(0, 6).map((sw) =>
+        `<div class="reg-row reg-mixed" data-go="rxn:${sw.rxn}" title="${esc(sw.name)}">`
+        + `<span class="reg-arrow">&#8644;</span>`
+        + `<span class="nm">${esc(sw.name.slice(0, 38))}</span>`
+        + `<span class="val">${esc(sw.up.gene)} ${fmtFc(sw.up.fc)} / ${esc(sw.down.gene)} ${fmtFc(sw.down.fc)}</span></div>`
+      ).join("") + `</div></details>`;
+  }
+
+  // 3. Multi-omic discrepancies & convergences
+  const disc = computeMultiOmicDiscrepancies(model, rs, { v: f?.v, vRef: f?.ref?.v, regResult: REG.result });
+  const hasDisc = disc.inducedIdle.length || disc.postTx.length || disc.concordant.length;
+  if (hasDisc) {
+    h += `<details class="rna-sec" open><summary>${t("rna.ovDisc")}</summary>`;
+    if (disc.inducedIdle.length) {
+      h += `<div class="hint" style="margin:4px 0 2px"><b>${t("rna.ovIdle")} (${disc.inducedIdle.length})</b> — ${t("rna.ovIdleHint")}</div><div class="reg-list">`
+        + disc.inducedIdle.slice(0, 6).map((it) =>
+          `<div class="reg-row reg-up" data-go="rxn:${it.rxn}" title="${esc(it.name)}">`
+          + `<span class="reg-arrow">&uarr;</span>`
+          + `<span class="nm">${esc(it.name.slice(0, 40))}</span>`
+          + `<span class="val">${esc(it.gene)} ${fmtFc(it.fc)}</span></div>`
+        ).join("") + `</div>`;
+    }
+    if (disc.postTx.length) {
+      h += `<div class="hint" style="margin:6px 0 2px"><b>${t("rna.ovPostTx")} (${disc.postTx.length})</b></div><div class="reg-list">`
+        + disc.postTx.slice(0, 6).map((st) => {
+          const r = model.rxns[st.rxn];
+          const g0 = st.rnaGenes?.[0];
+          return `<div class="reg-row reg-down" data-go="rxn:${st.rxn}" title="${esc(r?.n || st.name || "")}">`
+            + `<span class="reg-arrow">&otimes;</span>`
+            + `<span class="nm">${esc((r?.n || st.name || "").slice(0, 40))}</span>`
+            + `<span class="val">${g0 ? `${esc(g0.gene)} ${fmtFc(g0.log2fc)}` : "—"}</span></div>`;
+        }).join("") + `</div>`;
+    }
+    if (disc.concordant.length) {
+      h += `<div class="hint" style="margin:6px 0 2px"><b>${t("rna.ovConc")} (${disc.concordant.length})</b></div><div class="reg-list">`
+        + disc.concordant.slice(0, 6).map((it) => {
+          const up = it.fc >= 0;
+          const tags = [it.viaFlux ? "FBA" : "", it.viaMet ? "MTB" : ""].filter(Boolean).join("+");
+          return `<div class="reg-row ${up ? "reg-up" : "reg-down"}" data-go="rxn:${it.rxn}" title="${esc(it.name)}">`
+            + `<span class="reg-arrow">${up ? "&uarr;" : "&darr;"}</span>`
+            + `<span class="nm">${esc(it.name.slice(0, 38))}</span>`
+            + `<span class="val">${fmtFc(it.fc)}<span class="rna-badge">${tags}</span></span></div>`;
+        }).join("") + `</div>`;
+    }
+    h += `</details>`;
+  }
+  return h;
+}
+
 function plainSummaryHtml(f) {
   const { model } = S, out = [], obj = model.rxns[S.cfg.objective];
   const growth = isGrowthRxn(obj);
@@ -3489,6 +4196,8 @@ function summaryHtml() {
       <div class="card"><div class="lbl">${t("sum.active")}</div><div class="big">${active}<small>${t("sum.of", { n: model.rxns.length })}</small></div></div>
       ${f.biomass ? `<div class="card"><div class="lbl">${t("sum.biomass")}</div><div class="big">${f.biomass.toFixed(2)}<small>gDW/L</small></div></div>` : ""}
     </div>`;
+  if (REG.markedTf) h += regulonSummaryHtml(f);
+  if (REG.rnaSummary) h += rnaOverviewHtml(f);
   if (S.result.evList?.length) {
     h += `<h4>${t("sum.events")}</h4><div class="evlist">${S.result.evList.map((ev) => `<div class="${f.t > ev.t ? "done" : ""}">${esc(ev.type === "medium" ? t("sum.evMedium", { t: fmtTime(ev.t), name: mediumName(ev.mediumId) }) : t("sum.evAdd", { t: fmtTime(ev.t), c: ev.conc, name: eventName(ev) }))}</div>`).join("")}</div>`;
   }
@@ -3578,6 +4287,31 @@ function metHtml(m) {
   h += `<div class="actions"><button data-act="supply">${t("met.addSupply")}</button><button data-act="label">${t("met.label")}</button>${ppMet !== undefined ? `<button data-act="phase" title="${esc(t("pp.title"))}">${t("pp.button")}</button>` : ""}</div><div id="ppOut"></div>`;
   if (S.editMode) h += `<div class="actions edit"><button data-act="newRxnMet">${t("ed.act.newRxnMet")}</button><button data-act="newComp">${t("ed.act.newComp")}</button><button data-act="removeMet" class="danger">${t("ed.act.removeMet")}</button></div>`;
   if (f?.ref?.scen) h += `<div id="detCmp"></div>`;
+  if (REG.result && f?.v) {
+    const mr = metaboliteRegulators(model, REG.result, REG.rnaSummary, f.v, m, regProcessOpts());
+    if (mr.items.length) {
+      const scopeTag = mr.scope === "base" ? t("reg.metAllComp") : compName(met.c);
+      const spec = mr.scope === "base" ? { kind: "met", base: met.b } : { kind: "met", met: m };
+      h += `<h4>${t("reg.metTitle")}${small(esc(scopeTag))}</h4><div class="reg-list">`
+        + mr.items.map((it) => {
+          const dirCls = it.netPush > 0.01 ? "reg-up" : it.netPush < -0.01 ? "reg-down" : "reg-mixed";
+          const arrow = it.netPush > 0.01 ? "&uarr;" : it.netPush < -0.01 ? "&darr;" : "&middot;";
+          const pPct = Math.round(100 * it.prodShare), cPct = Math.round(100 * it.consShare);
+          const fbaTag = fbaBadgeHtml(it.tf, spec);
+          const sub = [
+            pPct ? `${t("reg.metProd")} ${pPct}%` : "",
+            cPct ? `${t("reg.metCons")} ${cPct}%` : "",
+          ].filter(Boolean).join(" · ");
+          const drv = it.drivers[0] ? ` · ${esc(it.drivers[0].name.slice(0, 28))}` : "";
+          const ov = it.sharedWith.length ? ` · ${t("reg.sharedShort", { tf: esc(it.sharedWith[0].tf), p: it.sharedWith[0].pct })}` : "";
+          return `<div class="reg-row ${dirCls}" data-marktf="${esc(it.tf)}" title="${esc(t("reg.clickMarkTf"))}">`
+            + `<span class="reg-arrow">${arrow}</span>`
+            + `<span class="nm"><b>${esc(it.tf)}</b>${fbaTag}</span>`
+            + `<span class="val">${Math.round(100 * it.totalShare)}%</span>`
+            + `<span class="reg-genes">${sub}${drv}${ov}</span></div>`;
+        }).join("") + `</div>`;
+    }
+  }
   const prod = [], cons = [];
   for (let p = index.rxnStart[m]; p < index.rxnStart[m + 1]; p++) {
     const j = index.rxnList[p], x = f ? f.v[j] * index.rxnCoef[p] : 0;
@@ -3762,6 +4496,31 @@ function rxnHtml(j) {
     const obsTxt = MTB.result.obsRxns.has(j) ? t("mtb.rxnObs") : t("mtb.rxnUnobs");
     mtbKv = `<dt>${t("h.mtb")}</dt><dd>${obsTxt}${ddgTxt ? `<br>${ddgTxt}` : ""}</dd>`;
   }
+  let rnaKv = "";
+  const rnaInfo = REG.rnaSummary?.rxnInfo?.get(j);
+  const rxnTfs = REG.result ? activeTfsForReaction(REG.result, j) : [];
+  const tfChipsHtml = rxnTfs.length
+    ? `<div class="rna-chips">${rxnTfs.map((x) => {
+        const c = x.dir > 0 ? " up" : x.dir < 0 ? " down" : "";
+        const arrow = x.dir > 0 ? "&uarr;" : x.dir < 0 ? "&darr;" : "&middot;";
+        const drv = x.drivers.slice(0, 2).map((d) => `${d.gene}${d.regSign > 0 ? "+" : "−"}`).join(", ");
+        const tip = `${x.tf} (t = ${x.zRna.toFixed(2)})${drv ? " · " + drv : ""} — ${t("reg.clickMarkTf")}`;
+        return `<span class="rna-chip${c}" data-marktf="${esc(x.tf)}" title="${esc(tip)}">${esc(x.tf)} ${arrow}</span>`;
+      }).join("")}</div>`
+    : "";
+  if (rnaInfo) {
+    const qTxt = Number.isFinite(rnaInfo.q) ? ` · q = ${rnaInfo.q < 1e-4 ? rnaInfo.q.toExponential(1) : rnaInfo.q.toFixed(3)}` : "";
+    const chips = rnaInfo.genes.map((g) => {
+      const c = g.log2fc >= 0.5 ? " up" : g.log2fc <= -0.5 ? " down" : "";
+      const tip = `${g.gene}: log2FC = ${fmtFc(g.log2fc)}${Number.isFinite(g.q) ? `, q = ${g.q < 1e-4 ? g.q.toExponential(1) : g.q.toFixed(3)}` : ""}`;
+      return `<span class="rna-chip${c}" data-go="gene:${esc(g.gene)}" title="${esc(tip)}">${esc(g.gene)} <b>${fmtFc(g.log2fc)}</b></span>`;
+    }).join("");
+    const isoTag = rnaInfo.iso
+      ? `<div class="rna-iso-tag">&#8644; ${t("rna.ovIsoNote", { up: esc(rnaInfo.iso.up.gene), upFc: fmtFc(rnaInfo.iso.up.fc), dn: esc(rnaInfo.iso.down.gene), dnFc: fmtFc(rnaInfo.iso.down.fc) })}</div>`
+      : "";
+    rnaKv = `<dt>${t("rna.rxnLabel")}</dt><dd><b>${fmtFc(rnaInfo.fc)}</b>${qTxt}<div class="rna-chips">${chips}</div>${isoTag}</dd>`;
+  }
+  const tfKv = tfChipsHtml ? `<dt>${t("rna.rxnTfs")}</dt><dd>${tfChipsHtml}</dd>` : "";
   const tag = r.user ? t("ed.tagNewRxn") : r.edited ? t("ed.tagEditedRxn") : "";
   return `<div class="kind">${t("rxn.kind")}</div><h3>${esc(r.n)}</h3>${tag ? `<div class="note edtag">${tag}</div>` : ""}
     <div class="meta">${r.id} · <span class="linkish" data-go="sub:${r.ss}">${esc(model.subsystems[r.ss])}</span></div>
@@ -3776,6 +4535,8 @@ function rxnHtml(j) {
       <dt>${t("rxn.atommap")}</dt><dd>${mapTxt}</dd>
       ${dgHtml(j, v)}
       ${mtbKv}
+      ${rnaKv}
+      ${tfKv}
     </dl>
     <div class="actions"><button data-act="perturb">${t("pert.button")}</button><button data-act="objective">${t("rxn.useObjective")}</button><button data-act="fva" title="${t("rxn.fvaTitle")}">${t("rxn.fva")}</button></div><div id="fvaOut"></div>
     ${S.editMode ? `<div class="actions edit"><button data-act="editRxn">${t(r.user ? "ed.act.editAdded" : "ed.act.editRxn")}</button><button data-act="copyRxn">${t("ed.act.copyRxn")}</button><button data-act="removeRxn" class="danger">${t(r.user ? "ed.act.dropRxn" : "ed.act.removeRxn")}</button></div>` : ""}`;
@@ -3787,10 +4548,46 @@ function rxnListHtml(kind, title, rxns, ss, canOpen) {
   const rows = rxns.map((j) => [model.rxns[j].n, f ? Math.abs(f.v[j]) : 0, `rxn:${j}`]).sort((a, b) => b[1] - a[1]);
   const act = rows.filter((r) => r[1] > 0);
   const mx = act.length ? act[0][1] : 1;
+  let rnaSub = "";
+  if (REG.rnaSummary) {
+    const measured = rxns.map((j) => ({ j, info: REG.rnaSummary.rxnInfo.get(j) })).filter((x) => x.info);
+    if (measured.length) {
+      const pInfo = ss >= 0 ? REG.rnaSummary.pathwayBySs.get(ss) : null;
+      const meanFc = pInfo ? pInfo.meanFc : measured.reduce((s, x) => s + x.info.fc, 0) / measured.length;
+      const nUp = pInfo ? pInfo.nUp : measured.filter((x) => x.info.fc >= 0.5).length;
+      const nDown = pInfo ? pInfo.nDown : measured.filter((x) => x.info.fc <= -0.5).length;
+      const topRna = measured.slice().sort((a, b) => Math.abs(b.info.fc) - Math.abs(a.info.fc)).slice(0, 6);
+      rnaSub = `<h4>${t("rna.subTitle")}${small(t("rna.subMeta", { n: measured.length, fc: fmtFc(meanFc), up: nUp, dn: nDown }))}</h4>`
+        + `<div class="reg-list">` + topRna.map(({ j, info }) => {
+          const up = info.fc >= 0;
+          const iso = info.iso ? `<span class="rna-badge">&#8644;</span>` : "";
+          return `<div class="reg-row ${up ? "reg-up" : "reg-down"}" data-go="rxn:${j}" title="${esc(model.rxns[j].n)}">`
+            + `<span class="reg-arrow">${up ? "&uarr;" : "&darr;"}</span>`
+            + `<span class="nm">${esc(model.rxns[j].n.slice(0, 42))}</span>`
+            + `<span class="val">${fmtFc(info.fc)}${iso}</span></div>`;
+        }).join("") + `</div>`;
+    }
+  }
+  let tfSub = "";
+  if (REG.result && f?.v) {
+    const pTfs = pathwayRegulators(model, REG.result, REG.rnaSummary, f.v, rxns);
+    if (pTfs.length) {
+      tfSub = `<h4>${t("reg.subTfs")}</h4><div class="reg-list">` + pTfs.map((it) => {
+        const dirCls = it.push > 0.01 ? "reg-up" : it.push < -0.01 ? "reg-down" : "reg-mixed";
+        const arrow = it.push > 0.01 ? "&uarr;" : it.push < -0.01 ? "&darr;" : "&middot;";
+        return `<div class="reg-row ${dirCls}" data-marktf="${esc(it.tf)}" title="${esc(t("reg.clickMarkTf"))}">`
+          + `<span class="reg-arrow">${arrow}</span>`
+          + `<span class="nm"><b>${esc(it.tf)}</b></span>`
+          + `<span class="val">${Math.round(100 * it.share)}%<span class="rna-badge">${it.nActiveRxns} rxns</span></span></div>`;
+      }).join("") + `</div>`;
+    }
+  }
   return `<div class="kind">${esc(kind)}</div><h3>${esc(title)}</h3>
     <div class="meta">${t("sub.meta", { n: rows.length, a: act.length })}${drawable(ss) ? "" : t("sub.listOnly")}</div>
     ${canOpen ? `<div class="actions"><button data-act="open">${t("sub.open")}</button></div>` : ""}
     <h4>${t("sub.top")}</h4>${bars(act.slice(0, 14).map(([n, v, k]) => [n, fmtFlux(v), k, v / mx]), "#4cc9f0") || `<p class="meta">${t("sub.none")}</p>`}
+    ${rnaSub}
+    ${tfSub}
     ${ss >= 0 ? flexHtml(ss, rxns) : ""}`;
 }
 
@@ -3876,7 +4673,24 @@ function geneHtml(ref) {
   const mx = rows.length && rows[0][1] ? rows[0][1] : 1;
   const ctx = currentContext();
   const ctxNote = ctx ? `<div class="note ctxnote">${t(offGenes(ctx, S.base.model.genes).has(g ? g[1] : ref) ? "ctx.geneOff" : ctx.rescued.some(([k]) => S.base.model.genes[k][1] === (g ? g[1] : ref)) ? "ctx.geneRescued" : "ctx.geneOn", { ctx: esc(ctx.name) })}</div>` : "";
-  return `<div class="kind">${t("gene.kind")}</div><h3>${esc(geneSymbol(ref))}</h3><div class="meta">${g ? esc(g[2] || "") + "<br>" + esc(g[0]) : ""}</div>${ctxNote}
+  let rnaNote = "";
+  if (REG.rnaMap) {
+    const sym = (g ? g[1] : ref) || ref;
+    const keys = [sym, ref, sym.toLowerCase(), String(ref).toLowerCase()];
+    let info = null;
+    for (const k of keys) { if (REG.rnaMap.has(k)) { info = REG.rnaMap.get(k); break; } }
+    if (!info) {
+      const low = sym.toLowerCase();
+      for (const [k, v] of REG.rnaMap) if (k.toLowerCase() === low) { info = v; break; }
+    }
+    if (info && Number.isFinite(info.log2fc)) {
+      const qTxt = Number.isFinite(info.q) ? `, q = ${info.q < 1e-4 ? info.q.toExponential(1) : info.q.toFixed(3)}` : "";
+      const tfs = (REG.rnaSummary?.tfsByGene.get(sym.toLowerCase()) || []).slice(0, 5);
+      const tfLine = tfs.length ? `<br>${t("rna.rxnTfs")}: ${tfs.map((x) => `${esc(x.tf)} (${x.expected > 0 ? "&uarr;" : x.expected < 0 ? "&darr;" : "&middot;"})`).join(", ")}` : "";
+      rnaNote = `<div class="note"><b>${t("rna.rxnLabel")}:</b> ${fmtFc(info.log2fc)}${qTxt}${tfLine}</div>`;
+    }
+  }
+  return `<div class="kind">${t("gene.kind")}</div><h3>${esc(geneSymbol(ref))}</h3><div class="meta">${g ? esc(g[2] || "") + "<br>" + esc(g[0]) : ""}</div>${ctxNote}${rnaNote}
     <div class="actions"><button data-act="perturb">${t("pert.button")}</button></div>
     <p class="meta">${t("gene.mapHint")}</p>
     <h4>${t("gene.rxns", { n: rows.length })}</h4>${bars(rows.slice(0, 40).map(([n, v, k]) => [n, fmtFlux(v), k, v / mx]), "#b48cff")}`;
@@ -3885,7 +4699,10 @@ function geneHtml(ref) {
 function renderDetails() {
   const box = $("details"), sel = S.sel;
   if (!S.model) return;
-  map.marks = sel?.type === "gene" ? new Set(S.search.geneRxns.get(sel.sym) || []) : (REG.markedRxns || null);
+  const geneSel = sel?.type === "gene";
+  map.marks = geneSel ? new Set(S.search.geneRxns.get(sel.sym) || []) : (REG.markedRxns || null);
+  // direction only for a regulon: a gene's own reactions have no up or down
+  map.markDir = geneSel ? null : (REG.markedTf ? REG.result?.tfs.find((x) => x.tf === REG.markedTf)?.metRxnDir || null : null);
   box.innerHTML = !sel ? summaryHtml() : sel.type === "met" ? metHtml(sel.met) : sel.type === "rxn" ? rxnHtml(sel.rxn) : sel.type === "sub" ? subHtml(sel.ss) : sel.type === "grp" ? grpHtml(sel.g) : geneHtml(sel.sym);
   if (sel) {
     const back = document.createElement("div");
@@ -3894,6 +4711,22 @@ function renderDetails() {
     box.prepend(back);
   }
   wireGo(box);
+  box.querySelectorAll("[data-regrxn]").forEach((el) => {
+    el.onclick = () => { S.sel = { type: "rxn", rxn: +el.dataset.regrxn }; map.selected = map.findNode(1, +el.dataset.regrxn); renderDetails(); };
+  });
+  box.querySelectorAll("[data-regroute]").forEach((el) => {
+    el.onclick = () => {
+      if (!REG.markedRxns?.size) return;
+      const v = el.dataset.regroute;
+      const idx = v === "scattered" ? "scattered" : +v;
+      openRegulonView(REG.markedRxns, true, REG.markedTf, idx);
+      applyFrame();
+      renderDetails();
+    };
+  });
+  box.querySelectorAll("[data-marktf]").forEach((el) => {
+    el.onclick = () => regMarkTf(el.dataset.marktf);
+  });
   const on = (act, fn) => { const b = box.querySelector(`[data-act="${act}"]`); if (b) b.onclick = fn; };
   if (sel?.type === "met") {
     const m = sel.met, st = S.structures[S.model.bases[S.model.mets[m].b].id], f = frame();
@@ -4174,6 +5007,7 @@ function bindUi() {
   $("mtbFile").onchange = (ev) => { const f = ev.target.files[0]; if (f) f.text().then((x) => { $("mtbText").value = x; mtbRun(); }); };
   $("mtbRun").onclick = mtbRun;
   $("regOpen").onclick = openRegDialog;
+  $("regShowMap").onchange = (ev) => { REG.overlay = ev.target.checked; applyFrame(); };
   $("regClear").onclick = () => regClear(true);
   $("regFile").onchange = (ev) => { const f = ev.target.files[0]; if (f) f.text().then((x) => { $("regText").value = x; regRun(); }); };
   $("regRun").onclick = regRun;

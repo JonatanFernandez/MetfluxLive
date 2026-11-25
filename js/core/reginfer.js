@@ -13,6 +13,8 @@
 //
 // Pure ES module, zero DOM, zero solver dependencies.
 import { fdr, studentTP } from "./metcontrast.js";
+import { REDOX_PAIRS } from "./flows.js";
+import { gprActivity } from "./gpr.js";
 
 const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
 const median = (a) => { const s = [...a].sort((x, y) => x - y); const h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; };
@@ -84,9 +86,10 @@ export function reactionToGeneEvidence(model, net, fcByBase, qByBase, opts = {})
     if (!S.length || !P.length) continue;
     if (S.some((a) => P.some((b) => sameGroup(a, b)))) continue;
 
-    const v = flux ? flux[r.rxn] : 0;
+    const fluxVec = flux && typeof flux.length === "number" ? flux : flux?.v || null;
+    const v = fluxVec ? fluxVec[r.rxn] : 0;
     let direction = 1;
-    if (flux && v < -1e-9) { [S, P] = [P, S]; direction = -1; }
+    if (fluxVec && v < -1e-9) { [S, P] = [P, S]; direction = -1; }
 
     const up = median(S.map((b) => fcByBase.get(b)));
     const down = median(P.map((b) => fcByBase.get(b)));
@@ -263,8 +266,106 @@ export function parseRnaDiffTable(text) {
  *    Counts concordant vs discordant chains and computes a combined multi-omic score.
  * 4. Classifies each candidate metabolic bottleneck step as transcriptional vs post-transcriptional.
  *
+ * 5. If a flux CHANGE is supplied, compares it with what the regulator predicts for each enzyme. This is the
+ *    axis that answers "the transcriptome says this step should slow down, does the flux agree?", and it is
+ *    the one place where the two omics can contradict each other at the level of the reaction itself.
+ *
  * @param rnaByGene Map<geneLowerOrSym, { gene?, log2fc, stat?, q? }> | Map<gene, number>
+ * @param opts.flux { v, vRef, source } two flux vectors to compare and where they come from:
+ *        "fitted"    -- both ends constrained by measured exchange rates (exometabolomics). Independent of
+ *                       the transcriptome, so a joint test is legitimate.
+ *        "contrast"  -- an A/B the user built. Independent only insofar as its constraints are measured.
+ *        "predicted" -- the model's own choice. NOT independent evidence: the agreement would largely be the
+ *                       model agreeing with itself, so the joint test refuses to report a p-value.
  */
+/**
+ * The contiguous routes inside a set of reactions.
+ *
+ * Two reactions belong to the same route when they share a metabolite that is not a currency metabolite.
+ * Without that exclusion everything joins to everything through ATP and the answer is always "one route",
+ * which says nothing. With it, the question becomes worth asking: do a regulator's targets form a stretch of
+ * metabolism, or are they scattered across it? A scattered regulon is a real finding, not a failure -- it
+ * says the regulator acts broadly rather than on a pathway.
+ *
+ * @param rxns     iterable of reaction indices
+ * @param model    the model
+ * @param currency index.currency, truthy per metabolite BASE for the carriers to ignore
+ * @param minSize  routes shorter than this are returned as "scattered" instead
+ * @returns { routes: [[rxnIdx,...]], scattered: [rxnIdx,...], shared: Map<rxnIdx, Set<metIdx>> }
+ */
+export function regulonRoutes(rxns, model, currency, minSize = 2) {
+  const set = [...rxns].filter((j) => model.rxns[j] && !model.rxns[j].removed);
+  const byMet = new Map();
+  for (const j of set) {
+    for (const m of model.rxns[j].m) {
+      if (currency && currency[model.mets[m].b]) continue;
+      if (!byMet.has(m)) byMet.set(m, []);
+      byMet.get(m).push(j);
+    }
+  }
+  // union-find over the reactions, joined through the metabolites they share
+  const parent = new Map(set.map((j) => [j, j]));
+  const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
+  const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent.set(ra, rb); };
+  const shared = new Map();
+  for (const [m, js] of byMet) {
+    if (js.length < 2) continue;                     // a metabolite only this reaction touches joins nothing
+    for (let i = 1; i < js.length; i++) union(js[0], js[i]);
+    for (const j of js) { if (!shared.has(j)) shared.set(j, new Set()); shared.get(j).add(m); }
+  }
+  const groups = new Map();
+  for (const j of set) { const r = find(j); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(j); }
+  const routes = [], scattered = [];
+  for (const g of groups.values()) (g.length >= minSize ? routes : scattered).push(...(g.length >= minSize ? [g] : g));
+  routes.sort((a, b) => b.length - a.length);
+  return { routes, scattered, shared };
+}
+
+/**
+ * Is it surprising that THIS regulator's enzymes move in the transcriptome AND that their reactions move in
+ * the flux the same way?
+ *
+ * The statistic is: among the regulon's enzymes whose mRNA moved AND whose reactions moved, how many move
+ * the SAME way in both. The null draws sets of the same size from every gene that could have been asked the
+ * same question -- mRNA moved, reactions moved -- so regulon size cannot help, and neither can a gene being
+ * well annotated, because the pool is the observed genes rather than the regulon's.
+ *
+ * Both sides must be conditioned the same way. The first version of this test was not: the observed count
+ * was already restricted to genes whose mRNA agreed with the regulator, while the null also had to get the
+ * mRNA right by chance. That mismatch of denominators made random flux significant in 15 of 40 trials.
+ *
+ * It refuses to answer when the flux is the model's own prediction. There the flux change is produced by the
+ * same network the regulon is drawn on, so agreement is largely the model agreeing with itself; multiplying
+ * that by the transcriptome would manufacture significance. Only a flux fitted to measured exchange rates is
+ * independent of the transcriptome.
+ *
+ * @returns { p, observed, n, reason } -- p is null when the question cannot be asked honestly.
+ */
+export function jointFluxTest(entry, result, rounds = 2000, rng = Math.random) {
+  if (!result?.flux) return { p: null, reason: "noFlux" };
+  if (!result.flux.independent) return { p: null, reason: "fluxNotIndependent", source: result.flux.source };
+
+  // the regulon's testable enzymes: mRNA moved as the regulator predicts, and the reactions moved at all
+  const testable = entry.metGenes.filter((g) => g.fluxAgree === 1 || g.fluxAgree === -1);
+  const obs = testable.filter((g) => g.fluxAgree === 1).length;
+  if (testable.length < 3) return { p: null, reason: "tooFew", n: testable.length };
+
+  // the pool: every observed gene that could have been asked the same question
+  const pool = result._jointPool || [];
+  if (pool.length < testable.length * 3) return { p: null, reason: "poolTooSmall", n: pool.length };
+
+  let ge = 0;
+  for (let r = 0; r < rounds; r++) {
+    let hit = 0;
+    for (let k = 0; k < testable.length; k++) {
+      const pick = pool[(rng() * pool.length) | 0];
+      if (pick.agree) hit++;          // did that gene's flux move the way its own mRNA did?
+    }
+    if (hit >= obs) ge++;
+  }
+  return { p: (ge + 1) / (rounds + 1), observed: obs, n: testable.length, reason: null };
+}
+
 export function inferRegulatorsMultiOmic(model, net, regulons, fcByBase, qByBase, rnaByGene, opts = {}) {
   const {
     minTargetsRna = 5,
@@ -272,7 +373,33 @@ export function inferRegulatorsMultiOmic(model, net, regulons, fcByBase, qByBase
     rnaFcMin = 0.35,
     metActMin = 0.15,
     bottleneckSteps = [],
+    flux = null,
+    fluxMin = 0.1,          // a reaction counts as changed when it moves this fraction of its larger end
   } = opts;
+
+  // How much each reaction's throughput moved, and which way. Magnitudes, because "carries more or less"
+  // is the question; a reaction that reverses is a different phenomenon and is reported separately.
+  const fluxDelta = new Map();
+  let nFluxChanged = 0, nReversed = 0;
+  if (flux?.v && flux?.vRef) {
+    for (let j = 0; j < flux.v.length; j++) {
+      const a = flux.vRef[j] || 0, b = flux.v[j] || 0;
+      const scale = Math.max(Math.abs(a), Math.abs(b));
+      if (scale < 1e-9) continue;
+      const rel = (Math.abs(b) - Math.abs(a)) / scale;
+      const reversed = a * b < 0 && Math.min(Math.abs(a), Math.abs(b)) > 1e-9;
+      if (reversed) nReversed++;
+      if (Math.abs(rel) >= fluxMin) { fluxDelta.set(j, { rel, dir: Math.sign(rel), reversed }); nFluxChanged++; }
+      else fluxDelta.set(j, { rel, dir: 0, reversed });
+    }
+  }
+  /** Which way a gene's reactions moved, weighted by how much each one moved. */
+  const geneFluxDir = (rxns) => {
+    let w = 0, n = 0;
+    for (const j of rxns) { const d = fluxDelta.get(j); if (!d) continue; w += d.rel; n++; }
+    if (!n || Math.abs(w / n) < fluxMin) return 0;
+    return Math.sign(w);
+  };
 
   // Normalise RNA map to lowercase key -> { gene, log2fc, stat, q }
   const rnaNorm = new Map();
@@ -300,8 +427,9 @@ export function inferRegulatorsMultiOmic(model, net, regulons, fcByBase, qByBase
   const rnaTFs = ulm(regulons, rnaStatMap, { minTargets: minTargetsRna, metabolicOnly: false });
   // 2. Optional metabolomics-side gene evidence and metabolic ULM
   const hasMet = !!(fcByBase && fcByBase.size && net);
+  const metFluxVec = opts.fluxVec || (flux && typeof flux.length === "number" ? flux : flux?.v || null);
   const evidence = hasMet
-    ? reactionToGeneEvidence(model, net, fcByBase, qByBase || new Map(), opts)
+    ? reactionToGeneEvidence(model, net, fcByBase, qByBase || new Map(), { ...opts, flux: metFluxVec })
     : { geneScore: new Map(), geneRxns: new Map(), observableGenes: new Set(), rxnScore: new Map() };
   const metTFs = hasMet ? ulm(regulons, evidence.geneScore, { minTargets: minTargetsMet, metabolicOnly: true }) : [];
   const metByTf = new Map(metTFs.map((x) => [x.tf, x]));
@@ -323,17 +451,35 @@ export function inferRegulatorsMultiOmic(model, net, regulons, fcByBase, qByBase
     const tfDir = rt.score >= 0 ? 1 : -1;
     const concordant = [], rnaOnly = [], discordant = [], metGenes = [];
     const metRxns = new Set();
+    // Which way each reaction is pushed, kept per reaction rather than collapsed into the set: a target's
+    // enzyme is expected to move in direction tfDir*sign, so a reaction inherits that. A reaction catalysed
+    // by targets that disagree (an activated and a repressed subunit) is marked 0 -- "regulated, direction
+    // unclear" -- which is honest and is what the map draws differently.
+    const metRxnDir = new Map();
+    const rxnDrivers = new Map();   // rxn -> [{ gene, regSign, expected }], what the sidebar lists
     const allMetTargets = metTargetsByTf.get(rt.tf) || [];
     for (const { gene, sign } of allMetTargets) {
       const k = gene.toLowerCase();
       const rxns = rxnsByGene.get(k) || [];
-      for (const j of rxns) metRxns.add(j);
+      for (const j of rxns) {
+        metRxns.add(j);
+        const d = tfDir * sign;
+        metRxnDir.set(j, metRxnDir.has(j) && metRxnDir.get(j) !== d ? 0 : d);
+        if (!rxnDrivers.has(j)) rxnDrivers.set(j, []);
+        rxnDrivers.get(j).push({ gene, regSign: sign, expected: d });
+      }
       const rna = rnaNorm.get(k);
       const met = metGeneLow.get(k);
       const expected = tfDir * sign; // expected direction of enzyme mRNA & activity
       const rnaHit = rna && Math.abs(rna.log2fc) >= rnaFcMin ? Math.sign(rna.log2fc) : 0;
       if (rna && rnaHit === expected) {
-        metGenes.push({ gene, regSign: sign, expected, log2fc: rna.log2fc, q: rna.q, rxns });
+        const fDir = fluxDelta.size ? geneFluxDir(rxns) : null;
+        metGenes.push({
+          gene, regSign: sign, expected, log2fc: rna.log2fc, q: rna.q, rxns,
+          // null = no flux change supplied; 0 = the step did not move; otherwise agree / disagree
+          fluxDir: fDir,
+          fluxAgree: fDir === null ? null : fDir === 0 ? 0 : (fDir === expected ? 1 : -1),
+        });
       }
       if (!met) continue;
       const metHit = Math.abs(met.score) >= metActMin ? Math.sign(met.score) : 0;
@@ -365,9 +511,15 @@ export function inferRegulatorsMultiOmic(model, net, regulons, fcByBase, qByBase
       nMetTargets: allMetTargets.length,
       metGenes,
       metRxns,
+      metRxnDir,
+      rxnDrivers,
       concordant,
       rnaOnly,
       discordant,
+      // the flux axis, per TF: how many of its RNA-confirmed enzymes move the way it predicts
+      fluxAgree: metGenes.filter((g) => g.fluxAgree === 1).length,
+      fluxDisagree: metGenes.filter((g) => g.fluxAgree === -1).length,
+      fluxIdle: metGenes.filter((g) => g.fluxAgree === 0).length,
     };
   });
   combined.sort((a, b) => Math.abs(b.combinedScore) - Math.abs(a.combinedScore));
@@ -400,7 +552,23 @@ export function inferRegulatorsMultiOmic(model, net, regulons, fcByBase, qByBase
     return { ...b, mechanism, rnaGenes: genes };
   });
 
+  // Every gene the transcriptome saw move, whose reactions also moved: the population the regulon's
+  // enzymes are a sample of. `agree` is the same question the statistic asks of the regulon.
+  const jointPool = [];
+  if (fluxDelta.size) {
+    for (const [k, info] of rnaNorm) {
+      if (!(Math.abs(info.log2fc) >= rnaFcMin)) continue;
+      const rxns = rxnsByGene.get(k);
+      if (!rxns?.length) continue;
+      const fd = geneFluxDir(rxns);
+      if (!fd) continue;
+      jointPool.push({ agree: fd === Math.sign(info.log2fc) });
+    }
+  }
+
   return {
+    flux: flux ? { source: flux.source || "predicted", nChanged: nFluxChanged, nReversed, independent: flux.source === "fitted" } : null,
+    _jointPool: jointPool,           // for jointFluxTest's null; not part of the displayed result
     tfs: combined,
     metOnlyTFs: metTFs,
     evidence,
@@ -411,3 +579,620 @@ export function inferRegulatorsMultiOmic(model, net, regulons, fcByBase, qByBase
     nObservableRxns: evidence.rxnScore.size,
   };
 }
+
+/**
+ * Project differential RNA-seq directly onto the GEM's reactions, GPR isoenzymes, and pathways.
+ *
+ * Gives the map and sidebar everything differential transcriptomics can say about metabolism beyond TF scores:
+ *  - `fcByRxn`: reaction-level log2FC (GPR-weighted) for colouring reaction diamonds on the map,
+ *  - `sigRxns`: reactions with significant transcriptional shift (q < 0.05, or |log2FC| >= 1 when q is absent),
+ *  - `isoRxns` & `isoSwitches`: reactions where alternative OR-branch isoenzymes move in opposite directions
+ *    (e.g. LDHA up while LDHB drops, HK2 up while HK1 drops) — a regulatory switch TF summaries often hide,
+ *  - `pathways` & `pathwayBySs`: per-subsystem transcriptional shifts (median/mean log2FC, up/down counts),
+ *  - `tfsByGene`: active TFs (|t| >= 2 or q < 0.05) regulating each metabolic gene, for reaction cards.
+ */
+export function summarizeRnaOnModel(model, rnaByGene, regResult = null, opts = {}) {
+  const { offGenes = null, rnaFcMin = 0.35, isoMin = 0.5 } = opts;
+  const rnaNorm = new Map();
+  let anyQ = false;
+  if (rnaByGene) {
+    for (const [k, v] of rnaByGene) {
+      const obj = typeof v === "number"
+        ? { gene: k, log2fc: v, stat: v, q: NaN }
+        : { gene: v.gene || k, log2fc: v.log2fc, stat: v.stat ?? v.log2fc, q: v.q ?? NaN };
+      if (!Number.isFinite(obj.log2fc)) continue;
+      if (Number.isFinite(obj.q)) anyQ = true;
+      rnaNorm.set(String(k).trim().toLowerCase(), obj);
+    }
+  }
+
+  const fcByRxn = new Map();
+  const sigRxns = new Set();
+  const isoRxns = new Set();
+  const rxnInfo = new Map();
+  const isoSwitches = [];
+  const ssBucket = new Map(); // ss -> { fcs: [], nUp, nDown }
+
+  if (model?.rxns && rnaNorm.size) {
+    model.rxns.forEach((r, j) => {
+      if (r.removed || !r.g) return;
+      const gw = gprGeneWeights(r.g, offGenes);
+      if (!gw.size) return;
+      let num = 0, den = 0, minQ = Infinity;
+      const genes = [];
+      for (const [g, w] of gw) {
+        const info = rnaNorm.get(g.toLowerCase());
+        if (!info) continue;
+        num += w * info.log2fc;
+        den += w;
+        if (Number.isFinite(info.q) && info.q < minQ) minQ = info.q;
+        genes.push({ gene: g, log2fc: info.log2fc, stat: info.stat, q: info.q, weight: w });
+      }
+      if (!genes.length || !(den > 0)) return;
+      genes.sort((a, b) => Math.abs(b.log2fc) - Math.abs(a.log2fc));
+      const fc = num / den;
+      const sig = Number.isFinite(minQ) ? minQ < 0.05 : (!anyQ && Math.abs(fc) >= 1.0);
+
+      // Detect true OR-branch isoenzyme switches: one branch rises >= isoMin while another drops <= -isoMin
+      const branches = r.g.split(/\bor\b/i).map((b) => [...new Set(b.replace(/[()]/g, " ").split(/\band\b/i).map((x) => x.trim()).filter(Boolean))]).filter((b) => b.length);
+      let iso = null;
+      if (branches.length >= 2) {
+        let bestUp = null, bestDown = null;
+        for (const br of branches) {
+          const vals = br.map((g) => ({ g, info: rnaNorm.get(g.toLowerCase()) })).filter((x) => x.info);
+          if (!vals.length) continue;
+          const bFc = mean(vals.map((x) => x.info.log2fc));
+          const lead = vals.slice().sort((a, b) => Math.abs(b.info.log2fc) - Math.abs(a.info.log2fc))[0];
+          if (bFc >= isoMin && (!bestUp || bFc > bestUp.fc)) bestUp = { fc: bFc, gene: lead.g, q: lead.info.q };
+          if (bFc <= -isoMin && (!bestDown || bFc < bestDown.fc)) bestDown = { fc: bFc, gene: lead.g, q: lead.info.q };
+        }
+        if (bestUp && bestDown && bestUp.gene.toLowerCase() !== bestDown.gene.toLowerCase()) {
+          iso = { rxn: j, id: r.id, name: r.n || r.id, ss: r.ss, up: bestUp, down: bestDown, span: bestUp.fc - bestDown.fc };
+          isoRxns.add(j);
+          isoSwitches.push(iso);
+        }
+      }
+
+      fcByRxn.set(j, fc);
+      if (sig) sigRxns.add(j);
+      rxnInfo.set(j, { fc, q: Number.isFinite(minQ) ? minQ : NaN, sig, genes, iso });
+
+      if (r.ss >= 0) {
+        let b = ssBucket.get(r.ss);
+        if (!b) ssBucket.set(r.ss, (b = { fcs: [], nUp: 0, nDown: 0 }));
+        b.fcs.push(fc);
+        if (fc >= rnaFcMin) b.nUp++;
+        else if (fc <= -rnaFcMin) b.nDown++;
+      }
+    });
+  }
+
+  isoSwitches.sort((a, b) => b.span - a.span);
+
+  const pathways = [];
+  const pathwayBySs = new Map();
+  for (const [ss, b] of ssBucket) {
+    const meanFc = mean(b.fcs);
+    const medianFc = median(b.fcs);
+    const entry = {
+      ss,
+      name: model.subsystems?.[ss] || "",
+      nRxns: b.fcs.length,
+      nUp: b.nUp,
+      nDown: b.nDown,
+      meanFc,
+      medianFc,
+      score: Math.abs(meanFc) * Math.sqrt(b.fcs.length),
+    };
+    pathwayBySs.set(ss, entry);
+    if (b.fcs.length >= 3) pathways.push(entry);
+  }
+  pathways.sort((a, b) => b.score - a.score);
+
+  // Active regulating TFs per metabolic gene (for reaction cards)
+  const tfsByGene = new Map();
+  if (regResult?.tfs?.length) {
+    for (const tf of regResult.tfs.slice(0, 40)) {
+      if (!(tf.qRna < 0.05 || Math.abs(tf.zRna) >= 2)) continue;
+      for (const mg of tf.metGenes || []) {
+        const k = mg.gene.toLowerCase();
+        const arr = tfsByGene.get(k) || tfsByGene.set(k, []).get(k);
+        if (!arr.some((x) => x.tf === tf.tf)) {
+          arr.push({ tf: tf.tf, regSign: mg.regSign, expected: mg.expected, zRna: tf.zRna, qRna: tf.qRna });
+        }
+      }
+    }
+  }
+
+  return {
+    nMeasuredRxns: fcByRxn.size,
+    fcByRxn,
+    sigRxns,
+    isoRxns,
+    rxnInfo,
+    isoSwitches,
+    pathways,
+    pathwayBySs,
+    tfsByGene,
+  };
+}
+
+/**
+ * Summarise where differential RNA-seq converges with or contradicts FBA flux and intracellular metabolomics:
+ *  - `inducedIdle`: strongly induced enzymes (log2FC >= 0.75) sitting on zero-flux reactions in the current model,
+ *  - `postTx`: candidate metabolomics bottlenecks whose enzymes did not drop in mRNA (post-transcriptional/allosteric),
+ *  - `concordant`: reactions where mRNA and either flux change or metabolomics activity agree in direction.
+ */
+export function computeMultiOmicDiscrepancies(model, rnaSummary, { v = null, vRef = null, regResult = null } = {}) {
+  const inducedIdle = [];
+  const concordant = [];
+  if (rnaSummary?.rxnInfo?.size && model?.rxns) {
+    const evRxn = regResult?.evidence?.rxnScore || null;
+    for (const [j, info] of rnaSummary.rxnInfo) {
+      const r = model.rxns[j];
+      if (!r || r.removed) continue;
+      const curV = v ? Math.abs(v[j] || 0) : 0;
+      if (v && info.fc >= 0.75 && curV <= 1e-9) {
+        inducedIdle.push({ rxn: j, name: r.n || r.id, ss: r.ss, fc: info.fc, q: info.q, gene: info.genes[0]?.gene || "" });
+      }
+      if (Math.abs(info.fc) >= 0.5) {
+        let fluxDir = 0;
+        if (v && vRef) {
+          const a = Math.abs(vRef[j] || 0), b = Math.abs(v[j] || 0), sc = Math.max(a, b);
+          if (sc > 1e-9 && Math.abs(b - a) / sc >= 0.1) fluxDir = Math.sign(b - a);
+        }
+        const metAct = evRxn?.get(j)?.activity || 0;
+        const metDir = Math.abs(metAct) >= 0.15 ? Math.sign(metAct) : 0;
+        const rnaDir = Math.sign(info.fc);
+        if ((fluxDir && fluxDir === rnaDir) || (metDir && metDir === rnaDir)) {
+          concordant.push({
+            rxn: j, name: r.n || r.id, ss: r.ss, fc: info.fc,
+            viaFlux: fluxDir === rnaDir, viaMet: metDir === rnaDir,
+            gene: info.genes[0]?.gene || "",
+          });
+        }
+      }
+    }
+  }
+  inducedIdle.sort((a, b) => b.fc - a.fc);
+  concordant.sort((a, b) => (Number(b.viaMet) + Number(b.viaFlux)) - (Number(a.viaMet) + Number(a.viaFlux)) || Math.abs(b.fc) - Math.abs(a.fc));
+  const postTx = (regResult?.classifiedSteps || []).filter((s) => s.mechanism === "postTranscriptional");
+  return { inducedIdle, postTx, concordant };
+}
+
+// ------------------------------------------------ process-level leverage & counterfactual FBA ----
+export const PROCESS_KEYS = ["atp", "nadph", "redox", "protein", "obj"];
+
+const CATABOLIC_REDOX = (() => {
+  const m = { ...REDOX_PAIRS, "menaquinol-8": 1, "2-demethylmenaquinol 8": 1 };
+  delete m.NADPH;
+  return m;
+})();
+
+const PROTEIN_AA_RE = /^(?:l-)?(alanine|arginine|asparagine|aspartate|cysteine|glutamate|glutamine|glycine|histidine|isoleucine|leucine|lysine|methionine|phenylalanine|proline|serine|threonine|tryptophan|tyrosine|valine)(?:\s*\([^)]*\))?$/i;
+const INORGANIC_SKIP = new Set(["H+", "H2O", "O2", "H2O2", "CO2", "HCO3-", "NH4+", "Pi", "PPi", "OH-"]);
+
+/**
+ * Per-reaction physical flux weights for a metabolic process or a specific metabolite on flux vector `v`.
+ * Summing stoichiometry across compartments automatically cancels pure inter-compartment transports so
+ * turnover reflects genuine biochemical synthesis (`prod`) and consumption (`cons`), avoiding serial double-counting.
+ *
+ * @param processSpec "atp" | "nadph" | "redox" | "protein" | "obj" | { kind: "met", met?: number, base?: number }
+ * @returns { prod: Map<number, number>, cons: Map<number, number>, totalProd: number, totalCons: number, scope: string }
+ */
+export function processRxnWeights(model, v, processSpec, opts = {}) {
+  const prod = new Map(), cons = new Map();
+  let totalProd = 0, totalCons = 0, scope = typeof processSpec === "string" ? processSpec : "met";
+  if (!model?.rxns || !v) return { prod, cons, totalProd, totalCons, scope };
+
+  const add = (j, net) => {
+    if (Math.abs(net) < 1e-9) return;
+    if (net > 0) { prod.set(j, (prod.get(j) || 0) + net); totalProd += net; }
+    else { cons.set(j, (cons.get(j) || 0) - net); totalCons -= net; }
+  };
+
+  if (processSpec === "atp" || processSpec === "nadph" || processSpec === "redox") {
+    const weights = processSpec === "atp" ? { ATP: 1 } : processSpec === "nadph" ? { NADPH: 1 } : CATABOLIC_REDOX;
+    model.rxns.forEach((r, j) => {
+      const vj = v[j];
+      if (!vj || r.removed) return;
+      let net = 0;
+      for (let k = 0; k < r.m.length; k++) {
+        const w = weights[model.bases[model.mets[r.m[k]].b].n];
+        if (w) net += w * r.c[k] * vj;
+      }
+      add(j, net);
+    });
+  } else if (processSpec === "protein") {
+    const aaBases = new Set();
+    model.bases.forEach((b, bi) => { if (PROTEIN_AA_RE.test(b.n || "")) aaBases.add(bi); });
+    const bioRxn = opts.biomassRxn ?? -1;
+    model.rxns.forEach((r, j) => {
+      const vj = v[j];
+      if (!vj || r.removed || r.m.length < 2) return; // skip exchanges (uptake is supply, not synthesis)
+      // Sum stoichiometry per AA base across compartments so pure AA transports cancel out
+      const byAa = new Map();
+      for (let k = 0; k < r.m.length; k++) {
+        const b = model.mets[r.m[k]].b;
+        if (aaBases.has(b)) byAa.set(b, (byAa.get(b) || 0) + r.c[k] * vj);
+      }
+      let pSum = 0, cSum = 0;
+      for (const net of byAa.values()) {
+        if (net > 1e-9 && j !== bioRxn) pSum += net;
+        else if (net < -1e-9) cSum -= net;
+      }
+      if (pSum > 1e-9) { prod.set(j, pSum); totalProd += pSum; }
+      if (cSum > 1e-9) { cons.set(j, cSum); totalCons += cSum; }
+    });
+  } else if (processSpec === "obj") {
+    const objIdx = opts.objective ?? opts.biomassRxn ?? -1;
+    const objR = objIdx >= 0 ? model.rxns[objIdx] : null;
+    if (objR && !objR.removed && Math.abs(v[objIdx] || 0) > 1e-9) {
+      const dir = v[objIdx] >= 0 ? 1 : -1;
+      const reqBases = new Map(); // baseIdx -> stoichiometric demand weight (normalized)
+      let reqSum = 0;
+      for (let k = 0; k < objR.m.length; k++) {
+        const c = objR.c[k] * dir;
+        if (c >= 0) continue;
+        const b = model.mets[objR.m[k]].b;
+        const bn = model.bases[b].n || "";
+        if (INORGANIC_SKIP.has(bn)) continue;
+        reqBases.set(b, (reqBases.get(b) || 0) + Math.abs(c));
+        reqSum += Math.abs(c);
+      }
+      if (reqBases.size && reqSum > 0) {
+        // Normalize each precursor by its total production so scarce macromolecular precursors (nucleotides,
+        // lipids, amino acids) aren't drowned out by high-flux currency cofactors like ATP.
+        const baseTotProd = new Map();
+        model.rxns.forEach((r, j) => {
+          const vj = v[j];
+          if (!vj || r.removed || j === objIdx || r.m.length < 2) return;
+          const byB = new Map();
+          for (let k = 0; k < r.m.length; k++) {
+            const b = model.mets[r.m[k]].b;
+            if (reqBases.has(b)) byB.set(b, (byB.get(b) || 0) + r.c[k] * vj);
+          }
+          for (const [b, net] of byB) if (net > 1e-9) baseTotProd.set(b, (baseTotProd.get(b) || 0) + net);
+        });
+        model.rxns.forEach((r, j) => {
+          const vj = v[j];
+          if (!vj || r.removed || j === objIdx || r.m.length < 2) return;
+          const byB = new Map();
+          for (let k = 0; k < r.m.length; k++) {
+            const b = model.mets[r.m[k]].b;
+            if (reqBases.has(b)) byB.set(b, (byB.get(b) || 0) + r.c[k] * vj);
+          }
+          let score = 0;
+          for (const [b, net] of byB) {
+            if (net > 1e-9) {
+              const tot = baseTotProd.get(b) || 1;
+              score += (net / tot) * (reqBases.get(b) / reqSum);
+            }
+          }
+          if (score > 1e-9) { prod.set(j, score); totalProd += score; }
+        });
+      }
+    }
+    // Fallback if objective has no precursor producers (e.g. an exchange or single-step demand)
+    if (totalProd <= 1e-9) {
+      model.rxns.forEach((r, j) => {
+        const vj = Math.abs(v[j] || 0);
+        if (vj > 1e-9 && !r.removed && r.m.length >= 2) { prod.set(j, vj); totalProd += vj; }
+      });
+    }
+  } else if (processSpec && typeof processSpec === "object" && processSpec.kind === "met") {
+    const useComp = Number.isInteger(processSpec.met) && processSpec.met >= 0;
+    const baseIdx = Number.isInteger(processSpec.base) ? processSpec.base : (useComp ? model.mets[processSpec.met]?.b : -1);
+    const fillComp = () => {
+      scope = "comp";
+      model.rxns.forEach((r, j) => {
+        const vj = v[j];
+        if (!vj || r.removed) return;
+        let net = 0;
+        for (let k = 0; k < r.m.length; k++) if (r.m[k] === processSpec.met) net += r.c[k] * vj;
+        add(j, net);
+      });
+    };
+    const fillBase = () => {
+      scope = "base";
+      model.rxns.forEach((r, j) => {
+        const vj = v[j];
+        if (!vj || r.removed) return;
+        let net = 0;
+        for (let k = 0; k < r.m.length; k++) if (model.mets[r.m[k]].b === baseIdx) net += r.c[k] * vj;
+        add(j, net);
+      });
+    };
+    if (useComp) {
+      fillComp();
+      if (totalProd + totalCons <= 1e-9 && baseIdx >= 0) fillBase();
+    } else if (baseIdx >= 0) {
+      fillBase();
+    }
+  }
+
+  return { prod, cons, totalProd, totalCons, scope };
+}
+
+/**
+ * Concordant transcriptional evidence weight for a reaction `j` regulated in expected direction `dir` by a TF.
+ * Returns a scalar in [0, 1]:
+ *   - measured enzyme concordant with `dir`: min(1, |log2FC| / 2)
+ *   - measured enzyme contradicting `dir`: 0
+ *   - enzyme not measured in the RNA-seq table: small prior 0.2 (so measured concordant enzymes dominate)
+ */
+function rxnEvidenceWeight(rnaSummary, j, dir) {
+  if (!dir) return 0;
+  const info = rnaSummary?.rxnInfo?.get(j);
+  if (!info) return 0.2;
+  return Math.sign(info.fc) === dir ? Math.min(1, Math.abs(info.fc) / 2) : 0;
+}
+
+/**
+ * Level 1 — Rank transcriptionally active TFs by their metabolic leverage over a specific process or metabolite.
+ * Reports both exact physical turnover coverage (`prodShare`, `consShare`, `totalShare` in [0, 1]) and
+ * concordant mRNA-weighted directional push (`prodPush`, `consPush`, `netPush` in [-1, 1]), plus co-regulation
+ * overlap warnings (`sharedWith`) whenever another ranked TF covers >= 50 % of the same active reactions.
+ */
+export function rankRegulatorsByProcess(model, regResult, rnaSummary, v, processSpec, opts = {}) {
+  const weights = processRxnWeights(model, v, processSpec, opts);
+  const { prod, cons, totalProd, totalCons, scope } = weights;
+  if (!regResult?.tfs?.length || totalProd + totalCons <= 1e-9) {
+    return { process: processSpec, scope, totalProd, totalCons, items: [] };
+  }
+
+  const sigOnly = regResult.tfs.filter((e) => e.qRna < 0.05 || Math.abs(e.zRna) >= 2);
+  const pool = sigOnly.length >= 3 ? sigOnly : regResult.tfs.slice(0, 25);
+
+  const items = [];
+  for (const e of pool) {
+    if (!e.metRxns?.size) continue;
+    let pCov = 0, cCov = 0, pPush = 0, cPush = 0;
+    const activeSet = new Set();
+    const drivers = [];
+    for (const j of e.metRxns) {
+      const pw = prod.get(j) || 0;
+      const cw = cons.get(j) || 0;
+      if (pw <= 1e-9 && cw <= 1e-9) continue;
+      activeSet.add(j);
+      const d = e.metRxnDir?.get(j) || 0;
+      const c = rxnEvidenceWeight(rnaSummary, j, d);
+      if (pw > 1e-9) {
+        pCov += pw;
+        pPush += d * c * pw;
+        drivers.push({ rxn: j, name: model.rxns[j].n || model.rxns[j].id, w: pw, share: totalProd > 0 ? pw / totalProd : 0, dir: d, fc: rnaSummary?.rxnInfo?.get(j)?.fc ?? NaN, side: "prod" });
+      }
+      if (cw > 1e-9) {
+        cCov += cw;
+        cPush += d * c * cw;
+        drivers.push({ rxn: j, name: model.rxns[j].n || model.rxns[j].id, w: cw, share: totalCons > 0 ? cw / totalCons : 0, dir: d, fc: rnaSummary?.rxnInfo?.get(j)?.fc ?? NaN, side: "cons" });
+      }
+    }
+    if (!activeSet.size) continue;
+    const prodShare = totalProd > 0 ? Math.min(1, pCov / totalProd) : 0;
+    const consShare = totalCons > 0 ? Math.min(1, cCov / totalCons) : 0;
+    const totalShare = Math.min(1, (pCov + cCov) / (totalProd + totalCons));
+    const prodPush = totalProd > 0 ? pPush / totalProd : 0;
+    const consPush = totalCons > 0 ? cPush / totalCons : 0;
+    // For processes (ATP, NADPH, redox, protein, obj), pushing either side up accelerates pathway turnover.
+    // For a specific metabolite pool, production up (+) and consumption down (-) raise the pool, while both
+    // sides moving together accelerates its turnover (falls back to turnover push if balanced).
+    const turnoverPush = (pPush + cPush) / (totalProd + totalCons);
+    const isMet = typeof processSpec === "object" && processSpec?.kind === "met";
+    const poolPush = (totalProd > 0 ? prodPush : 0) - (totalCons > 0 ? consPush : 0);
+    const netPush = isMet && Math.abs(poolPush) > 0.05 ? Math.max(-1, Math.min(1, poolPush)) : turnoverPush;
+    drivers.sort((a, b) => b.w - a.w);
+    items.push({
+      tf: e.tf,
+      entry: e,
+      zRna: e.zRna,
+      qRna: e.qRna,
+      prodShare,
+      consShare,
+      totalShare,
+      prodPush,
+      consPush,
+      netPush,
+      nActiveRxns: activeSet.size,
+      activeRxns: activeSet,
+      drivers: drivers.slice(0, 4),
+      sharedWith: [],
+    });
+  }
+
+  items.sort((a, b) => (Math.abs(b.netPush) - Math.abs(a.netPush)) || (b.totalShare - a.totalShare) || (Math.abs(b.zRna) - Math.abs(a.zRna)));
+
+  // Co-regulation overlap check among the top 15 TFs in this process
+  const topN = items.slice(0, 15);
+  for (let i = 0; i < topN.length; i++) {
+    const a = topN[i];
+    const peers = [];
+    for (let k = 0; k < topN.length; k++) {
+      if (i === k) continue;
+      const b = topN[k];
+      let inter = 0;
+      for (const j of a.activeRxns) if (b.activeRxns.has(j)) inter++;
+      const pct = Math.round((100 * inter) / a.activeRxns.size);
+      if (pct >= 50) peers.push({ tf: b.tf, pct });
+    }
+    peers.sort((x, y) => y.pct - x.pct);
+    a.sharedWith = peers.slice(0, 2);
+  }
+
+  return { process: processSpec, scope, totalProd, totalCons, items };
+}
+
+/**
+ * Compact profile of which core metabolic processes (`atp`, `nadph`, `redox`, `protein`, `obj`) a given TF
+ * controls on the current flux solution `v`. Returns processes with >= 2 % turnover coverage.
+ */
+export function tfProcessProfile(model, regResult, rnaSummary, v, tfEntry, opts = {}) {
+  if (!tfEntry?.metRxns?.size || !v) return [];
+  const out = [];
+  for (const key of PROCESS_KEYS) {
+    const { prod, cons, totalProd, totalCons } = processRxnWeights(model, v, key, opts);
+    if (totalProd + totalCons <= 1e-9) continue;
+    let pCov = 0, cCov = 0, pPush = 0, cPush = 0, nAct = 0;
+    for (const j of tfEntry.metRxns) {
+      const pw = prod.get(j) || 0, cw = cons.get(j) || 0;
+      if (pw <= 1e-9 && cw <= 1e-9) continue;
+      nAct++;
+      const d = tfEntry.metRxnDir?.get(j) || 0;
+      const c = rxnEvidenceWeight(rnaSummary, j, d);
+      if (pw > 1e-9) { pCov += pw; pPush += d * c * pw; }
+      if (cw > 1e-9) { cCov += cw; cPush += d * c * cw; }
+    }
+    const prodShare = totalProd > 0 ? Math.min(1, pCov / totalProd) : 0;
+    const consShare = totalCons > 0 ? Math.min(1, cCov / totalCons) : 0;
+    const totalShare = Math.min(1, (pCov + cCov) / (totalProd + totalCons));
+    if (totalShare < 0.02 && prodShare < 0.02) continue;
+    const prodPush = totalProd > 0 ? pPush / totalProd : 0;
+    const consPush = totalCons > 0 ? cPush / totalCons : 0;
+    const netPush = (pPush + cPush) / (totalProd + totalCons);
+    out.push({ key, prodShare, consShare, totalShare, prodPush, consPush, netPush, nActiveRxns: nAct });
+  }
+  out.sort((a, b) => (Math.max(Math.abs(b.netPush), b.totalShare * 0.5) - Math.max(Math.abs(a.netPush), a.totalShare * 0.5)) || (b.totalShare - a.totalShare));
+  return out;
+}
+
+/** Top active TFs with leverage on a specific metabolite `metIdx` (compartment-first, fallback to base). */
+export function metaboliteRegulators(model, regResult, rnaSummary, v, metIdx, opts = {}) {
+  const res = rankRegulatorsByProcess(model, regResult, rnaSummary, v, { kind: "met", met: metIdx }, opts);
+  return {
+    scope: res.scope,
+    totalProd: res.totalProd,
+    totalCons: res.totalCons,
+    items: res.items.filter((x) => x.totalShare >= 0.005).slice(0, 6),
+  };
+}
+
+/** Top active TFs controlling flux inside a specific pathway's reaction list. */
+export function pathwayRegulators(model, regResult, rnaSummary, v, rxns) {
+  if (!regResult?.tfs?.length || !v || !rxns?.length) return [];
+  const rxnSet = new Set(rxns);
+  let tot = 0;
+  for (const j of rxns) if (!model.rxns[j]?.removed) tot += Math.abs(v[j] || 0);
+  if (tot <= 1e-9) return [];
+  const sigOnly = regResult.tfs.filter((e) => e.qRna < 0.05 || Math.abs(e.zRna) >= 2);
+  const pool = sigOnly.length >= 3 ? sigOnly : regResult.tfs.slice(0, 25);
+  const out = [];
+  for (const e of pool) {
+    if (!e.metRxns?.size) continue;
+    let cov = 0, push = 0, nAct = 0;
+    for (const j of e.metRxns) {
+      if (!rxnSet.has(j)) continue;
+      const w = Math.abs(v[j] || 0);
+      if (w <= 1e-9) continue;
+      nAct++;
+      cov += w;
+      const d = e.metRxnDir?.get(j) || 0;
+      push += d * rxnEvidenceWeight(rnaSummary, j, d) * w;
+    }
+    if (!nAct) continue;
+    const share = Math.min(1, cov / tot);
+    if (share < 0.01) continue;
+    out.push({ tf: e.tf, zRna: e.zRna, qRna: e.qRna, share, push: push / tot, nActiveRxns: nAct });
+  }
+  out.sort((a, b) => (Math.abs(b.push) - Math.abs(a.push)) || (b.share - a.share));
+  return out.slice(0, 5);
+}
+
+/** All transcriptionally active TFs targeting a specific reaction `rxnIdx` (even if its enzymes weren't in RNA-seq). */
+export function activeTfsForReaction(regResult, rxnIdx) {
+  if (!regResult?.tfs?.length) return [];
+  const out = [];
+  for (const e of regResult.tfs.slice(0, 60)) {
+    if (!(e.qRna < 0.05 || Math.abs(e.zRna) >= 2)) continue;
+    if (!e.metRxns?.has(rxnIdx)) continue;
+    out.push({
+      tf: e.tf,
+      dir: e.metRxnDir?.get(rxnIdx) || 0,
+      zRna: e.zRna,
+      qRna: e.qRna,
+      drivers: e.rxnDrivers?.get(rxnIdx) || [],
+    });
+  }
+  out.sort((a, b) => Math.abs(b.zRna) - Math.abs(a.zRna));
+  return out.slice(0, 6);
+}
+
+/**
+ * Level 2 — Build a GPR-respecting FBA counterfactual perturbation for a TF:
+ *  - Mode `"repressed"`: attenuates concordantly downregulated metabolic targets (expected < 0, log2FC <= -0.35),
+ *    measuring the loss caused by the TF's transcriptional repression.
+ *  - Mode `"induced"`: if no repressed targets affect any reaction via GPR, attenuates concordantly upregulated
+ *    targets (expected > 0, log2FC >= 0.35) to measure how much the process depends on the TF's induced module.
+ * Redundant `or`-branch isoenzymes automatically keep reaction activity = 1 (zero spurious effect).
+ */
+export function buildTfCounterfactualPerturbation(model, tfEntry, offGenes = null) {
+  if (!model?.rxns || !tfEntry?.metGenes?.length) return { mode: "none", pert: new Map(), nGenes: 0, nRxns: 0, genes: [] };
+  // Map lowercase gene symbols to every exact GPR token spelling present in model.genes
+  const tokensByLower = new Map();
+  for (const g of model.genes || []) {
+    for (const tok of [g[0], g[1]]) {
+      if (!tok) continue;
+      const k = tok.toLowerCase();
+      const set = tokensByLower.get(k) || tokensByLower.set(k, new Set()).get(k);
+      set.add(tok);
+    }
+  }
+  const makePert = (targets, capFn) => {
+    const levels = new Map();
+    if (offGenes) {
+      for (const og of offGenes) {
+        levels.set(og, 0);
+        for (const tok of tokensByLower.get(og.toLowerCase()) || []) levels.set(tok, 0);
+      }
+    }
+    const usedGenes = [];
+    for (const mg of targets) {
+      const a = capFn(mg.log2fc);
+      const low = mg.gene.toLowerCase();
+      const toks = tokensByLower.get(low);
+      levels.set(mg.gene, Math.min(levels.get(mg.gene) ?? 1, a));
+      if (toks) for (const tok of toks) levels.set(tok, Math.min(levels.get(tok) ?? 1, a));
+      usedGenes.push(mg.gene);
+    }
+    const pert = new Map();
+    for (const j of tfEntry.metRxns || []) {
+      const r = model.rxns[j];
+      if (!r || r.removed || !r.g) continue;
+      const a = gprActivity(r.g, levels);
+      if (a < 0.999) pert.set(j, a);
+    }
+    return { pert, usedGenes };
+  };
+
+  const downTargets = tfEntry.metGenes.filter((mg) => mg.expected < 0 && mg.log2fc <= -0.35);
+  if (downTargets.length) {
+    const { pert, usedGenes } = makePert(downTargets, (fc) => (fc <= -2 ? 0 : Math.max(0.05, Math.min(0.5, Math.pow(2, fc)))));
+    if (pert.size) return { mode: "repressed", pert, nGenes: usedGenes.length, nRxns: pert.size, genes: usedGenes };
+  }
+  const upTargets = tfEntry.metGenes.filter((mg) => mg.expected > 0 && mg.log2fc >= 0.35);
+  if (upTargets.length) {
+    const { pert, usedGenes } = makePert(upTargets, (fc) => Math.max(0.05, Math.min(0.5, Math.pow(2, -fc))));
+    if (pert.size) return { mode: "induced", pert, nGenes: usedGenes.length, nRxns: pert.size, genes: usedGenes };
+  }
+  return { mode: "none", pert: new Map(), nGenes: 0, nRxns: 0, genes: [] };
+}
+
+/**
+ * Compute exact counterfactual FBA effect size (% change in process turnover or objective) from a baseline
+ * pFBA solution (`baseV`, `baseObj`) and a perturbed solution (`pertV`, `pertObj`).
+ */
+export function evaluateCounterfactualEffect(model, baseV, pertV, baseObj, pertObj, processSpec, opts = {}) {
+  if (!baseV) return null;
+  if (processSpec === "obj") {
+    if (!Number.isFinite(baseObj) || Math.abs(baseObj) < 1e-12) return null;
+    const pv = pertV ? (pertObj || 0) : 0;
+    return { baseVal: baseObj, pertVal: pv, relDelta: (pv - baseObj) / Math.abs(baseObj) };
+  }
+  const b = processRxnWeights(model, baseV, processSpec, opts);
+  const baseVal = b.totalProd > 1e-9 ? b.totalProd : b.totalCons;
+  if (baseVal <= 1e-9) return null;
+  if (!pertV) return { baseVal, pertVal: 0, relDelta: -1 };
+  const p = processRxnWeights(model, pertV, processSpec, opts);
+  const pertVal = b.totalProd > 1e-9 ? p.totalProd : p.totalCons;
+  return { baseVal, pertVal, relDelta: (pertVal - baseVal) / baseVal };
+}
+

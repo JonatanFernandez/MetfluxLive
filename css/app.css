@@ -1,4 +1,5 @@
 :root {
+  --reg-up: #3ddc97; --reg-down: #ffa03c;
   --bg: #0b1020; --panel: #111830; --panel2: #162040; --line: #243055; --text: #e8eefc; --muted: #93a2c6;
   --accent: #4cc9f0; --hot: #ffbe3c; --danger: #ff6b6b; --ok: #5fd38d;
   --radius: 10px; font-size: 14px; color-scheme: dark;
@@ -10,6 +11,7 @@
 :root[data-theme="light"] {
   --bg: #eceff5; --panel: #f7f8fb; --panel2: #e6ebf3; --line: #d0d7e4; --text: #283044; --muted: #67718a;
   --accent: #2b7ca3; --hot: #b26f0e; --danger: #c24c4c; --ok: #368a5b; color-scheme: light;
+  --reg-up: #0e8f63; --reg-down: #b55309;   /* the darker pair of js/ui/mapview.js THEMES.light */
   --field: #fdfdfe; --overlay: rgba(247, 248, 251, .9); --overlay-strong: rgba(247, 248, 251, .96); --line-soft: rgba(196, 205, 222, .7);
   --hover: #e0e7f2; --stage-hi: #f6f8fb; --tip: rgba(255, 255, 255, .97); --loading-bg: rgba(236, 239, 245, .94); --backdrop: rgba(70, 80, 100, .32);
   --scroll: #c2cad9; --bond: #3e4759; --shadow: rgba(60, 70, 95, .18);
@@ -533,4 +535,56 @@ details.sec2[open] > summary { color: var(--text); margin-bottom: 6px; }
 .scr-group.sl-top summary { color: var(--accent); }
 .scr-row.diff-row { grid-template-columns: minmax(0, 1fr) auto 22px; }
 .scr-row.diff-row .val { white-space: nowrap; }
+
+/* ---- marked regulon: the summary sidebar panel ---------------------------------- */
+.reg-head { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 4px; }
+.reg-act { font-weight: 600; font-size: 12px; padding: 1px 6px; border-radius: 3px; }
+.reg-act.up { color: var(--reg-up); border: 1px solid var(--reg-up); }
+.reg-act.down { color: var(--reg-down); border: 1px solid var(--reg-down); }
+.reg-counts { display: flex; gap: 10px; font-size: 12px; margin-bottom: 4px; }
+.reg-counts .reg-up { color: var(--reg-up); }
+.reg-counts .reg-down { color: var(--reg-down); }
+.reg-counts .reg-mixed { color: var(--muted); }
+.reg-list { display: flex; flex-direction: column; gap: 1px; margin: 4px 0; }
+.reg-row { display: grid; grid-template-columns: 12px 1fr auto; gap: 6px; align-items: baseline;
+           padding: 2px 4px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+.reg-row:hover { background: var(--panel2); }
+.reg-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reg-row .val { font-variant-numeric: tabular-nums; color: var(--muted); }
+.reg-row .reg-genes { grid-column: 2 / -1; font-size: 11px; color: var(--muted); }
+.reg-row .reg-sign { opacity: 0.7; }
+.reg-row.reg-up .reg-arrow { color: var(--reg-up); }
+.reg-row.reg-down .reg-arrow { color: var(--reg-down); }
+.reg-row.reg-mixed .reg-arrow { color: var(--muted); }
+.reg-flux { margin-top: 8px; font-size: 12px; }
+#regFluxRow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+#regFluxWhy { margin: 2px 0 6px; }
+.reg-routes { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
+.reg-routes button { border: 1px solid var(--line); background: var(--field); color: var(--muted); border-radius: 5px; padding: 2px 7px; font-size: 11px; cursor: pointer; }
+.reg-routes button:hover { color: var(--text); border-color: var(--accent); }
+.reg-routes button.on { background: var(--panel2); color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.rna-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 3px 0; }
+.rna-chip { display: inline-flex; align-items: baseline; gap: 4px; padding: 1px 6px; border-radius: 4px; font-size: 11.5px; border: 1px solid var(--line); background: var(--field); cursor: pointer; font-variant-numeric: tabular-nums; }
+.rna-chip:hover { border-color: var(--accent); }
+.rna-chip.up { border-color: var(--reg-up); color: var(--reg-up); }
+.rna-chip.down { border-color: var(--reg-down); color: var(--reg-down); }
+.rna-iso-tag { display: inline-block; margin-top: 4px; padding: 2px 6px; border-radius: 4px; font-size: 11.5px; border: 1px dashed var(--hot); color: var(--hot); }
+.rna-sec { margin-top: 8px; }
+.rna-sec summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text); padding: 2px 0; }
+.rna-sec .reg-row { grid-template-columns: 12px 1fr auto; }
+.rna-badge { font-size: 10.5px; padding: 0 5px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); margin-left: 4px; }
+.reg-proc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--field); font-size: 12px; }
+.reg-proc-bar select { max-width: 220px; font-size: 12px; }
+.reg-proc-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
+.reg-proc-chip { display: inline-flex; align-items: baseline; gap: 3px; padding: 1px 6px; border-radius: 4px; font-size: 11px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); font-variant-numeric: tabular-nums; cursor: pointer; }
+.reg-proc-chip:hover { border-color: var(--accent); }
+.reg-proc-chip.up { border-color: var(--reg-up); color: var(--reg-up); }
+.reg-proc-chip.down { border-color: var(--reg-down); color: var(--reg-down); }
+.reg-fba-tag { display: inline-block; padding: 0 5px; border-radius: 3px; font-size: 11px; font-weight: 600; background: var(--panel2); border: 1px solid var(--accent); color: var(--accent); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.reg-fba-tag.down { border-color: var(--hot); color: var(--hot); }
+.reg-overlap { font-size: 11px; color: var(--muted); font-style: italic; }
+.reg-cov-bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; margin: 3px 0; }
+.reg-cov-bar i { display: block; height: 100%; background: var(--accent); }
+.reg-cov-bar.up i { background: var(--reg-up); }
+.reg-cov-bar.down i { background: var(--reg-down); }
 
