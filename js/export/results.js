@@ -316,9 +316,172 @@ export const DATASETS = [
     id: "map", kind: "chart", file: "map.png", when: (c) => !!c.canvas,
     build: (c) => new Promise((resolve) => c.canvas.toBlob(async (b) => resolve(b ? new Uint8Array(await b.arrayBuffer()) : null), "image/png")),
   },
+
+  // ---------------------------------------------------------------- the Interpret tab ----
+  // These come from data the user supplied, so none of them needs a flux solution (`anytime: true`) and
+  // every one declares `when`: a session with no omics loaded sees nothing new in the dialog.
+  {
+    id: "exoRates", kind: "table", file: "exometabolomics_rates.csv", anytime: true, when: (c) => !!c.exo,
+    build: (c) => {
+      const g = c.exo.growth;
+      const rows = c.exo.rates.map((r) => [
+        r.name, r.met !== undefined ? c.model.mets[r.met].id : "", r.met !== undefined ? c.model.bases[c.model.mets[r.met].b].n : "",
+        r.via || "", r.rate > 0 ? "uptake" : r.rate < 0 ? "secretion" : "none", r.rate, r.sd ?? "",
+        r.n ?? "", (r.flags || []).join(";"),
+      ]);
+      if (g) rows.push(["(growth rate)", "", "", "", "growth", g.mu, g.sd ?? "", g.n ?? "", ""]);
+      return csv(["label", "metabolite_id", "metabolite_name", "resolved_by", "direction",
+        "rate_mmol_gDW_h", "sd", "n_replicates", "flags"], rows);
+    },
+  },
+  {
+    id: "exoFit", kind: "table", file: "exometabolomics_fit.csv", anytime: true, when: (c) => !!c.exo?.fit,
+    build: (c) => {
+      const f = c.exo.fit, b = f.balance || {};
+      const name = (m) => (m === -1 ? "(growth)" : c.model.bases[c.model.mets[m].b].n);
+      const rows = (f.residuals || []).map((r) => [
+        name(r.met), r.met === -1 ? "" : c.model.mets[r.met].id, r.observed, r.fitted, r.residual, r.share,
+      ]);
+      // the diagnostics belong with the residuals: a small deviation with an absurd respiratory quotient is
+      // not a good fit, and reading one without the other is how that gets missed
+      const diag = [
+        ["condition", f.condition], ["measurements", f.nMeasurements], ["total_deviation", f.deviation],
+        ["objective", f.objective], ["growth_observed_per_h", f.growthObserved], ["growth_sd", f.growthSd],
+        ["growth_fitted_per_h", f.growthFitted], ["respiratory_quotient", b.rq],
+        ["carbon_closure", b.closure?.C], ["nitrogen_closure", b.closure?.N],
+        ["electron_balance", b.electrons], ["proton_flux", b.proton],
+        ...(b.warnings || []).map((w, i) => [`warning_${i + 1}`, w]),
+      ];
+      return csv(["metabolite", "metabolite_id", "observed_mmol_gDW_h", "fitted_mmol_gDW_h", "residual", "share_of_deviation"], rows)
+        + "\n" + csv(["diagnostic", "value"], diag);
+    },
+  },
+  {
+    id: "mtbContrast", kind: "table", file: "metabolomics_contrast.csv", anytime: true, when: (c) => !!c.mtb,
+    build: (c) => {
+      const r = c.mtb, mapped = new Map();
+      for (const row of r.rows) for (const b of row.bases || []) mapped.set(row.label, b);
+      const rows = r.rows.map((x) => [
+        x.label, mapped.has(x.label) ? c.model.bases[mapped.get(x.label)].id : "",
+        mapped.has(x.label) ? c.model.bases[mapped.get(x.label)].n : "", x.via || "",
+        x.log2fc, 2 ** x.log2fc, x.t, x.df, x.p, x.q, x.n, x.q < 0.05 ? "yes" : "no",
+      ]);
+      const unres = (r.unmapped || []).map((x) => [x.label, "", "", x.via || "unresolved", x.log2fc, 2 ** x.log2fc, x.t, x.df, x.p, x.q, x.n, ""]);
+      return csv(["label", "metabolite_id", "metabolite_name", "resolved_by", "log2FC", "fold_change",
+        "t", "df", "p", "q_BH", "n_samples", "significant_q_lt_0.05"], rows.concat(unres));
+    },
+  },
+  {
+    id: "mtbSteps", kind: "table", file: "metabolomics_candidate_steps.csv", anytime: true, when: (c) => !!c.mtb?.steps?.length,
+    build: (c) => {
+      const r = c.mtb, perm = r.perm || {};
+      const rows = r.steps.map((x, k) => [
+        k + 1, x.id, x.name, c.model.subsystems[x.ss] ?? "", x.score, x.raw, x.subUp, x.prodDown,
+        x.direction ?? "", x.support ?? "", x.oppositeSigns ? "yes" : "no", x.couldBeReversal ? "yes" : "no",
+        x.carriesFlux ? "yes" : "no", r.shifts?.get?.(x.rxn) ?? "",
+      ]);
+      const head = csv(["rank", "reaction_id", "reaction_name", "pathway", "score", "raw_score", "substrates_up",
+        "products_down", "flux_direction", "support", "opposite_signs", "could_be_reversal", "carries_flux",
+        "partial_ddG_kJ_mol"], rows);
+      // the permutation line is what says whether the top of this list means anything at all
+      return head + "\n" + csv(["calibration", "value"], [
+        ["permutation_p", perm.p], ["permutation_rounds", perm.rounds], ["best_observed_score", perm.observed],
+        ["panel_median_log2FC", r.rawMedian], ["median_normalisation_applied", r.norm ? "yes" : "no"],
+      ]);
+    },
+  },
+  {
+    id: "mtbRatios", kind: "table", file: "metabolomics_ratios.csv", anytime: true, when: (c) => !!c.mtb?.ratios?.length,
+    build: (c) => csv(["numerator", "denominator", "meaning", "delta_log2", "fold_change"],
+      c.mtb.ratios.map((x) => [x.a, x.b, x.what || "", x.dlog2, x.fold])),
+  },
+  {
+    id: "tfTable", kind: "table", file: "tf_activities.csv", anytime: true, when: (c) => !!c.reg?.tfs?.length,
+    build: (c) => {
+      const r = c.reg, joint = r.joint || new Map(), fx = r.flux;
+      const rows = r.tfs.map((e, k) => {
+        const jt = joint.get?.(e.tf);
+        return [
+          k + 1, e.tf, e.dir > 0 ? "up" : "down", e.zRna, e.pRna, e.qRna, e.nObsRna, e.nTotalRna,
+          e.nMetTargets, e.metGenes.length, e.metRxns.size,
+          e.concordant.length, e.rnaOnly.length, e.discordant.length,
+          ...(fx ? [e.fluxAgree, e.fluxDisagree, e.fluxIdle, jt?.p ?? "", jt?.reason ?? ""] : []),
+          Number.isFinite(e.zMet) ? e.zMet : "", Number.isFinite(e.qMet) ? e.qMet : "", e.combinedScore,
+        ];
+      });
+      const head = ["rank", "tf", "activity", "ulm_t", "p", "q_BH", "targets_observed", "targets_total",
+        "metabolic_targets", "metabolic_targets_confirmed_by_mRNA", "reactions",
+        "chains_concordant", "chains_rna_only", "chains_discordant",
+        ...(fx ? ["flux_agree", "flux_disagree", "flux_unchanged", "joint_p", "joint_declined_because"] : []),
+        "metabolomics_t", "metabolomics_q", "combined_score"];
+      const meta = [["regulon_source", r.regulons?.source], ["regulon_organism", r.regulons?.organism],
+        ["regulon_built", r.regulons?.built], ["regulon_licence", r.regulons?.license],
+        ["flux_change_source", fx?.source ?? "none"],
+        ["flux_independent_of_transcriptome", fx ? (fx.independent ? "yes" : "no") : ""],
+        ["reactions_whose_flux_moved", fx?.nChanged ?? ""], ["reactions_reversed", fx?.nReversed ?? ""]];
+      return csv(head, rows) + "\n" + csv(["provenance", "value"], meta);
+    },
+  },
+  {
+    id: "tfTargets", kind: "table", file: "tf_targets.csv", anytime: true, when: (c) => !!c.reg?.tfs?.length,
+    build: (c) => {
+      const r = c.reg, fx = r.flux, rows = [];
+      for (const e of r.tfs.slice(0, 40)) {
+        for (const g of e.metGenes) rows.push([
+          e.tf, e.dir > 0 ? "up" : "down", e.qRna, g.gene,
+          g.regSign > 0 ? "activates" : "represses", g.expected > 0 ? "up" : "down",
+          g.log2fc, g.q ?? "", g.rxns.length,
+          ...(fx ? [g.fluxDir === null ? "" : g.fluxDir > 0 ? "up" : g.fluxDir < 0 ? "down" : "unchanged",
+            g.fluxAgree === 1 ? "agree" : g.fluxAgree === -1 ? "disagree" : g.fluxAgree === 0 ? "unchanged" : ""] : []),
+        ]);
+      }
+      return csv(["tf", "tf_activity", "tf_q", "target_gene", "edge", "expected_enzyme_change",
+        "mRNA_log2FC", "mRNA_q", "reactions",
+        ...(fx ? ["flux_direction", "flux_vs_prediction"] : [])], rows);
+    },
+  },
+  {
+    id: "tfRegulon", kind: "table", file: "tf_marked_regulon.csv", anytime: true,
+    when: (c) => !!c.reg?.markedTf,
+    build: (c) => {
+      const r = c.reg, e = r.tfs.find((x) => x.tf === r.markedTf);
+      if (!e) return null;
+      const v = c.frame?.v || null;
+      const rows = [...e.metRxns].map((j) => {
+        const d = e.metRxnDir?.get(j) ?? 0;
+        const drivers = (e.rxnDrivers?.get(j) || []).map((g) => `${g.gene}${g.regSign > 0 ? "+" : "-"}`).join(";");
+        const rx = c.model.rxns[j];
+        return [rx.id, rx.n, c.model.subsystems[rx.ss] ?? "", d > 0 ? "up" : d < 0 ? "down" : "unclear",
+          drivers, v ? v[j] : "", rx.g || ""];
+      });
+      rows.sort((a, b) => Math.abs(+b[5] || 0) - Math.abs(+a[5] || 0));
+      return csv(["reaction_id", "reaction_name", "pathway", "pushed", "regulating_genes",
+        "flux_mmol_gDW_h", "gpr"], rows);
+    },
+  },
+  {
+    id: "metMap", kind: "other", file: "metabolite_mapping.json", anytime: true,
+    when: (c) => (c.metMap?.exo?.length || 0) + (c.metMap?.mtb?.length || 0) > 0,
+    // Hand mapping is curated work that otherwise lives only in this browser's localStorage. Writing it out
+    // lets it be reviewed, shared, kept with the paper, and loaded on another machine.
+    build: (c) => JSON.stringify({
+      model: c.model.meta?.slug || "", exported: new Date().toISOString(),
+      note: "label -> metabolite base id; an empty value means the label was deliberately ignored",
+      mapping: Object.fromEntries([...c.metMap.exo, ...c.metMap.mtb]),
+    }, null, 2) + "\n",
+  },
 ];
 
 const README = {
+  "exometabolomics_rates.csv": "Uptake (+) and secretion (-) computed from the spent-medium table, with the growth rate as the last row. `flags` names what limits a rate: only two time points, no cell-free control, a metabolite that ran out.",
+  "exometabolomics_fit.csv": "Whether one flux distribution can satisfy all those rates at once. The residuals come first, then the diagnostics after a blank line. Read the deviation together with the respiratory quotient and the carbon closure: a small deviation with an absurd quotient is not a good fit.",
+  "metabolomics_contrast.csv": "Each measured metabolite between the two conditions, with the model metabolite it resolved to and how. Labels nothing resolved are listed at the end with an empty metabolite_id.",
+  "metabolomics_candidate_steps.csv": "Reactions whose measured substrates rose while their products fell, best first, with the permutation calibration after a blank line. These order hypotheses for an experiment to settle; they do not identify a cause.",
+  "metabolomics_ratios.csv": "The diagnostic energy and redox ratios, reported only as changes between the conditions because ionisation response factors cancel in relative data.",
+  "tf_activities.csv": "Transcription factors ranked by ULM activity, with their targets, the three-step chains and, when a flux change was supplied, how many of their enzymes move the way they predict. `joint_p` is filled only when the flux came from measured exchange rates; otherwise `joint_declined_because` says why no p-value is honest.",
+  "tf_targets.csv": "One row per regulator and metabolic target gene: the sign of the edge, the direction that predicts for the enzyme, the measured mRNA change and, when available, whether the reaction flux agreed.",
+  "tf_marked_regulon.csv": "Every reaction of the regulon highlighted on the map, which way its regulator pushes it, and the target genes responsible with their sign.",
+  "metabolite_mapping.json": "The labels you mapped by hand, so the same table resolves the same way on another machine. An empty value means a label you chose to ignore.",
   "session.json": "The whole session: model edits, medium, tracers, measured fluxes, perturbations, events, objective and saved scenarios. Load it with the Import button to repeat these calculations.",
   "model_edits.json": "Only the model edits (added / removed reactions and metabolites, changed bounds and GPR rules), to import into another session.",
   "model_edits_report.csv": "Every model edit with its validation result (applied or rejected) and the checks that were raised.",

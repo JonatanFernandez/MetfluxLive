@@ -8,11 +8,11 @@ import { buildMetIndex, resolveMetabolite, suggestMetabolites } from "./core/met
 import { DEMOS, demoById, runDemo } from "./ui/demos.js";
 import { parseWideTable, splitByPattern, contrast, normaliseByMedian, metaboliteNetwork, observability,
   bottlenecks, pathwayShifts, ratioChanges, permutationNull, deltaDeltaG } from "./core/metcontrast.js";
-import { parseRnaDiffTable, inferRegulatorsMultiOmic, jointFluxTest, regulonRoutes, summarizeRnaOnModel, computeMultiOmicDiscrepancies,
+import { parseRnaDiffTable, inferRegulatorsMultiOmic, jointFluxTest, regulonRoutes, buildRegulonIndex, regulatorsOfReaction, regulonReactions, regulatorsOfGene, summarizeRnaOnModel, computeMultiOmicDiscrepancies,
   PROCESS_KEYS, rankRegulatorsByProcess, tfProcessProfile, metaboliteRegulators, pathwayRegulators, activeTfsForReaction,
   buildTfCounterfactualPerturbation, evaluateCounterfactualEffect } from "./core/reginfer.js";
 import { gprActivity } from "./core/gpr.js";
-import { loadContexts, offGenes, blockedReactions, offGenesOf, ContextIndex, taskName } from "./core/contexts.js";
+import { loadContexts, offGenes, blockedReactions, offGenesOf, ContextIndex, taskName, geneOffCounts } from "./core/contexts.js";
 import { ModelIndex, fmtFlux, fmtTime, escapeHtml as esc } from "./modelindex.js";
 import { MapView, compColor, setCompAliases, enrichColor, deltaColor, energyColor, setMapTheme, revColor, regColors} from "./ui/mapview.js";
 import { fluxChange, FLUX_EPS } from "./core/change.js";
@@ -149,6 +149,7 @@ async function loadModel(slug, opts = {}) {
     $("loadingText").textContent = t("load.solver");
     mtbClear(false);
     regClear(false);
+    REG.data = null; REG.index = null; REG.slug = null;   // the cached file belongs to the previous model
     updateRegButton();
     rebuildModel();
     S.supplies = []; S.events = [];
@@ -263,6 +264,20 @@ function capture() {
     objective: { reaction: M.rxns[S.cfg.objective].id, maximize: S.cfg.maximize, parsimonious: S.cfg.parsimonious,
       secondary: S.cfg.secondary ? { reaction: M.rxns[S.cfg.secondary.rxn].id, maximize: S.cfg.secondary.maximize !== false, keep: S.cfg.secondary.frac } : null },
     dynamic: { hours: +$("dynHours").value || 24, biomass: +$("dynBiomass").value || 0.5, pool: +$("dynPool").value || 0.5 },
+    // The omics the Interpret tab holds. The RAW tables are saved rather than the computed results: they are
+    // text, they compress, and they let the analysis be recomputed -- which is what makes a saved session
+    // reproducible instead of merely restorable. The hand mapping travels with them, since without it the
+    // same table resolves differently on another machine.
+    omics: {
+      exo: $("exoText")?.value ? { table: $("exoText").value, condition: $("exoCond")?.value || "",
+        gdwPerCell: $("exoGdw")?.value || "", mu: $("exoMu")?.value || "", muSd: $("exoMuSd")?.value || "" } : null,
+      mtb: $("mtbText")?.value ? { table: $("mtbText").value, patternA: $("mtbPatA")?.value || "", patternB: $("mtbPatB")?.value || "" } : null,
+      rna: $("regText")?.value ? { table: $("regText").value, fluxMethod: $("regFluxMethod")?.value || "",
+        condA: $("regCondA")?.value || "", condB: $("regCondB")?.value || "" } : null,
+      // One mapping, not two: both importers read and write metflux.metmap.<slug>. Whatever either of them
+      // has in memory is merged, since they are separate Map objects over the same store.
+      mapping: Object.fromEntries([...(EXO.manual || []), ...(MTB.manual || [])]),
+    },
     events: S.events.map((ev) => (ev.type === "medium" ? { t: ev.t, type: "medium", medium: ev.mediumId, saved: savedMedium(ev.mediumId) } : { t: ev.t, type: "add", met: mid(ev.met), conc: ev.conc, label: labelIdx(ev.label), fraction: ev.fraction ?? 1 })),
   };
 }
@@ -315,6 +330,25 @@ function applySettings(o) {
     if (ev.type === "medium") { S.events.push({ type: "medium", t: +ev.t, mediumId: ensureMedium(ev.medium, ev.saved) }); continue; }
     const m = met(ev.met);
     if (m !== undefined) S.events.push({ type: "add", t: +ev.t, met: m, conc: +ev.conc, label: label(m, ev.label), fraction: +ev.fraction || 1 });
+  }
+  // The omics tables go back into their dialogs, and the hand mapping back into memory and storage. Nothing
+  // is recomputed here: restoring a session should not quietly launch three analyses, so the tables are left
+  // ready and the user presses the button.
+  const om = o.omics;
+  if (om) {
+    const put = (id, v) => { const el = $(id); if (el && v !== undefined && v !== null) el.value = v; };
+    if (om.exo) { put("exoText", om.exo.table); put("exoGdw", om.exo.gdwPerCell); put("exoMu", om.exo.mu); put("exoMuSd", om.exo.muSd); }
+    if (om.mtb) { put("mtbText", om.mtb.table); put("mtbPatA", om.mtb.patternA); put("mtbPatB", om.mtb.patternB); }
+    if (om.rna) { put("regText", om.rna.table); put("regFluxMethod", om.rna.fluxMethod); }
+    const mp = om.mapping || {};
+    if (Object.keys(mp).length) {
+      // merge into what this browser already knows rather than replacing it: a session carries the mapping
+      // it needs, but the reader may have curated more labels since.
+      const merged = new Map([...loadMetMap(S.slug), ...Object.entries(mp)]);
+      saveMetMap(S.slug, merged);
+      if (EXO.manual) EXO.manual = new Map(merged);
+      if (MTB.manual) MTB.manual = new Map(merged);
+    }
   }
   renderContext(); renderMediumSel(); renderSupplies(); renderMeasured(); renderPerturb(); renderEvents(); renderObjective(); renderSecondary();
   return lost;
@@ -1177,6 +1211,7 @@ async function mtbRun() {
   if ($("mtbOverlay")) $("mtbOverlay").checked = true;
   if ($("mtbOverlayWrap")) $("mtbOverlayWrap").hidden = false;
   mtbRender();
+  MTB.result.unresolved = unresolved;   // kept so the download dialog can write them out with their mapping
   mtbRenderUnmapped(unresolved);
   if (REG.rnaMap) await regRun();
   applyFrame();
@@ -1292,7 +1327,7 @@ function mtbRenderUnmapped(rows) {
 // is intentionally omitted because whole-sample permutation testing showed it is underpowered.
 
 const REG_MODELS = new Set(["human-gem", "mouse-gem", "rat-gem", "ecoli-gem"]);
-const REG = { data: null, slug: null, rnaMap: null, result: null, rnaSummary: null, overlay: true, markedTf: null, markedRxns: null, joint: null, routes: null, routeIdx: 0, sortProc: "ulm", sortMet: -1, fbaImpact: null, fbaBusy: null };
+const REG = { data: null, index: null, slug: null, markedStatic: false, rnaMap: null, result: null, rnaSummary: null, overlay: true, markedTf: null, markedRxns: null, joint: null, routes: null, routeIdx: 0, sortProc: "ulm", sortMet: -1, fbaImpact: null, fbaBusy: null };
 
 function rnaMapData(kind) {
   if (!REG.overlay || !REG.rnaSummary || !S.model) return null;
@@ -1322,6 +1357,10 @@ function updateRegButton() {
   const ok = REG_MODELS.has(S.slug);
   btn.disabled = !ok;
   btn.title = ok ? t("reg.openTitle") : t("reg.noModel");
+  // Fetch the regulon file alongside the model, in the background. Which factors are known to regulate a
+  // reaction is a property of the model, not of an experiment, so the reaction cards should not have to
+  // wait for someone to open the RNA-seq dialog. Failure is silent: the cards simply show no regulators.
+  if (ok && REG.slug !== S.slug) loadRegulons().then(() => { if (S.sel?.type === "rxn") renderDetails(); }).catch(() => {});
 }
 
 async function loadRegulons() {
@@ -1330,6 +1369,7 @@ async function loadRegulons() {
   const r = await fetch(`data/${S.slug}/regulons.json`);
   if (!r.ok) return null;
   REG.data = await r.json();
+  REG.index = buildRegulonIndex(S.model, REG.data);   // usable with no RNA-seq at all
   REG.slug = S.slug;
   return REG.data;
 }
@@ -1429,9 +1469,23 @@ async function regRun() {
   renderDetails();
 }
 
+/**
+ * Highlight a regulator's reactions on the map.
+ *
+ * With RNA-seq loaded this uses the inferred entry, where the sign per reaction is the DIRECTION the
+ * regulator pushes it. Without RNA-seq it falls back to the regulon file, where the sign is only whether
+ * the factor activates or represses those genes -- real knowledge, but a different claim. `REG.markedStatic`
+ * records which of the two is on screen so the legend and the sidebar say the right thing.
+ */
 function regMarkTf(tfName) {
-  const entry = REG.result?.tfs.find((x) => x.tf === tfName);
-  if (!entry || !entry.metRxns?.size) return;
+  let entry = REG.result?.tfs.find((x) => x.tf === tfName);
+  REG.markedStatic = false;
+  if (!entry || !entry.metRxns?.size) {
+    const rr = regulonReactions(REG.index, tfName);
+    if (!rr.rxns.size) return;
+    entry = { tf: tfName, metRxns: rr.rxns, metRxnDir: rr.sign, rxnDrivers: rr.drivers, metGenes: [], nMetTargets: rr.rxns.size };
+    REG.markedStatic = true;
+  }
   REG.markedTf = entry.tf;
   REG.markedRxns = entry.metRxns;
   $("regMarkTxt").textContent = t("reg.marked", { tf: entry.tf, n: entry.metRxns.size });
@@ -1850,10 +1904,10 @@ function renderFluxMethods() {
   explain();
 }
 
-const EXO = { groups: null, rates: null, unit: null, index: null, baseToMet: null, baseById: null, manual: null };
+const EXO = { groups: null, rates: null, unit: null, index: null, baseToMet: null, baseById: null, manual: null, fit: null, growth: null };
 
 function openExoDialog() {
-  EXO.groups = null; EXO.rates = null; EXO.index = null; EXO.baseToMet = null; EXO.baseById = null; EXO.manual = null;
+  EXO.groups = null; EXO.rates = null; EXO.index = null; EXO.baseToMet = null; EXO.baseById = null; EXO.manual = null; EXO.fit = null; EXO.growth = null;
   $("exoFile").value = ""; $("exoText").value = "";
   $("exoOut").hidden = true; $("exoStatus").textContent = ""; $("exoFit").textContent = "";
   $("exoGdw").value = CELL_MASS_PG;
@@ -1950,6 +2004,11 @@ function exoRender() {
   const g0 = groups[0];
   if (g0) {
     const mus = g0.replicates.map((r) => growthRate(r.times, r.biomass).mu).filter(Number.isFinite);
+    if (mus.length) {
+      const m0 = mus.reduce((a, b) => a + b, 0) / mus.length;
+      EXO.growth = { condition: cond, mu: m0, n: mus.length,
+        sd: mus.length > 1 ? Math.sqrt(mus.reduce((a, x) => a + (x - m0) ** 2, 0) / (mus.length - 1)) : null };
+    }
     if (mus.length && !$("exoMu").value) {
       const mu = mus.reduce((a, b) => a + b, 0) / mus.length;
       $("exoMu").value = mu.toPrecision(3);
@@ -2033,6 +2092,11 @@ async function exoCheck() {
   catch (err) { out.innerHTML = `<div class="note err">${esc(err.message)}</div>`; return; }
   if (res.status !== "optimal") { out.innerHTML = `<div class="note err">${t("exo.fitFailed", { status: esc(res.status) })}</div>`; return; }
   const bal = exchangeBalance(S.model, S.sim.exchanges, res.v);
+  // Kept so the download dialog can write it out: until now the fit existed only as HTML in the dialog.
+  EXO.fit = { condition: $("exoCond").value, deviation: res.deviation, residuals: res.residuals, balance: bal,
+    growthObserved: mu > 0 ? mu : null, growthSd: muSd > 0 ? muSd : null,
+    growthFitted: mu > 0 ? res.v[S.cfg.objective] : null, objective: S.model.rxns[S.cfg.objective].id,
+    nMeasurements: measurements.length };
   const name = (m) => (m === -1 ? t("exo.growth") : S.model.bases[S.model.mets[m].b].n);
   const off = res.residuals.filter((r) => Math.abs(r.residual) > 1e-6);
   const fitted = mu > 0 ? res.v[S.cfg.objective] : null;
@@ -2560,10 +2624,12 @@ function renderLegend(mode, view = "b") {
   if (REG.markedTf) {
     const rc = regColors();
     const ring = (c) => `<svg width="16" height="12" aria-hidden="true"><circle cx="8" cy="6" r="4.6" fill="none" stroke="${c}" stroke-width="2"/></svg>`;
+    const st = REG.markedStatic;
     h += `<div style="margin-top:6px"><b style="color:var(--text)">${t("legend.regTitle", { tf: esc(REG.markedTf) })}</b></div>`
-      + `<div class="chl">${ring(rc.up)}${t("legend.regUp")}</div>`
-      + `<div class="chl">${ring(rc.down)}${t("legend.regDown")}</div>`
-      + `<div class="chl">${ring(rc.mixed)}${t("legend.regMixed")}</div>`;
+      + `<div class="chl">${ring(rc.up)}${t(st ? "legend.regActivates" : "legend.regUp")}</div>`
+      + `<div class="chl">${ring(rc.down)}${t(st ? "legend.regRepresses" : "legend.regDown")}</div>`
+      + `<div class="chl">${ring(rc.mixed)}${t(st ? "legend.regBoth" : "legend.regMixed")}</div>`
+      + (st ? `<div class="chnote">${t("legend.regStaticNote")}</div>` : "");
   }
   if (view === "a") h += `<div class="chnote">${t("legend.viewA", { a: esc(cmpNames(frame()).a), b: esc(cmpNames(frame()).b) })}</div>`;
   if (sub && S.result?.pert?.size) h += `<div>${t("legend.pert")}</div>`;
@@ -3976,16 +4042,27 @@ function regulonSummaryHtml(f) {
   const arrow = (d) => (d > 0 ? "&uarr;" : d < 0 ? "&darr;" : "&middot;");
   const cls = (d) => (d > 0 ? "reg-up" : d < 0 ? "reg-down" : "reg-mixed");
 
-  const act = e.zRna >= 0 ? "up" : "down";
-  let h = `<h4>${t("reg.sumTitle")}${small(esc(e.tf))}</h4>`
-    + `<div class="reg-head"><span class="reg-act ${act}">${t("reg.act." + act)}</span>`
-    + `<span class="hint">t = ${e.zRna.toFixed(2)}${Number.isFinite(e.qRna) ? `, q = ${e.qRna < 1e-4 ? e.qRna.toExponential(1) : e.qRna.toFixed(3)}` : ""}</span></div>`
-    + `<div class="reg-counts"><span class="reg-up">${arrow(1)} ${t("reg.nUp", { n: up })}</span>`
-    + `<span class="reg-down">${arrow(-1)} ${t("reg.nDown", { n: down })}</span>`
-    + (unclear ? `<span class="reg-mixed">${arrow(0)} ${t("reg.nMixed", { n: unclear })}</span>` : "")
-    + `</div>`
-    + (f?.v ? tfProfileHtml(e, f, false) : "")
-    + `<p class="hint">${t("reg.sumHow", { n: e.nMetTargets, r: dir.size })}</p>`;
+  // Static: the sign is what the curated network says the factor does to those genes. Inferred: the sign is
+  // the direction this reaction is pushed, which needs a measured change in the factor's activity.
+  let h = `<h4>${t("reg.sumTitle")}${small(esc(e.tf))}</h4>`;
+  if (stat) {
+    h += `<div class="reg-head"><span class="reg-act known">${t("reg.act.known")}</span></div>`
+      + `<div class="reg-counts"><span class="reg-up">+ ${t("reg.nActivates", { n: up })}</span>`
+      + `<span class="reg-down">&minus; ${t("reg.nRepresses", { n: down })}</span>`
+      + (unclear ? `<span class="reg-mixed">&plusmn; ${t("reg.nBoth", { n: unclear })}</span>` : "")
+      + `</div>`
+      + `<p class="hint">${t("reg.sumHowStatic", { r: dir.size, src: esc(REG.index?.meta?.source || "") })}</p>`;
+  } else {
+    const act = e.zRna >= 0 ? "up" : "down";
+    h += `<div class="reg-head"><span class="reg-act ${act}">${t("reg.act." + act)}</span>`
+      + `<span class="hint">t = ${e.zRna.toFixed(2)}${Number.isFinite(e.qRna) ? `, q = ${e.qRna < 1e-4 ? e.qRna.toExponential(1) : e.qRna.toFixed(3)}` : ""}</span></div>`
+      + `<div class="reg-counts"><span class="reg-up">${arrow(1)} ${t("reg.nUp", { n: up })}</span>`
+      + `<span class="reg-down">${arrow(-1)} ${t("reg.nDown", { n: down })}</span>`
+      + (unclear ? `<span class="reg-mixed">${arrow(0)} ${t("reg.nMixed", { n: unclear })}</span>` : "")
+      + `</div>`
+      + (f?.v ? tfProfileHtml(e, f, false) : "")
+      + `<p class="hint">${t("reg.sumHow", { n: e.nMetTargets, r: dir.size })}</p>`;
+  }
 
   // Ad-hoc contiguous route selector when the regulon spans multiple connected stretches
   if (REG.routes && (REG.routes.routes.length > 1 || (REG.routes.routes.length >= 1 && REG.routes.scattered.length))) {
@@ -4000,7 +4077,7 @@ function regulonSummaryHtml(f) {
   }
 
   // the flux axis, when one was supplied
-  if (REG.result?.flux) {
+  if (!stat && REG.result?.flux) {
     const fx = REG.result.flux;
     const tot = e.fluxAgree + e.fluxDisagree;
     h += `<div class="reg-flux"><b>${t("reg.fluxTitle")}</b>${small(t("reg.fluxSrc." + fx.source))}</div>`;
@@ -4287,6 +4364,26 @@ function metHtml(m) {
   h += `<div class="actions"><button data-act="supply">${t("met.addSupply")}</button><button data-act="label">${t("met.label")}</button>${ppMet !== undefined ? `<button data-act="phase" title="${esc(t("pp.title"))}">${t("pp.button")}</button>` : ""}</div><div id="ppOut"></div>`;
   if (S.editMode) h += `<div class="actions edit"><button data-act="newRxnMet">${t("ed.act.newRxnMet")}</button><button data-act="newComp">${t("ed.act.newComp")}</button><button data-act="removeMet" class="danger">${t("ed.act.removeMet")}</button></div>`;
   if (f?.ref?.scen) h += `<div id="detCmp"></div>`;
+  // Known regulators of the enzymes that make or use this metabolite: curated network, nothing uploaded.
+  if (!(REG.result && f?.v) && REG.index) {
+    const byTf = new Map();
+    for (let p = index.rxnStart[m]; p < index.rxnStart[m + 1]; p++) {
+      const j = index.rxnList[p];
+      if (model.rxns[j].removed) continue;
+      for (const x of regulatorsOfReaction(REG.index, model, j)) {
+        if (!byTf.has(x.tf)) byTf.set(x.tf, { tf: x.tf, sign: x.sign, n: 0 });
+        const e = byTf.get(x.tf);
+        if (e.sign !== x.sign) e.sign = 0;
+        e.n++;
+      }
+    }
+    const items = [...byTf.values()].sort((a, b) => b.n - a.n).slice(0, 8);
+    if (items.length) {
+      h += `<h4>${t("reg.metKnownTitle")}</h4><div class="rna-chips">`
+        + items.map((x) => `<span class="rna-chip known" data-marktf="${esc(x.tf)}" title="${esc(t("reg.metKnownTip", { n: x.n }) + " — " + t("reg.clickMarkTf"))}">${esc(x.tf)} ${x.sign > 0 ? "+" : x.sign < 0 ? "&minus;" : "&plusmn;"}</span>`).join("")
+        + `</div>` + unlockHint("rna");
+    }
+  }
   if (REG.result && f?.v) {
     const mr = metaboliteRegulators(model, REG.result, REG.rnaSummary, f.v, m, regProcessOpts());
     if (mr.items.length) {
@@ -4488,6 +4585,7 @@ function rxnHtml(j) {
     if (genes.length) note += `<div class="note ctxnote">${t("ctx.rxnKept", { ctx: esc(ctx.name), genes: esc(genes.join(", ")) })}</div>`;
   }
   let mtbKv = "";
+  if (!MTB.result) mtbKv = `<dt>${t("h.mtb")}</dt><dd>${unlockHint("mtb")}</dd>`;
   if (MTB.result) {
     const step = MTB.result.stepByRxn?.get(j);
     const dir = step ? step.direction : (v < -1e-9 ? -1 : 1);
@@ -4498,14 +4596,27 @@ function rxnHtml(j) {
   }
   let rnaKv = "";
   const rnaInfo = REG.rnaSummary?.rxnInfo?.get(j);
-  const rxnTfs = REG.result ? activeTfsForReaction(REG.result, j) : [];
+  // Who is known to regulate this reaction, from the regulon file alone. RNA-seq is not required for this:
+  // it is what the curated network says, and it is available as soon as the model is. When RNA-seq IS
+  // loaded, the factors it found active are shown first and with their measured direction; the rest stay,
+  // marked only with the sign of the edge, because an edge sign is not a direction of change.
+  const active = REG.result ? activeTfsForReaction(REG.result, j) : [];
+  const activeByTf = new Map(active.map((x) => [x.tf, x]));
+  const known = regulatorsOfReaction(REG.index, S.model, j);
+  const rxnTfs = known.map((k) => ({ ...k, live: activeByTf.get(k.tf) || null }))
+    .sort((a, b) => (b.live ? Math.abs(b.live.zRna) + 1e6 : 0) - (a.live ? Math.abs(a.live.zRna) + 1e6 : 0)
+      || b.genes.length - a.genes.length)
+    .slice(0, 8);
   const tfChipsHtml = rxnTfs.length
     ? `<div class="rna-chips">${rxnTfs.map((x) => {
-        const c = x.dir > 0 ? " up" : x.dir < 0 ? " down" : "";
-        const arrow = x.dir > 0 ? "&uarr;" : x.dir < 0 ? "&darr;" : "&middot;";
-        const drv = x.drivers.slice(0, 2).map((d) => `${d.gene}${d.regSign > 0 ? "+" : "−"}`).join(", ");
-        const tip = `${x.tf} (t = ${x.zRna.toFixed(2)})${drv ? " · " + drv : ""} — ${t("reg.clickMarkTf")}`;
-        return `<span class="rna-chip${c}" data-marktf="${esc(x.tf)}" title="${esc(tip)}">${esc(x.tf)} ${arrow}</span>`;
+        const d = x.live ? x.live.dir : 0;
+        const c = x.live ? (d > 0 ? " up" : d < 0 ? " down" : "") : " known";
+        // with activity: which way this reaction is pushed. Without it: whether the factor activates or represses.
+        const mark = x.live ? (d > 0 ? "&uarr;" : d < 0 ? "&darr;" : "&middot;") : (x.sign > 0 ? "+" : x.sign < 0 ? "&minus;" : "&plusmn;");
+        const via = x.genes.slice(0, 3).map((g) => `${g.gene}${g.sign > 0 ? "+" : "−"}`).join(", ");
+        const tip = (x.live ? `${x.tf} · ${t("reg.tipActive", { t: x.live.zRna.toFixed(2) })}` : `${x.tf} · ${t("reg.tipKnown")}`)
+          + (via ? ` · ${via}` : "") + ` — ${t("reg.clickMarkTf")}`;
+        return `<span class="rna-chip${c}" data-marktf="${esc(x.tf)}" title="${esc(tip)}">${esc(x.tf)} ${mark}</span>`;
       }).join("")}</div>`
     : "";
   if (rnaInfo) {
@@ -4569,6 +4680,21 @@ function rxnListHtml(kind, title, rxns, ss, canOpen) {
     }
   }
   let tfSub = "";
+  if (!(REG.result && f?.v) && REG.index) {
+    const byTf = new Map();
+    for (const j of rxns) for (const x of regulatorsOfReaction(REG.index, model, j)) {
+      if (!byTf.has(x.tf)) byTf.set(x.tf, { tf: x.tf, sign: x.sign, n: 0 });
+      const e = byTf.get(x.tf);
+      if (e.sign !== x.sign) e.sign = 0;
+      e.n++;
+    }
+    const items = [...byTf.values()].sort((a, b) => b.n - a.n).slice(0, 8);
+    if (items.length) {
+      tfSub = `<h4>${t("reg.subKnownTfs")}</h4><div class="rna-chips">`
+        + items.map((x) => `<span class="rna-chip known" data-marktf="${esc(x.tf)}" title="${esc(t("reg.subKnownTip", { n: x.n, total: rxns.length }) + " — " + t("reg.clickMarkTf"))}">${esc(x.tf)} ${x.sign > 0 ? "+" : x.sign < 0 ? "&minus;" : "&plusmn;"}</span>`).join("")
+        + `</div>` + unlockHint("rna");
+    }
+  }
   if (REG.result && f?.v) {
     const pTfs = pathwayRegulators(model, REG.result, REG.rnaSummary, f.v, rxns);
     if (pTfs.length) {
@@ -4665,6 +4791,17 @@ function grpHtml(g) {
   return rxnListHtml(locName(grp.loc), S.model.subsystems[grp.ss], grp.rxns, grp.ss, S.view.kind === "global");
 }
 
+/**
+ * One line telling the reader what to load to see more here, and nothing at all once they have.
+ * Every card that hides a section behind an upload should end that section with one of these, so the
+ * absence of a panel is never silent.
+ */
+function unlockHint(kind) {
+  const have = { rna: !!REG.result, mtb: !!MTB.result, exo: !!EXO.rates?.length, flux: !!frame()?.v };
+  if (have[kind]) return "";
+  return `<p class="hint unlock">${t("unlock." + kind)}</p>`;
+}
+
 function geneHtml(ref) {
   const { model } = S, f = frame();
   const g = model.genes.find((x) => x[1] === ref || x[0] === ref);
@@ -4690,10 +4827,28 @@ function geneHtml(ref) {
       rnaNote = `<div class="note"><b>${t("rna.rxnLabel")}:</b> ${fmtFc(info.log2fc)}${qTxt}${tfLine}</div>`;
     }
   }
+  const sym = (g ? g[1] : ref) || ref;
+  // Known regulators of this gene: the curated network, no RNA-seq needed. With RNA-seq the card above
+  // already says which of them turned out active.
+  const knownTfs = regulatorsOfGene(REG.index, sym).slice(0, 10);
+  const tfBlock = knownTfs.length
+    ? `<h4>${t("gene.regulators", { n: knownTfs.length })}</h4><div class="rna-chips">`
+      + knownTfs.map((x) => `<span class="rna-chip known" data-marktf="${esc(x.tf)}" title="${esc(`${x.tf} ${x.sign > 0 ? t("gene.activates") : t("gene.represses")} ${sym} — ${t("reg.clickMarkTf")}`)}">${esc(x.tf)} ${x.sign > 0 ? "+" : "&minus;"}</span>`).join("")
+      + `</div>` + unlockHint("rna")
+    : (REG.index ? "" : "");
+  // How many of the bundled cell types have it switched off: a gene off nowhere is housekeeping, a gene off
+  // in most of them is restricted, and neither fact needs anything uploaded.
+  const oc = geneOffCounts(S.ctxData, S.base?.model?.genes);
+  const gi = g ? S.base.model.genes.findIndex((x) => x[0] === g[0]) : -1;
+  const breadth = oc && gi >= 0
+    ? `<div class="meta">${t("gene.offIn", { n: oc.counts[gi], total: oc.total, pct: Math.round((100 * oc.counts[gi]) / oc.total) })}</div>`
+    : "";
   return `<div class="kind">${t("gene.kind")}</div><h3>${esc(geneSymbol(ref))}</h3><div class="meta">${g ? esc(g[2] || "") + "<br>" + esc(g[0]) : ""}</div>${ctxNote}${rnaNote}
     <div class="actions"><button data-act="perturb">${t("pert.button")}</button></div>
     <p class="meta">${t("gene.mapHint")}</p>
-    <h4>${t("gene.rxns", { n: rows.length })}</h4>${bars(rows.slice(0, 40).map(([n, v, k]) => [n, fmtFlux(v), k, v / mx]), "#b48cff")}`;
+    ${breadth}
+    <h4>${t("gene.rxns", { n: rows.length })}</h4>${bars(rows.slice(0, 40).map(([n, v, k]) => [n, fmtFlux(v), k, v / mx]), "#b48cff")}
+    ${tfBlock}`;
 }
 
 function renderDetails() {
@@ -4771,7 +4926,14 @@ function sessionFile() {
 function exportContext() {
   const f = frame();
   const session = { session: sessionFile(), edits: S.edits, editedModel: S.edited, baseModel: S.base.model };
-  if (!f || f.status !== "optimal") return { ...session, model: S.model, noResult: true };
+  if (!f || f.status !== "optimal") {
+    return { ...session, model: S.model, index: S.index, noResult: true,
+      exo: EXO.rates?.length ? { condition: $("exoCond")?.value || "", rates: EXO.rates, fit: EXO.fit, growth: EXO.growth,
+        gdwPerCell: +$("exoGdw")?.value || null, unmapped: EXO.rates.filter((r) => r.met === undefined).map((r) => r.name) } : null,
+      mtb: MTB.result ? { ...MTB.result, unmapped: MTB.result.unresolved || [], manual: MTB.manual || null } : null,
+      reg: REG.result ? { ...REG.result, markedTf: REG.markedTf, joint: REG.joint || null, regulons: REG.data?.meta || null } : null,
+      metMap: { exo: EXO.manual ? [...EXO.manual] : [], mtb: MTB.manual ? [...MTB.manual] : [] } };
+  }
   const steadyTracer = !!f.e && S.result.frames.length === 1;
   const ds = dynSampler(), fi = Math.min(S.frameIdx, S.result.frames.length - 1);
   const modelLabel = $("modelSelect").selectedOptions[0]?.text || S.slug;
@@ -4788,12 +4950,21 @@ function exportContext() {
     events: (S.result.evList || []).map((ev) => (ev.type === "medium" ? { time_h: ev.t, type: "replace_medium", medium: mediumName(ev.mediumId) } : { time_h: ev.t, type: "add", metabolite: S.index.metName(ev.met), concentration_mM: ev.conc, labelled_atoms: ev.label ? Array.from(ev.label, (x, a) => (x > 0 ? a : -1)).filter((a) => a >= 0) : [], fraction: ev.fraction })), canvas: S.view.kind === "list" ? null : $("map"),
     selectedMet: S.sel?.type === "met" ? S.sel.met : null,
     flowsFor: (kind) => frameFlows(f, kind, S.index.pathwayGroups), thermo: S.flowData.hasDG ? { dG: S.flowData.dG, sd: S.flowData.dGsd, cond: S.base.thermo.cond } : null,
+    // What the Interpret tab holds. Each is null when that analysis has not been run, and every dataset
+    // that uses it declares `when`, so nothing new appears in the dialog for a user who loaded no omics.
+    exo: EXO.rates?.length ? { condition: $("exoCond")?.value || "", rates: EXO.rates, fit: EXO.fit, growth: EXO.growth,
+      gdwPerCell: +$("exoGdw")?.value || null, unmapped: EXO.rates.filter((r) => r.met === undefined).map((r) => r.name) } : null,
+    mtb: MTB.result ? { ...MTB.result, unmapped: MTB.result.unresolved || [], manual: MTB.manual || null } : null,
+    reg: REG.result ? { ...REG.result, markedTf: REG.markedTf, joint: REG.joint || null, regulons: REG.data?.meta || null } : null,
+    metMap: { exo: EXO.manual ? [...EXO.manual] : [], mtb: MTB.manual ? [...MTB.manual] : [] },
     ...session, compare: compare.exportData(),
     caption: `${modelLabel} · ${mediumName(S.mediumId)} · ${S.result.frames.length > 1 ? "dynamic, t = " + fmtTime(f.t) : "steady state"}`,
   };
 }
 
-const EXP_NEEDS = { modelEdits: "edits", editLog: "edits", cmpExchanges: "compare", cmpPathways: "compare", cmpLabel: "compare", cmpMids: "compareLabel", changes: "ref", chartChanges: "ref", enrichment: "tracer", chartFate: "tracer", isotopologues: "tracer", chartMid: "tracer", midTimecourse: "metdyn", timecourse: "dynamic", timecourseLabel: "dynamic", chartTime: "dynamic" };
+const EXP_NEEDS = { modelEdits: "edits", editLog: "edits", cmpExchanges: "compare", cmpPathways: "compare", cmpLabel: "compare", cmpMids: "compareLabel", changes: "ref", chartChanges: "ref", enrichment: "tracer", chartFate: "tracer", isotopologues: "tracer", chartMid: "tracer", midTimecourse: "metdyn", timecourse: "dynamic", timecourseLabel: "dynamic", chartTime: "dynamic",
+  exoRates: "exo", exoFit: "exoFit", mtbContrast: "mtb", mtbSteps: "mtb", mtbRatios: "mtb",
+  tfTable: "reg", tfTargets: "reg", tfRegulon: "regMark", metMap: "metMap" };
 
 function openExport() {
   const list = $("expList"), go = $("expGo"), f = frame();

@@ -587,4 +587,6 @@ details.sec2[open] > summary { color: var(--text); margin-bottom: 6px; }
 .reg-cov-bar i { display: block; height: 100%; background: var(--accent); }
 .reg-cov-bar.up i { background: var(--reg-up); }
 .reg-cov-bar.down i { background: var(--reg-down); }
-
+.reg-act.known { color: var(--muted); border: 1px solid var(--line); }
+.rna-chip.known { opacity: 0.78; }
+.hint.unlock { opacity: 0.72; font-style: italic; margin-top: 4px; }

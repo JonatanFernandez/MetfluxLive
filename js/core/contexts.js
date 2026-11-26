@@ -64,6 +64,31 @@ export function blockedReactions(model, off, opts = {}) {
 }
 
 /** Genes of a reaction's rule that are off in the context. */
+const offCountCache = new WeakMap();
+/**
+ * How many of the bundled contexts have each gene switched off.
+ *
+ * This is a property of the context files, not of anything the user loads, so a gene card can say "undetected
+ * in 340 of 1,413 cell types" the moment a model is open. One pass over the bitmasks, cached per context set.
+ * @returns { counts: Uint16Array (by gene index), total: number } or null
+ */
+export function geneOffCounts(ctxData, baseGenes) {
+  if (!ctxData?.contexts?.length || !baseGenes?.length) return null;
+  const hit = offCountCache.get(ctxData);
+  if (hit) return hit;
+  const counts = new Uint16Array(baseGenes.length);
+  let total = 0;
+  for (const ctx of ctxData.contexts) {
+    if (!ctx.off) continue;                       // user contexts and strains carry their own lists
+    total++;
+    const bin = atob(ctx.off);
+    for (let i = 0; i < baseGenes.length; i++) if (bin.charCodeAt(i >> 3) & (1 << (i & 7))) counts[i]++;
+  }
+  const out = { counts, total };
+  offCountCache.set(ctxData, out);
+  return out;
+}
+
 export function offGenesOf(rule, off) {
   return [...new Set((rule || "").match(/[^\s()]+/g) || [])].filter((g) => !/^(and|or)$/i.test(g) && off.has(g));
 }

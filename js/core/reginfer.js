@@ -1097,6 +1097,93 @@ export function pathwayRegulators(model, regResult, rnaSummary, v, rxns) {
   return out.slice(0, 5);
 }
 
+// ---------------------------------------------------------------- the regulon as plain knowledge ----
+// Which transcription factors are known to regulate a reaction's enzymes is a property of the regulon file,
+// not of anybody's experiment. It is available as soon as a model is loaded, and the functions below read it
+// without any RNA-seq.
+//
+// What differs without RNA-seq is the MEANING of the sign. The edge sign says the regulator activates or
+// represses that gene. Only a measured change in the regulator's activity turns that into a direction of
+// change for the reaction ("pushed up"), which is why nothing here claims one.
+
+/**
+ * A reverse index over data/<model>/regulons.json: for a gene, who regulates it; for a regulator, which
+ * reactions of this model its targets catalyse. Built once per model.
+ */
+export function buildRegulonIndex(model, regulons) {
+  if (!regulons?.tfs) return null;
+  const genes = regulons.genes || [];
+  const byGene = new Map();                       // gene (lowercase) -> [{ tf, sign }]
+  const genesOfTf = new Map();                    // tf -> [{ gene, sign }]
+  for (const [tf, flat] of regulons.tfs) {
+    const arr = [];
+    for (let k = 0; k < flat.length; k += 2) {
+      const gene = genes[flat[k]];
+      if (!gene) continue;
+      const sign = flat[k + 1];
+      arr.push({ gene, sign });
+      const key = gene.toLowerCase();
+      if (!byGene.has(key)) byGene.set(key, []);
+      byGene.get(key).push({ tf, sign });
+    }
+    genesOfTf.set(tf, arr);
+  }
+  // gene -> reactions, from the GPR rules, the same way the inference does it
+  const rxnsOfGene = new Map();
+  model.rxns.forEach((r, j) => {
+    if (!r.g || r.removed) return;
+    for (const g of new Set(r.g.match(/[^\s()]+/g).filter((x) => !/^(and|or)$/i.test(x)))) {
+      const key = g.toLowerCase();
+      if (!rxnsOfGene.has(key)) rxnsOfGene.set(key, []);
+      rxnsOfGene.get(key).push(j);
+    }
+  });
+  return { byGene, genesOfTf, rxnsOfGene, meta: regulons.meta || null, nTfs: regulons.tfs.length };
+}
+
+/**
+ * The regulators known to act on a reaction, through the genes of its GPR rule.
+ * @returns [{ tf, sign, genes: [{ gene, sign }] }] -- sign is +1 activates, -1 represses, 0 both
+ */
+export function regulatorsOfReaction(index, model, rxnIdx) {
+  const r = model.rxns[rxnIdx];
+  if (!index || !r?.g) return [];
+  const byTf = new Map();
+  for (const g of new Set(r.g.match(/[^\s()]+/g).filter((x) => !/^(and|or)$/i.test(x)))) {
+    for (const { tf, sign } of index.byGene.get(g.toLowerCase()) || []) {
+      if (!byTf.has(tf)) byTf.set(tf, { tf, sign, genes: [] });
+      const e = byTf.get(tf);
+      if (e.sign !== sign) e.sign = 0;            // it activates one subunit and represses another
+      e.genes.push({ gene: g, sign });
+    }
+  }
+  // most of the reaction's enzymes first: a regulator that touches every subunit matters more than one
+  // that touches a single isoenzyme of several
+  return [...byTf.values()].sort((a, b) => b.genes.length - a.genes.length);
+}
+
+/** The regulators known to act on one gene. @returns [{ tf, sign }] */
+export function regulatorsOfGene(index, gene) {
+  return (index?.byGene.get(String(gene).toLowerCase()) || []).slice();
+}
+
+/**
+ * Every reaction of this model that a regulator's targets catalyse, with the edge sign.
+ * @returns { rxns: Set, sign: Map<rxnIdx, +1|-1|0>, drivers: Map<rxnIdx, [{gene, regSign}]> }
+ */
+export function regulonReactions(index, tf) {
+  const out = { rxns: new Set(), sign: new Map(), drivers: new Map() };
+  for (const { gene, sign } of index?.genesOfTf.get(tf) || []) {
+    for (const j of index.rxnsOfGene.get(gene.toLowerCase()) || []) {
+      out.rxns.add(j);
+      out.sign.set(j, out.sign.has(j) && out.sign.get(j) !== sign ? 0 : sign);
+      if (!out.drivers.has(j)) out.drivers.set(j, []);
+      out.drivers.get(j).push({ gene, regSign: sign });
+    }
+  }
+  return out;
+}
+
 /** All transcriptionally active TFs targeting a specific reaction `rxnIdx` (even if its enzymes weren't in RNA-seq). */
 export function activeTfsForReaction(regResult, rxnIdx) {
   if (!regResult?.tfs?.length) return [];
