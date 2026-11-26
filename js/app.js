@@ -973,6 +973,17 @@ function demoApi() {
     },
     closeDialogs: async () => { closeAllDialogs(); await settle(); },
     fill: async (id, value) => { const el = $(id); if (el) { el.value = value; el.dispatchEvent(new Event("input", { bubbles: true })); } await settle(); },
+    // Same as fill, but the text comes from a file under data/demos/. A whole-genome RNA-seq table is 75 kB
+    // and does not belong inside the application bundle, where every reader would pay for it.
+    fillFrom: async (id, path) => {
+      const el = $(id);
+      if (!el) return;
+      const r = await fetch(path);
+      if (!r.ok) throw new Error(`${path}: ${r.status}`);
+      el.value = await r.text();
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      await settle();
+    },
     click: async (id) => { const el = $(id); if (el) el.click(); await settle(); await settle(); },
     loadRnaText: async (text, name) => { readRnaText(text, name || "sample.tsv"); await settle(); },
     setOverlay: async (on) => {

@@ -16,7 +16,7 @@
 export const ACTIONS = [
   "model", "medium", "measured", "context", "objective", "perturb", "clearPerturb",
   "tracer", "setConc", "selectMet", "run", "saveScenario", "compare",
-  "task", "open", "closeDialogs", "fill", "click", "loadRnaText", "setOverlay", "markTopTf",
+  "task", "open", "closeDialogs", "fill", "fillFrom", "click", "loadRnaText", "setOverlay", "markTopTf",
 ];
 
 // A 48 h course of HEK293 in a 20 mL flask, built from the rates Dietmair et al. published in their
@@ -282,6 +282,53 @@ export const DEMOS = [
       { id: "demo.reg.4", sel: "#regOut", open: "reg" },
       { id: "demo.reg.5", sel: "#map", task: "data", open: "" },
       { id: "demo.reg.6", sel: "#secRna", task: "data", open: "" },
+    ],
+  },
+  {
+    // The only fully paired multi-omic experiment we could find where both halves are public, from the same
+    // laboratory, on the same strains, under the same conditions -- and where the sample names even match.
+    // Its value as a worked example is the control built into the design: each double mutant lacks two of
+    // the three global anaerobic regulators, so the right answer differs in each contrast and is falsifiable.
+    id: "multi",
+    needs: { model: "ecoli-gem" },
+    docs: "regulators",
+    cite: "Anaerobic double mutants of E. coli K-12 MG1655 from the Systems Biology and Metabolic Engineering Laboratory, IIT Bombay: RNA-seq (NCBI GEO GSE195954) and intracellular metabolomics (Metabolomics Workbench ST002076) of the same strains, grown together in glucose minimal medium under anaerobic fermentation. Shown here as ΔarcA ΔihfA against the wild type.",
+    actions: [
+      ["closeDialogs"],
+      ["model", "ecoli-gem"],
+      ["task", "sim"],
+      ["context", "strain:MG1655", "complex"],
+      ["medium", "m9glcAnaer"],
+      ["measured", "ecoliGlcAnaer"],
+      ["objective", "biomass"],
+      ["clearPerturb"],
+      ["run"],
+      ["task", "data"],
+      // metabolomics first: the contrast is what the regulatory read is later paired against
+      ["open", "mtb"],
+      ["fillFrom", "mtbText", "data/demos/ecoli_arcA_ihf_metabolomics.tsv"],
+      ["fill", "mtbPatA", "arcA_ihf"],
+      ["fill", "mtbPatB", "wildtype"],
+      ["click", "mtbRun"],
+      ["setOverlay", true],
+      ["closeDialogs"],
+      // then the whole transcriptome of the same samples
+      ["open", "reg"],
+      ["fillFrom", "regText", "data/demos/ecoli_arcA_ihf_rnaseq.tsv"],
+      ["click", "regRun"],
+      ["markTopTf"],
+    ],
+    steps: [
+      { id: "demo.multi.0", sel: "#secMedium", task: "sim" },
+      { id: "demo.multi.1", sel: "#secMeasured", task: "sim" },
+      { id: "demo.multi.2", sel: "#mtbOpen", task: "data", open: "" },
+      { id: "demo.multi.3", sel: "#mtbText", open: "mtb" },
+      { id: "demo.multi.4", sel: "#mtbOut", open: "mtb" },
+      { id: "demo.multi.5", sel: "#regText", open: "reg" },
+      { id: "demo.multi.6", sel: "#regOut", open: "reg" },
+      { id: "demo.multi.7", sel: "#regOut", open: "reg" },
+      { id: "demo.multi.8", sel: "#map", task: "data", open: "" },
+      { id: "demo.multi.9", sel: "#details", task: "data", open: "" },
     ],
   },
 ];
