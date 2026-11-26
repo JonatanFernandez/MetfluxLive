@@ -4038,8 +4038,17 @@ function cofactorHtml(f) {
 const fmtFc = (x) => (Math.abs(x) < 0.005 ? "0.00" : (x > 0 ? "+" : "−") + Math.abs(x).toFixed(2));
 
 function regulonSummaryHtml(f) {
-  const e = REG.result?.tfs.find((x) => x.tf === REG.markedTf);
-  if (!e || !REG.markedRxns?.size) return "";
+  if (!REG.markedTf || !REG.markedRxns?.size) return "";
+  // A regulon can be marked without any RNA-seq, straight from the curated network. Then there is no
+  // inference entry to read, so one is built from the regulon file, and `stat` tells the rest of this
+  // function to speak of activation and repression rather than of a direction of change.
+  const stat = !!REG.markedStatic;
+  const e = stat
+    ? (() => { const rr = regulonReactions(REG.index, REG.markedTf);
+        return { tf: REG.markedTf, metRxns: rr.rxns, metRxnDir: rr.sign, rxnDrivers: rr.drivers,
+          metGenes: [], nMetTargets: rr.rxns.size, zRna: NaN, qRna: NaN }; })()
+    : REG.result?.tfs.find((x) => x.tf === REG.markedTf);
+  if (!e) return "";
   const { model } = S, dir = REG.markedRxns;
   let up = 0, down = 0, unclear = 0;
   for (const j of dir) { const d = e.metRxnDir?.get(j); if (d > 0) up++; else if (d < 0) down++; else unclear++; }
@@ -4869,7 +4878,18 @@ function renderDetails() {
   map.marks = geneSel ? new Set(S.search.geneRxns.get(sel.sym) || []) : (REG.markedRxns || null);
   // direction only for a regulon: a gene's own reactions have no up or down
   map.markDir = geneSel ? null : (REG.markedTf ? REG.result?.tfs.find((x) => x.tf === REG.markedTf)?.metRxnDir || null : null);
-  box.innerHTML = !sel ? summaryHtml() : sel.type === "met" ? metHtml(sel.met) : sel.type === "rxn" ? rxnHtml(sel.rxn) : sel.type === "sub" ? subHtml(sel.ss) : sel.type === "grp" ? grpHtml(sel.g) : geneHtml(sel.sym);
+  // One panel must not be able to strand the reader. The markup is built first and assigned afterwards: if
+  // building it throws, the old content would otherwise stay on screen and every link in it -- including
+  // "back to summary" -- would look dead, because the handler had already thrown. A visible note and a
+  // console trace are far better than a sidebar that silently stops responding.
+  let html;
+  try {
+    html = !sel ? summaryHtml() : sel.type === "met" ? metHtml(sel.met) : sel.type === "rxn" ? rxnHtml(sel.rxn) : sel.type === "sub" ? subHtml(sel.ss) : sel.type === "grp" ? grpHtml(sel.g) : geneHtml(sel.sym);
+  } catch (err) {
+    console.error("renderDetails:", err);
+    html = `<div class="note err">${t("det.failed", { msg: esc(err?.message || String(err)) })}</div>`;
+  }
+  box.innerHTML = html;
   if (sel) {
     const back = document.createElement("div");
     back.className = "meta"; back.innerHTML = `<span class="linkish">${t("back")}</span>`;

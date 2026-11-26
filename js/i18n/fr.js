@@ -1354,7 +1354,7 @@ export default {
   "exp.na.regMark": "nécessite un régulon marqué sur la carte",
   "exp.na.metMap": "nécessite au moins un métabolite associé à la main",
 
-  "demo.multi.title": "Deux omiques des mêmes cellules : délétions de régulateurs chez E. coli anaérobie",
+  "demo.multi.title": "7. Deux omiques des mêmes cellules : délétions de régulateurs chez E. coli anaérobie",
   "demo.multi.what": "RNA-seq du transcriptome entier et métabolomique intracellulaire des mêmes cultures, utilisés ensemble pour demander quels régulateurs expliquent l'état métabolique.",
   "tour.demo.multi.0.t": "Le milieu est celui où elles ont poussé",
   "tour.demo.multi.0.b": "Glucose minimal, anaérobie. C'est essentiel : les trois régulateurs que cette expérience supprime — FNR, ArcA et IHF — gouvernent le métabolisme anaérobie, donc sous oxygène il n'y aurait rien à voir.",
@@ -1376,4 +1376,5 @@ export default {
   "tour.demo.multi.8.b": "Les métabolites mesurés portent leur changement, et le régulon marqué entoure les réactions que catalysent ses cibles. Là où les deux concordent l'hypothèse est plus forte ; là où elles divergent, voilà ce qui mérite une expérience.",
   "tour.demo.multi.9.t": "Ce que cela ne peut pas dire",
   "tour.demo.multi.9.b": "Avec 21 métabolites, les chaînes à trois étapes FT → ARNm → métabolite ressortent vides : il leur faut un gène dont l'ARNm a bougé et dont le métabolite a été mesuré, et cette intersection est ici presque vide. Le classement des régulateurs tient ; les chaînes causales exigent un panel plus riche.",
+  "det.failed": "Ce panneau n'a pas pu être construit : {msg}. Le reste de l'application fonctionne toujours ; la console du navigateur contient les détails.",
 };

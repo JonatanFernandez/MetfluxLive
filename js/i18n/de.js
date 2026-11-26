@@ -1354,7 +1354,7 @@ export default {
   "exp.na.regMark": "benötigt ein auf der Karte markiertes Regulon",
   "exp.na.metMap": "benötigt mindestens einen von Hand zugeordneten Metaboliten",
 
-  "demo.multi.title": "Zwei Omics derselben Zellen: Regulator-Knockouts in anaerober E. coli",
+  "demo.multi.title": "7. Zwei Omics derselben Zellen: Regulator-Knockouts in anaerober E. coli",
   "demo.multi.what": "RNA-Seq des gesamten Transkriptoms und intrazelluläre Metabolomik derselben Kulturen, gemeinsam genutzt, um zu fragen, welche Regulatoren den Stoffwechselzustand erklären.",
   "tour.demo.multi.0.t": "Das Medium ist jenes, in dem sie wuchsen",
   "tour.demo.multi.0.b": "Glukose-Minimalmedium, anaerob. Das ist wesentlich: Die drei Regulatoren, die dieses Experiment entfernt — FNR, ArcA und IHF —, steuern den anaeroben Stoffwechsel, unter Sauerstoff gäbe es also nichts zu sehen.",
@@ -1376,4 +1376,5 @@ export default {
   "tour.demo.multi.8.b": "Gemessene Metaboliten tragen ihre Veränderung, und das markierte Regulon umringt die Reaktionen, die seine Zielgene katalysieren. Wo beide übereinstimmen, ist die Hypothese stärker; wo sie sich widersprechen, lohnt sich ein Experiment.",
   "tour.demo.multi.9.t": "Was das nicht sagen kann",
   "tour.demo.multi.9.b": "Mit 21 Metaboliten bleiben die dreistufigen Ketten TF → mRNA → Metabolit leer: Sie brauchen ein Gen, dessen mRNA sich bewegt hat und dessen Metabolit gemessen wurde, und diese Schnittmenge ist hier fast leer. Die Rangfolge der Regulatoren bleibt; die kausalen Ketten brauchen ein reicheres Panel.",
+  "det.failed": "Dieses Panel konnte nicht erstellt werden: {msg}. Der Rest der Anwendung funktioniert weiterhin; Einzelheiten stehen in der Browser-Konsole.",
 };

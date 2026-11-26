@@ -1354,7 +1354,7 @@ export default {
   "exp.na.regMark": "richiede un regulone marcato sulla mappa",
   "exp.na.metMap": "richiede almeno un metabolita mappato a mano",
 
-  "demo.multi.title": "Due omiche delle stesse cellule: delezioni di regolatori in E. coli anaerobia",
+  "demo.multi.title": "7. Due omiche delle stesse cellule: delezioni di regolatori in E. coli anaerobia",
   "demo.multi.what": "RNA-seq dell'intero trascrittoma e metabolomica intracellulare delle stesse colture, usati insieme per chiedere quali regolatori spiegano lo stato metabolico.",
   "tour.demo.multi.0.t": "Il terreno è quello in cui sono cresciute",
   "tour.demo.multi.0.b": "Glucosio minimo, anaerobio. È essenziale: i tre regolatori che questo esperimento elimina — FNR, ArcA e IHF — governano il metabolismo anaerobio, quindi in presenza di ossigeno non ci sarebbe nulla da vedere.",
@@ -1376,4 +1376,5 @@ export default {
   "tour.demo.multi.8.b": "I metaboliti misurati portano il loro cambiamento, e il regulone marcato cerchia le reazioni catalizzate dai suoi bersagli. Dove le due concordano l'ipotesi è più solida; dove divergono, è lì che serve un esperimento.",
   "tour.demo.multi.9.t": "Ciò che questo non può dirti",
   "tour.demo.multi.9.b": "Con 21 metaboliti le catene a tre passaggi TF → mRNA → metabolita risultano vuote: servono un gene il cui mRNA si sia mosso e il cui metabolita sia stato misurato, e qui quell'intersezione è quasi nulla. L'ordine dei regolatori regge; le catene causali richiedono un pannello più ricco.",
+  "det.failed": "Non è stato possibile costruire questo pannello: {msg}. Il resto dell'applicazione continua a funzionare; i dettagli sono nella console del browser.",
 };
