@@ -590,3 +590,17 @@ details.sec2[open] > summary { color: var(--text); margin-bottom: 6px; }
 .reg-act.known { color: var(--muted); border: 1px solid var(--line); }
 .rna-chip.known { opacity: 0.78; }
 .hint.unlock { opacity: 0.72; font-style: italic; margin-top: 4px; }
+/* ---- sidebar hierarchy: summary > pathway or regulon > reaction > metabolite ---- */
+.sel-trail { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; font-size: 12px; margin-bottom: 6px; }
+.sel-trail .sep { color: var(--muted); opacity: 0.7; }
+.sel-trail .linkish:last-child { color: var(--muted); }
+/* regulators of a reaction, one line per direction */
+.tf-line { display: flex; align-items: baseline; gap: 6px; margin: 2px 0; flex-wrap: wrap; }
+.tf-line .tf-lbl { font-size: 11px; color: var(--muted); white-space: nowrap; }
+/* named, expandable routes of a regulon */
+.reg-routes button { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; }
+.reg-routes .rt-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rt-n { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rt-list { margin: 2px 0; }
+.rt-list > summary { cursor: pointer; font-size: 12px; padding: 2px 0; display: flex; gap: 6px; align-items: baseline; }
+.rt-list > summary::marker { color: var(--muted); }

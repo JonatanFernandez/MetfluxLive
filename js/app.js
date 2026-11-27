@@ -586,10 +586,20 @@ const drawable = (ss) => !!S.layout.subs[ss];
 
 // History of views (pathway, global, centred view) with their selection and camera: back / forward.
 const NAV = { back: [], fwd: [], restoring: false };
-const navState = () => ({ view: { ...S.view }, sel: S.sel ? { ...S.sel } : null, cam: { ...map.cam } });
+let SEL_TRAIL = [];   // the sidebar breadcrumb; declared here because navState() captures it
+// Two different questions, two different controls. The breadcrumb answers "what is this inside of?" and
+// walks the hierarchy. Back and forward answer "where was I a moment ago?" and walk time -- which is the
+// only way to undo a sideways move, such as leaving a pathway for a regulon, or to return to the previous
+// reaction after zooming into another one. The history carries the breadcrumb so the two never disagree.
+const navState = () => ({ view: { ...S.view }, sel: S.sel ? { ...S.sel } : null, cam: { ...map.cam }, trail: SEL_TRAIL.slice() });
+const sameNavState = (a, b) => a && b && a.view?.kind === b.view?.kind && a.view?.ss === b.view?.ss
+  && a.view?.center?.ref === b.view?.center?.ref
+  && JSON.stringify(a.sel || null) === JSON.stringify(b.sel || null);
 function navPush() {
   if (NAV.restoring || !S.model || !S.view) return;
-  NAV.back.push(navState());
+  const st = navState();
+  if (sameNavState(NAV.back[NAV.back.length - 1], st)) return;   // gotoReaction() arrives twice per click
+  NAV.back.push(st);
   if (NAV.back.length > 60) NAV.back.shift();
   NAV.fwd = [];
   renderNavBtns();
@@ -610,6 +620,7 @@ function navGo(dir) {
       } else openFocus(v.center);
     } else openSubsystem(v.ss, true, v.grp ?? null);
     S.sel = st.sel;
+    SEL_TRAIL = st.trail ? st.trail.slice() : [];
     map.cam = { ...st.cam }; map.camTarget = null;
     applyGhosts();
     if (st.sel?.type === "met" || st.sel?.type === "rxn") map.selected = map.findNode(st.sel.type === "met" ? 0 : 1, st.sel.type === "met" ? st.sel.met : st.sel.rxn);
@@ -636,7 +647,13 @@ function goToPathwayOf(j) {
 function applyGhosts(force = false) {
   const cur = map.scene, base = cur.ghostBase || cur, f = frame();
   let m = null;
-  if (S.view.kind === "sub" && S.sel?.type === "met" && f && base.nodes.some((n) => n.type === 0 && n.ref === S.sel.met)) m = S.sel.met;
+  // Which views may fan out a metabolite's other reactions. A pathway may, and so may a regulon, where a
+  // metabolite at the edge of the stretch would otherwise look like a dead end -- the reactions that feed or
+  // drain it are exactly what you want to click on next. A metabolite-centred focus scene may not: it has
+  // already fanned them out by construction, and doing it twice would draw each one on top of itself.
+  const hosts = S.view.kind === "sub"
+    || (S.view.kind === "focus" && S.view.center?.type === "regulon");
+  if (hosts && S.sel?.type === "met" && f && base.nodes.some((n) => n.type === 0 && n.ref === S.sel.met)) m = S.sel.met;
   if (m === null) { if (cur.ghostBase) { map.setScene(base, true); map.selected = -1; applyFrame(); } return; }
   if (!force && cur.ghostBase && cur.ghostOf === m && cur.ghostResult === S.result && cur.ghostFrame === S.frameIdx) return;
   const { index, model } = S, inScene = new Set(base.nodes.filter((n) => n.type === 1).map((n) => n.ref));
@@ -1514,7 +1531,7 @@ function regMarkTf(tfName) {
     const best = [...counts].sort((a, b) => b[1] - a[1])[0];
     if (best) openSubsystem(best[0], true);
   }
-  S.sel = null;
+  S.sel = { type: "regulon", tf: entry.tf };   // its own view, with a way back to the summary
   map.marks = REG.markedRxns;
   map.markDir = entry.metRxnDir || null;
   applyFrame();
@@ -2174,6 +2191,7 @@ function openCtxMenu(node, x, y) {
 }
 
 function gotoReaction(j) {
+  descend();           // reached from a link inside the card being read
   S.sel = { type: "rxn", rxn: j };
   let i = map.findNode(1, j);
   if (i >= 0 && map.scene.nodes[i].ghost) i = -1;
@@ -2217,6 +2235,7 @@ function gotoGene(sym) {
 }
 
 function gotoMet(m) {
+  descend();           // reached from a link inside the card being read
   S.sel = { type: "met", met: m };
   if (map.scene.ghostBase) { map.setScene(map.scene.ghostBase, true); applyFrame(); }
   let i = map.findNode(0, m);
@@ -2253,7 +2272,15 @@ function onMapSelect(node) {
   if (node?.ghost) { goToPathwayOf(node.ref); return; } // a reaction of another pathway: go there
   // adaptive view: a click on a metabolite or reaction re-arranges the map around it
   if (S.adaptive && node && node.type < 2 && !(S.view.kind === "focus" && S.view.center.type === (node.type ? "rxn" : "met") && S.view.center.ref === node.ref)) { openFocus({ type: node.type ? "rxn" : "met", ref: node.ref }); return; }
-  if (!node) S.sel = S.view.kind === "sub" ? { type: "sub", ss: S.view.ss } : null;
+  // Clicking empty space deselects to whatever the map is showing: the pathway in a pathway view, the
+  // regulon in a regulon view. Dropping all the way to the model summary while a regulon is on screen
+  // contradicts the hierarchy the sidebar now shows.
+  resetTrail();        // a map click is a lateral move, not a step into the card being read
+  if (!node) {
+    S.sel = S.view.kind === "sub" ? { type: "sub", ss: S.view.ss }
+      : S.view.kind === "focus" && S.view.center?.type === "regulon" ? { type: "regulon", tf: S.view.center.ref }
+      : null;
+  }
   else if (node.type === 0) S.sel = { type: "met", met: node.ref };
   else if (node.type === 1) S.sel = { type: "rxn", rxn: node.ref };
   else S.sel = map.scene.cell ? { type: "grp", g: node.ref } : { type: "sub", ss: node.ref };
@@ -3464,6 +3491,68 @@ function bars(rows, color, wide = false) {
   return rows.map(([label, val, key, share]) => `<div class="bar-row${wide ? " wide" : ""}" data-go="${key}"><span class="nm" title="${esc(label)}">${esc(label)}</span><span class="val">${val}</span><div class="bar"><i style="width:${Math.max(1.5, 100 * share)}%;background:${color}"></i></div></div>`).join("");
 }
 
+// --------------------------------------------------------- sidebar breadcrumb ----
+// The cards form a hierarchy -- summary, then a pathway or a regulon, then a reaction, then a metabolite --
+// but selecting one used to replace the last, so descending into a reaction from a regulon lost the regulon
+// and the only way back was the summary. SEL_TRAIL remembers the cards you came through.
+//
+// Only a DESCENT pushes: clicking a link inside the card you are reading. Any other way of selecting
+// (clicking the map, a search result) is a lateral move and clears the trail, because the card you land on
+// is not "inside" the one you were reading. Each descent records the card it is leaving at the moment it
+// leaves, so the sidebar can be redrawn any number of times afterwards without losing it -- which matters,
+// because gotoReaction() reaches it through openSubsystem() and the redraw happens twice for one click.
+/** Record the card being left, before S.sel moves into something inside it. */
+function descend() {
+  navPush();                                    // the card you are leaving is a place you can come back to
+  if (S.sel && SEL_TRAIL[SEL_TRAIL.length - 1] !== S.sel) SEL_TRAIL.push(S.sel);
+}
+/** A move that is not a descent: the new card is not inside the old one. */
+function resetTrail() { navPush(); SEL_TRAIL = []; }
+
+/** Select something that lives inside the card currently shown, keeping a way back to it. */
+function selectDown(sel) {
+  descend();
+  S.sel = sel;
+  renderDetails();
+}
+
+/** Go back up to a card in the trail (index) or, with -1, to the summary. */
+function selectUp(idx) {
+  navPush();                                    // climbing the breadcrumb is a move like any other
+  if (idx < 0) { SEL_TRAIL = []; S.sel = null; map.selected = -1; renderDetails(); return; }
+  const target = SEL_TRAIL[idx];
+  SEL_TRAIL = SEL_TRAIL.slice(0, idx);
+  S.sel = target;
+  if (target?.type === "rxn") map.selected = map.findNode(1, target.rxn);
+  else if (target?.type === "met") map.selected = map.findNode(0, target.met);
+  renderDetails();
+}
+
+/** A short name for a card, for the breadcrumb. */
+function selLabel(sel) {
+  if (!sel) return t("back");
+  const { model } = S;
+  switch (sel.type) {
+    case "rxn": return model.rxns[sel.rxn]?.n || model.rxns[sel.rxn]?.id || "";
+    case "met": return S.index.metName(sel.met);
+    case "sub": return model.subsystems[sel.ss] || "";
+    case "grp": return String(sel.g ?? "");
+    case "gene": return geneSymbol(sel.sym);
+    case "regulon": return sel.tf;
+    default: return "";
+  }
+}
+
+/** The trail above the current card: Summary / regulon / reaction ... */
+function trailHtml() {
+  const parts = [`<span class="linkish" data-up="-1">${esc(t("sum.title"))}</span>`];
+  SEL_TRAIL.forEach((sel, i) => {
+    const name = selLabel(sel);
+    if (name) parts.push(`<span class="linkish" data-up="${i}">${esc(name.length > 28 ? name.slice(0, 27) + "…" : name)}</span>`);
+  });
+  return `<div class="sel-trail">${parts.join('<span class="sep">›</span>')}</div>`;
+}
+
 function wireGo(root) {
   root.querySelectorAll("[data-go]").forEach((elx) => {
     elx.addEventListener("click", () => {
@@ -3473,7 +3562,7 @@ function wireGo(root) {
       else if (k === "met") gotoMet(+id);
       else if (k === "sub") openSubsystem(+id);
       else if (k === "base") gotoBase(+id);
-      else if (k === "gene") { S.sel = { type: "gene", sym: id }; renderDetails(); }
+      else if (k === "gene") selectDown({ type: "gene", sym: id });
     });
   });
 }
@@ -4037,6 +4126,97 @@ function cofactorHtml(f) {
  */
 const fmtFc = (x) => (Math.abs(x) < 0.005 ? "0.00" : (x > 0 ? "+" : "−") + Math.abs(x).toFixed(2));
 
+/**
+ * Metric cards for a SUBSET of the network, so that zooming into a regulon or a pathway stops reporting the
+ * whole model. A reader who has narrowed the view down to 40 reactions is asking about those 40; growth and
+ * the model-wide reaction count answer a question they did not ask, and reading them as if they described
+ * the subset is an easy mistake to make.
+ *
+ * @param rxns iterable of reaction indices
+ * @param f    the frame, or null when nothing has been solved
+ */
+function scopeCards(rxns, f) {
+  const list = [...rxns].filter((j) => S.model.rxns[j] && !S.model.rxns[j].removed);
+  if (!list.length) return "";
+  if (!f?.v) {
+    return `<div class="cards"><div class="card"><div class="lbl">${t("scope.reactions")}</div>`
+      + `<div class="big">${list.length}</div></div></div>`
+      + `<p class="hint">${t("scope.noRun")}</p>`;
+  }
+  let carried = 0, active = 0, maxAbs = 0, top = -1;
+  for (const j of list) {
+    const x = Math.abs(f.v[j]);
+    carried += x;
+    if (x > 1e-9) active++;
+    if (x > maxAbs) { maxAbs = x; top = j; }
+  }
+  let total = 0;
+  for (let j = 0; j < f.v.length; j++) total += Math.abs(f.v[j]);
+  const share = total > 0 ? (100 * carried) / total : 0;
+  // which pathways this subset falls in, busiest first: a regulon usually spans several
+  const bySs = new Map();
+  for (const j of list) {
+    const ss = S.model.rxns[j].ss;
+    if (!(ss >= 0)) continue;
+    bySs.set(ss, (bySs.get(ss) || 0) + Math.abs(f.v[j]));
+  }
+  const paths = [...bySs].filter(([, v]) => v > 1e-9).sort((a, b) => b[1] - a[1]).slice(0, 3)
+    .map(([ss]) => S.model.subsystems[ss]).filter(Boolean);
+  return `<div class="cards">`
+    + `<div class="card"><div class="lbl">${t("scope.active")}</div><div class="big">${active}<small>${t("sum.of", { n: list.length })}</small></div></div>`
+    + `<div class="card"><div class="lbl">${t("scope.flux")}</div><div class="big">${fmtFlux(carried)}<small>mmol/gDW/h</small></div></div>`
+    + `<div class="card"><div class="lbl">${t("scope.share")}</div><div class="big">${share < 0.1 && share > 0 ? "<0.1" : share.toFixed(1)}<small>%</small></div></div>`
+    + `</div>`
+    + (top >= 0 ? `<div class="meta">${t("scope.busiest")}: <span class="linkish" data-go="rxn:${top}">${esc(S.model.rxns[top].n)}</span> (${fmtFlux(maxAbs)})</div>` : "")
+    + (paths.length ? `<div class="meta">${t("scope.spans", { p: esc(paths.join(", ")) })}</div>` : "");
+}
+
+/** The marked regulon as a view of its own: only its reactions, and metrics scoped to them. */
+function regulonHtml(tf) {
+  const f = frame();
+  const body = regulonSummaryHtml(f);
+  if (!body) return `<div class="kind">${t("reg.kind")}</div><h3>${esc(tf)}</h3><div class="note">${t("reg.gone")}</div>`;
+  return `<div class="kind">${t("reg.kind")}</div><h3>${esc(tf)}</h3>`
+    + scopeCards(REG.markedRxns || [], f)
+    + body;
+}
+
+/**
+ * A name for a contiguous route of a regulon.
+ *
+ * Preference: the pathway its reactions mostly belong to, when most of them agree, because that is a name
+ * the reader already knows. Otherwise the route is named by where it starts and where it ends -- the
+ * metabolite only produced in it and the one only consumed -- which reads like the chemistry it is
+ * ("calcidiol -> 25-hydroxyvitamin D3-26,23-lactone"). Failing both, its busiest reaction.
+ */
+function routeName(rxns) {
+  const { model, index } = S;
+  const list = [...rxns];
+  if (!list.length) return "";
+  const bySs = new Map();
+  for (const j of list) { const ss = model.rxns[j].ss; if (ss >= 0) bySs.set(ss, (bySs.get(ss) || 0) + 1); }
+  const top = [...bySs].sort((a, b) => b[1] - a[1])[0];
+  if (top && top[1] / list.length >= 0.6 && model.subsystems[top[0]]) return model.subsystems[top[0]];
+
+  // ends of the stretch: non-currency metabolites that only enter it, and that only leave it
+  const made = new Map(), used = new Map();
+  for (const j of list) {
+    const r = model.rxns[j], v = frame()?.v ? frame().v[j] : 1;
+    r.m.forEach((m, q) => {
+      if (index.currency[model.mets[m].b]) return;
+      const produced = (r.c[q] > 0) === (v >= 0);
+      (produced ? made : used).set(m, (produced ? made : used).get(m) || 0);
+    });
+  }
+  const starts = [...used.keys()].filter((m) => !made.has(m));
+  const ends = [...made.keys()].filter((m) => !used.has(m));
+  if (starts.length && ends.length) {
+    return `${index.metName(starts[0]).replace(/\s*\[[^\]]*\]$/, "")} → ${index.metName(ends[0]).replace(/\s*\[[^\]]*\]$/, "")}`;
+  }
+  const busiest = list.slice().sort((a, b) => Math.abs(frame()?.v?.[b] ?? 0) - Math.abs(frame()?.v?.[a] ?? 0))[0];
+  return model.rxns[busiest]?.n || "";
+}
+
 function regulonSummaryHtml(f) {
   if (!REG.markedTf || !REG.markedRxns?.size) return "";
   // A regulon can be marked without any RNA-seq, straight from the curated network. Then there is no
@@ -4064,7 +4244,8 @@ function regulonSummaryHtml(f) {
 
   // Static: the sign is what the curated network says the factor does to those genes. Inferred: the sign is
   // the direction this reaction is pushed, which needs a measured change in the factor's activity.
-  let h = `<h4>${t("reg.sumTitle")}${small(esc(e.tf))}</h4>`;
+  // In its own view the name is the heading already (regulonHtml), so this one would just repeat it.
+  let h = S.sel?.type === "regulon" ? "" : `<h4>${t("reg.sumTitle")}${small(esc(e.tf))}</h4>`;
   if (stat) {
     h += `<div class="reg-head"><span class="reg-act known">${t("reg.act.known")}</span></div>`
       + `<div class="reg-counts"><span class="reg-up">+ ${t("reg.nActivates", { n: up })}</span>`
@@ -4087,13 +4268,26 @@ function regulonSummaryHtml(f) {
   // Ad-hoc contiguous route selector when the regulon spans multiple connected stretches
   if (REG.routes && (REG.routes.routes.length > 1 || (REG.routes.routes.length >= 1 && REG.routes.scattered.length))) {
     const inReg = S.view.center?.type === "regulon";
-    const pills = REG.routes.routes.slice(0, 6).map((rt, idx) =>
-      `<button data-regroute="${idx}" class="${inReg && REG.routeIdx === idx ? "on" : ""}">${t("reg.route", { i: idx + 1, n: rt.length })}</button>`
-    );
+    // Named, and each one opens into the reactions it holds, because "Route 2" tells the reader nothing.
+    const pills = REG.routes.routes.slice(0, 6).map((rt, idx) => {
+      const nm = routeName(rt);
+      return `<button data-regroute="${idx}" class="${inReg && REG.routeIdx === idx ? "on" : ""}" title="${esc(t("reg.route", { i: idx + 1, n: rt.length }))}">`
+        + `<span class="rt-name">${esc(nm || t("reg.route", { i: idx + 1, n: rt.length }))}</span>`
+        + `<span class="rt-n">${rt.length}</span></button>`;
+    });
     if (REG.routes.scattered.length) {
       pills.push(`<button data-regroute="scattered" class="${inReg && REG.routeIdx === "scattered" ? "on" : ""}">${t("reg.scattered", { n: REG.routes.scattered.length })}</button>`);
     }
-    h += `<div class="reg-routes">${pills.join("")}</div><p class="hint">${t("reg.routesHint")}</p>`;
+    h += `<h4>${t("reg.routesTitle", { n: REG.routes.routes.length })}</h4>`
+      + `<div class="reg-routes">${pills.join("")}</div>`
+      + REG.routes.routes.slice(0, 6).map((rt, idx) =>
+          `<details class="rt-list" data-rtdetail="${idx}"><summary>${esc(routeName(rt) || t("reg.route", { i: idx + 1, n: rt.length }))}`
+          + `<span class="rt-n">${rt.length}</span></summary><div class="reg-list">`
+          + rt.slice(0, 40).map((j) => `<div class="reg-row" data-regrxn="${j}"><span class="nm">${esc(S.model.rxns[j].n || S.model.rxns[j].id)}</span>`
+              + `<span class="val">${f?.v ? fmtFlux(f.v[j]) : ""}</span></div>`).join("")
+          + (rt.length > 40 ? `<div class="hint">${t("reg.more", { n: rt.length - 40 })}</div>` : "")
+          + `</div></details>`).join("")
+      + `<p class="hint">${t("reg.routesHint")}</p>`;
   }
 
   // the flux axis, when one was supplied
@@ -4293,7 +4487,12 @@ function summaryHtml() {
       <div class="card"><div class="lbl">${t("sum.active")}</div><div class="big">${active}<small>${t("sum.of", { n: model.rxns.length })}</small></div></div>
       ${f.biomass ? `<div class="card"><div class="lbl">${t("sum.biomass")}</div><div class="big">${f.biomass.toFixed(2)}<small>gDW/L</small></div></div>` : ""}
     </div>`;
-  if (REG.markedTf) h += regulonSummaryHtml(f);
+  // A marked regulon is its own view now, not an appendix to the model summary: see regulonHtml(). All the
+  // summary says is that one is marked, with a way back into it.
+  if (REG.markedTf) {
+    h += `<h4>${t("reg.sumTitle")}</h4><p class="meta"><span class="linkish" data-openreg="1">`
+      + `${esc(t("reg.openMarked", { tf: REG.markedTf, n: REG.markedRxns?.size || 0 }))}</span></p>`;
+  }
   if (REG.rnaSummary) h += rnaOverviewHtml(f);
   if (S.result.evList?.length) {
     h += `<h4>${t("sum.events")}</h4><div class="evlist">${S.result.evList.map((ev) => `<div class="${f.t > ev.t ? "done" : ""}">${esc(ev.type === "medium" ? t("sum.evMedium", { t: fmtTime(ev.t), name: mediumName(ev.mediumId) }) : t("sum.evAdd", { t: fmtTime(ev.t), c: ev.conc, name: eventName(ev) }))}</div>`).join("")}</div>`;
@@ -4627,17 +4826,25 @@ function rxnHtml(j) {
     .sort((a, b) => (b.live ? Math.abs(b.live.zRna) + 1e6 : 0) - (a.live ? Math.abs(a.live.zRna) + 1e6 : 0)
       || b.genes.length - a.genes.length)
     .slice(0, 8);
+  // Two lines rather than one chip per row: which factors push this step up, and which hold it down. The
+  // +/- on each chip is redundant with the line it sits on, and that redundancy is deliberate -- the chips
+  // are also read one at a time, from their tooltips.
+  const chipOf = (x) => {
+    const d = x.live ? x.live.dir : 0;
+    const c = x.live ? (d > 0 ? " up" : d < 0 ? " down" : "") : " known";
+    const mark = x.live ? (d > 0 ? "&uarr;" : d < 0 ? "&darr;" : "&middot;") : (x.sign > 0 ? "+" : x.sign < 0 ? "&minus;" : "&plusmn;");
+    const via = x.genes.slice(0, 3).map((g) => `${g.gene}${g.sign > 0 ? "+" : "\u2212"}`).join(", ");
+    const tip = (x.live ? `${x.tf} \u00b7 ${t("reg.tipActive", { t: x.live.zRna.toFixed(2) })}` : `${x.tf} \u00b7 ${t("reg.tipKnown")}`)
+      + (via ? ` \u00b7 ${via}` : "") + ` \u2014 ${t("reg.clickMarkTf")}`;
+    return `<span class="rna-chip${c}" data-marktf="${esc(x.tf)}" title="${esc(tip)}">${esc(x.tf)} ${mark}</span>`;
+  };
+  const dirOf = (x) => (x.live ? x.live.dir : x.sign);
+  const pos = rxnTfs.filter((x) => dirOf(x) > 0), neg = rxnTfs.filter((x) => dirOf(x) < 0);
+  const other = rxnTfs.filter((x) => dirOf(x) === 0);
+  const line = (label, arr) => (arr.length
+    ? `<div class="tf-line"><span class="tf-lbl">${label}</span><span class="rna-chips">${arr.map(chipOf).join("")}</span></div>` : "");
   const tfChipsHtml = rxnTfs.length
-    ? `<div class="rna-chips">${rxnTfs.map((x) => {
-        const d = x.live ? x.live.dir : 0;
-        const c = x.live ? (d > 0 ? " up" : d < 0 ? " down" : "") : " known";
-        // with activity: which way this reaction is pushed. Without it: whether the factor activates or represses.
-        const mark = x.live ? (d > 0 ? "&uarr;" : d < 0 ? "&darr;" : "&middot;") : (x.sign > 0 ? "+" : x.sign < 0 ? "&minus;" : "&plusmn;");
-        const via = x.genes.slice(0, 3).map((g) => `${g.gene}${g.sign > 0 ? "+" : "−"}`).join(", ");
-        const tip = (x.live ? `${x.tf} · ${t("reg.tipActive", { t: x.live.zRna.toFixed(2) })}` : `${x.tf} · ${t("reg.tipKnown")}`)
-          + (via ? ` · ${via}` : "") + ` — ${t("reg.clickMarkTf")}`;
-        return `<span class="rna-chip${c}" data-marktf="${esc(x.tf)}" title="${esc(tip)}">${esc(x.tf)} ${mark}</span>`;
-      }).join("")}</div>`
+    ? line(t("reg.lineUp"), pos) + line(t("reg.lineDown"), neg) + line(t("reg.lineMixed"), other)
     : "";
   if (rnaInfo) {
     const qTxt = Number.isFinite(rnaInfo.q) ? ` · q = ${rnaInfo.q < 1e-4 ? rnaInfo.q.toExponential(1) : rnaInfo.q.toFixed(3)}` : "";
@@ -4729,6 +4936,7 @@ function rxnListHtml(kind, title, rxns, ss, canOpen) {
     }
   }
   return `<div class="kind">${esc(kind)}</div><h3>${esc(title)}</h3>
+    ${scopeCards(rxns, f)}
     <div class="meta">${t("sub.meta", { n: rows.length, a: act.length })}${drawable(ss) ? "" : t("sub.listOnly")}</div>
     ${canOpen ? `<div class="actions"><button data-act="open">${t("sub.open")}</button></div>` : ""}
     <h4>${t("sub.top")}</h4>${bars(act.slice(0, 14).map(([n, v, k]) => [n, fmtFlux(v), k, v / mx]), "#4cc9f0") || `<p class="meta">${t("sub.none")}</p>`}
@@ -4884,21 +5092,34 @@ function renderDetails() {
   // console trace are far better than a sidebar that silently stops responding.
   let html;
   try {
-    html = !sel ? summaryHtml() : sel.type === "met" ? metHtml(sel.met) : sel.type === "rxn" ? rxnHtml(sel.rxn) : sel.type === "sub" ? subHtml(sel.ss) : sel.type === "grp" ? grpHtml(sel.g) : geneHtml(sel.sym);
+    html = !sel ? summaryHtml()
+      : sel.type === "met" ? metHtml(sel.met)
+      : sel.type === "rxn" ? rxnHtml(sel.rxn)
+      : sel.type === "sub" ? subHtml(sel.ss)
+      : sel.type === "grp" ? grpHtml(sel.g)
+      : sel.type === "regulon" ? regulonHtml(sel.tf)
+      : geneHtml(sel.sym);
   } catch (err) {
     console.error("renderDetails:", err);
     html = `<div class="note err">${t("det.failed", { msg: esc(err?.message || String(err)) })}</div>`;
   }
   box.innerHTML = html;
+  // No trail bookkeeping here on purpose. gotoReaction() reaches the sidebar through openSubsystem(), which
+  // renders too, so this function runs twice for one click; doing the bookkeeping here meant the second run
+  // wiped what the first had just recorded. Descents record themselves, at the moment they happen.
+  if (!sel) SEL_TRAIL = [];
   if (sel) {
-    const back = document.createElement("div");
-    back.className = "meta"; back.innerHTML = `<span class="linkish">${t("back")}</span>`;
-    back.onclick = () => { S.sel = null; map.selected = -1; renderDetails(); };
-    box.prepend(back);
+    const trail = document.createElement("div");
+    trail.className = "meta";
+    trail.innerHTML = trailHtml();
+    trail.querySelectorAll("[data-up]").forEach((el) => { el.onclick = () => selectUp(+el.dataset.up); });
+    box.prepend(trail);
   }
   wireGo(box);
+  const openReg = box.querySelector("[data-openreg]");
+  if (openReg) openReg.onclick = () => selectDown({ type: "regulon", tf: REG.markedTf });
   box.querySelectorAll("[data-regrxn]").forEach((el) => {
-    el.onclick = () => { S.sel = { type: "rxn", rxn: +el.dataset.regrxn }; map.selected = map.findNode(1, +el.dataset.regrxn); renderDetails(); };
+    el.onclick = () => { map.selected = map.findNode(1, +el.dataset.regrxn); selectDown({ type: "rxn", rxn: +el.dataset.regrxn }); };
   });
   box.querySelectorAll("[data-regroute]").forEach((el) => {
     el.onclick = () => {
